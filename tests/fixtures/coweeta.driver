@@ -1,0 +1,15 @@
+read path: fixtures/
+write path: results/
+read fname: coweeta
+write fname: coweeta_output
+channel heads fname: NULL
+surface_fitting_radius: 20
+print_slope: true
+write extension: bil
+print_smoothed_elevation: true
+print_aspect: true
+print_curvature: true
+print_planform_curvature: true
+print_profile_curvature: true
+print_tangential_curvature: true
+print_point_classification: true

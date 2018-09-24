@@ -1,0 +1,29 @@
+package:
+  name: lsdtopotools
+  version: "0.1"
+
+source:
+  path: ../..
+  # git_url: https://github.com/LSDtopotools/LSDTT_public.git
+  # git_rev: master
+
+build:
+  number: 0
+
+requirements:
+  build:
+    - cmake
+    - fftw
+  run:
+    - fftw
+
+test:
+  commands:
+    - lsdtt-basic-metrics
+    - lsdtt-channel-extraction
+    - lsdtt-chi-mapping
+
+about:
+  home: https://github.com/LSDtopotools/LSDTT_public
+  license: GPLv3
+  summary: 'Software for topographic analysis'

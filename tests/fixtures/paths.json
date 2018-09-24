@@ -1,0 +1,34 @@
+{
+  "aspect": {
+    "expected": "fixtures\/coweeta_output_ASPECT.bil",
+    "result": "results\/coweeta_output_ASPECT.bil"
+  },
+  "class": {
+    "expected": "fixtures\/coweeta_output_CLASS.bil",
+    "result": "results\/coweeta_output_CLASS.bil"
+  },
+  "curv": {
+    "expected": "fixtures\/coweeta_output_CURV.bil",
+    "result": "results\/coweeta_output_CURV.bil"
+  },
+  "plfmcurv": {
+    "expected": "fixtures\/coweeta_output_PLFMCURV.bil",
+    "result": "results\/coweeta_output_PLFMCURV.bil"
+  },
+  "profcurv": {
+    "expected": "fixtures\/coweeta_output_PROFCURV.bil",
+    "result": "results\/coweeta_output_PROFCURV.bil"
+  },
+  "slope": {
+    "expected": "fixtures\/coweeta_output_SLOPE.bil",
+    "result": "results\/coweeta_output_SLOPE.bil"
+  },
+  "smooth": {
+    "expected": "fixtures\/coweeta_output_SMOOTH.bil",
+    "result": "results\/coweeta_output_SMOOTH.bil"
+  },
+  "tancurv": {
+    "expected": "fixtures\/coweeta_output_TANCURV.bil",
+    "result": "results\/coweeta_output_TANCURV.bil"
+  }
+}
