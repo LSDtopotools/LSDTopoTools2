@@ -61,9 +61,9 @@
 // This object is written by
 // Simon M. Mudd, University of Edinburgh
 // David T. Milodowski, University of Edinburgh
-// Martin D. Hurst, British Geological Survey
-// Fiona Clubb, University of Edinburgh
-// Stuart Grieve, University of Edinburgh
+// Martin D. Hurst, University of Glasgow
+// Fiona Clubb, University of Potsdam
+// Stuart Grieve, Queen Mary University of London
 //
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
@@ -75,12 +75,6 @@
 // MASSIVE MERGE: Starting version 1.0.0 on 15/07/2013
 //
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-//-----------------------------------------------------------------
-//DOCUMENTATION URL: http://www.geos.ed.ac.uk/~s0675405/LSD_Docs/
-//-----------------------------------------------------------------
-
-
 
 #ifndef LSDRaster_CPP
 #define LSDRaster_CPP

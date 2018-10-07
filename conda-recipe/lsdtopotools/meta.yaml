@@ -17,12 +17,6 @@ requirements:
   run:
     - fftw
 
-# test:
-#   commands:
-#     - lsdtt-basic-metrics
-#     - lsdtt-channel-extraction
-#     - lsdtt-chi-mapping
-
 about:
   home: https://github.com/LSDtopotools/LSDTT_public
   license: GPLv3
