@@ -76,5 +76,5 @@ deploy:
   skip_cleanup: true
   local_dir: html/
   github_token: $GITHUB_API_KEY
-  # on:
-  #   branch: master
+  on:
+    branch: travis
