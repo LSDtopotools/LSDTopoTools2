@@ -3,7 +3,7 @@ package:
   version: "0.1"
 
 source:
-  path: ../..
+  path: ../../src/
   # git_url: https://github.com/LSDtopotools/LSDTT_public.git
   # git_rev: master
 
