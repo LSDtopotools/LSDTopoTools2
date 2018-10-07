@@ -64,17 +64,17 @@ script:
   - lsdtt-basic-metrics fixtures/ coweeta.driver
   - pytest -v
 
-# after_success:
-#   # Build the docs
-#   - pwd
-#   - cd ..
-#   - sh build_docs.sh
-#
-# # Deploy using travis builtin GitHub Pages support - only for changes to master
-# deploy:
-#   provider: pages
-#   skip_cleanup: true
-#   local_dir: html/
-#   github_token: $GITHUB_API_KEY
-#   on:
-#     branch: master
+after_success:
+  # Build the docs
+  - pwd
+  - cd ..
+  - sh build_docs.sh
+
+# Deploy using travis builtin GitHub Pages support - only for changes to master
+deploy:
+  provider: pages
+  skip_cleanup: true
+  local_dir: html/
+  github_token: $GITHUB_API_KEY
+  # on:
+  #   branch: master
