@@ -47,7 +47,8 @@ script:
   - source activate lsdtt
   - cd ..
   - sh testing_setup.sh
-  - lsdtt-basic-metrics tests/fixtures/ coweeta.driver
+  - cd tests/
+  - lsdtt-basic-metrics fixtures/ coweeta.driver
   - pytest -v
 
 after_success:
