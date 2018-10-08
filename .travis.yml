@@ -5,11 +5,13 @@ language:
 compiler:
   - gcc
 
-# services:
-#   - docker
 
 matrix:
   include:
+
+    services:
+      - docker
+      
     env: CONDA_FLAG=1
     env: CONDA_FLAG=0
 
