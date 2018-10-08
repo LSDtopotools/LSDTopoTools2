@@ -8,9 +8,10 @@ compiler:
 # services:
 #   - docker
 
-# matrix:
-#   include:
-#     env: CONDA_FLAG=1
+matrix:
+  include:
+    env: CONDA_FLAG=1
+    env: CONDA_FLAG=0
 
 # Install dependencies needed for docs
 addons:
@@ -21,39 +22,47 @@ addons:
       - doxygen-latex
       - doxygen-gui
       - graphviz
+  on:
+    condition:
+      CONDA_FLAG=1
 
-# Use conda to install LSDTT and create a virual environment
-install:
-  - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
-  - bash miniconda.sh -b -p $HOME/miniconda
-  - export PATH="$HOME/miniconda/bin:$PATH"
-  - hash -r
-  - conda config --set always_yes yes --set changeps1 no
-  - conda update -q conda
-  - conda install conda-build
-  - cd conda-recipe
-  - conda build lsdtopotools -c conda-forge
-  - conda create -n lsdtt lsdtopotools -c conda-forge --use-local
-  # Needed to run the tests
-  - conda install git pip pytest numpy
-  # From the rasterio docs
-  - sudo add-apt-repository ppa:ubuntugis/ppa -y
-  - sudo apt-get update -y
-  - sudo apt-get install gdal-bin libgdal-dev -y
-  - pip install rasterio
-
-# Activate the venv and run a driver
 script:
-  - source activate lsdtt
-  - cd ..
-  - sh testing_setup.sh
-  - cd tests/
-  - lsdtt-basic-metrics fixtures/ coweeta.driver
-  - pytest -v
+  - echo $CONDA_FLAG
 
-after_success:
-  # Build the docs
-  - sh build_docs.sh
+#
+#
+# # Use conda to install LSDTT and create a virual environment
+# install:
+#   - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+#   - bash miniconda.sh -b -p $HOME/miniconda
+#   - export PATH="$HOME/miniconda/bin:$PATH"
+#   - hash -r
+#   - conda config --set always_yes yes --set changeps1 no
+#   - conda update -q conda
+#   - conda install conda-build
+#   - cd conda-recipe
+#   - conda build lsdtopotools -c conda-forge
+#   - conda create -n lsdtt lsdtopotools -c conda-forge --use-local
+#   # Needed to run the tests
+#   - conda install git pip pytest numpy
+#   # From the rasterio docs
+#   - sudo add-apt-repository ppa:ubuntugis/ppa -y
+#   - sudo apt-get update -y
+#   - sudo apt-get install gdal-bin libgdal-dev -y
+#   - pip install rasterio
+#
+# # Activate the venv and run a driver
+# script:
+#   - source activate lsdtt
+#   - cd ..
+#   - sh testing_setup.sh
+#   - cd tests/
+#   - lsdtt-basic-metrics fixtures/ coweeta.driver
+#   - pytest -v
+#
+# after_success:
+#   # Build the docs
+#   - sh build_docs.sh
 
 # # Deploy using travis builtin GitHub Pages support - only for changes to master
 # deploy:
