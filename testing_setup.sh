@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -ev
 cd tests/
 mkdir results
 cd fixtures
