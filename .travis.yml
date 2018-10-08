@@ -1,19 +1,17 @@
 dist: trusty
 sudo: required
-language:
-  - cpp
-compiler:
-  - gcc
 
+
+# services:
+#   - docker
 
 matrix:
-  include:
-
-    services:
-      - docker
-      
-    env: CONDA_FLAG=1
-    env: CONDA_FLAG=0
+  language:
+    - cpp
+  compiler:
+    - gcc
+  env: CONDA_FLAG=1
+  env: CONDA_FLAG=0
 
 # Install dependencies needed for docs
 addons:
