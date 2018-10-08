@@ -6,10 +6,10 @@ sudo: required
 #   - docker
 
 matrix:
-  language:
-    - cpp
-  compiler:
-    - gcc
+  language: cpp
+  compiler: gcc
+  language: cpp
+  compiler: gcc
   env: CONDA_FLAG=1
   env: CONDA_FLAG=0
 
