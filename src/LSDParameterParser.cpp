@@ -890,17 +890,24 @@ string LSDParameterParser::check_for_path_and_add_read_path_if_required(string t
 {
   string sl_dot = "/";
   string new_string;
-
-  if (this_string.find(sl_dot) != std::string::npos)
+  
+  cout << "The string to check is: " << this_string << endl;
+  if (this_string == "NULL" || this_string == "null" || this_string == "Null")
   {
-    cout << "This filename includes a path. I am not going to modify it." << endl;
-  } 
+    new_string = "NULL";
+  }
   else
   {
-    cout << "This finlename doesn't have a path. I am adding the read path." << endl;
-    new_string = read_path+this_string;
-    cout << "The new filename is: " << new_string << endl;
-
+    if (this_string.find(sl_dot) != std::string::npos)
+    {
+      cout << "This filename includes a path. I am not going to modify it." << endl;
+    } 
+    else
+    {
+      cout << "This finlename doesn't have a path. I am adding the read path." << endl;
+      new_string = read_path+this_string;
+      cout << "The new filename is: " << new_string << endl;
+    }
   } 
 
   return new_string;
