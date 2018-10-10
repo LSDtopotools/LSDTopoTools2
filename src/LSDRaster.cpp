@@ -1774,7 +1774,16 @@ float LSDRaster::get_value_of_point(float UTME, float UTMN)
   if (is_in_raster)
   {
     get_row_and_col_of_a_point(UTME,UTMN,row, col);
-    this_value = RasterData[row][col];
+    //cout << "[R][C]: " << row << "," << col << endl;
+
+    if (row == NoDataValue || col == NoDataValue)
+    {
+      this_value = NoDataValue;
+    }
+    else
+    {
+      this_value = RasterData[row][col];
+    }
   }
 
   return this_value;
@@ -1971,7 +1980,7 @@ void LSDRaster::get_row_and_col_of_a_point(float X_coordinate,float Y_coordinate
 
   // Get row and column of point
   int col_point = int(X_coordinate_shifted_origin/DataResolution);
-  int row_point = (NRows - 1) - int(round(Y_coordinate_shifted_origin/DataResolution));
+  int row_point = (NRows - 1) - int(round(Y_coordinate_shifted_origin/DataResolution)-0.5);
 
   //cout << "Getting row and col, " << row_point << " " << col_point << endl;
 

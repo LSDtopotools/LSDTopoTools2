@@ -811,12 +811,15 @@ void LSDSpatialCSVReader::burn_raster_data_to_csv(LSDRaster& ThisRaster,string c
   }
   else
   {
-    //cout << "Let me get the x and y data." << endl;
+    cout << "Let me get the x and y data." << endl;
     get_x_and_y_from_latlong(UTME,UTMN);
+    cout << "Got the x and y" << endl;
+
     int n_nodes = int(UTME.size());
     for(int i = 0; i<n_nodes; i++)
     {
       stringstream s;
+      s.precision(9);
       this_UTME = UTME[i];
       this_UTMN = UTMN[i];
 

@@ -280,9 +280,10 @@ int main (int nNumberofArgs,char *argv[])
       cout << "I am burning the raster into the column header " << header_for_burn_data << endl;
       
       string full_csv_name = DATA_DIR+this_string_map["csv_to_burn_name"];
-      cout << "I am burning the raster to the csv file." << full_csv_name << endl;
+      cout << "I am burning the raster to the csv file: " << full_csv_name << endl;
       LSDSpatialCSVReader CSVFile(RI,full_csv_name);
 
+      cout << "Now let me burn that raster for you." << endl;
       CSVFile.burn_raster_data_to_csv(BurnRaster,header_for_burn_data);
 
       string full_burned_csv_name = OUT_DIR+OUT_ID+"_burned.csv";
