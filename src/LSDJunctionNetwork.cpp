@@ -6937,6 +6937,28 @@ int LSDJunctionNetwork::get_junction_of_nearest_channel_from_lat_long(double lat
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// Get upstream junction from lat long
+// FJC 27/09/18
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+int LSDJunctionNetwork::get_upstream_junction_from_lat_long(double latitude, double longitude, LSDFlowInfo& FlowInfo, LSDCoordinateConverterLLandUTM Converter)
+{
+  double this_Northing, this_Easting;
+  int UTM_zone;
+  bool is_North;
+  FlowInfo.get_UTM_information(UTM_zone, is_North);
+  int eId = 22;             // defines the ellipsiod. This is WGS
+  Converter.LLtoUTM_ForceZone(eId, latitude, longitude,
+                    this_Northing, this_Easting, UTM_zone);
+
+  int this_node = get_nodeindex_of_nearest_channel_for_specified_coordinates(this_Easting, this_Northing, 1, 5, FlowInfo);
+  int this_junc = find_upstream_junction_from_channel_nodeindex(this_node, FlowInfo);
+
+  return this_junc;
+
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // GET node index of nearest channel for specificed coordinates
 // For input coordinates (e.g. the location of a cosmogenic radionuclide sample), get the

@@ -703,8 +703,6 @@ int main (int nNumberofArgs,char *argv[])
         }
       }   // End print sources logic
       
-      cout << "WHAMMOOO!!!" << endl;
-      
       // Now we check if we are going to deal with basins
       if(this_bool_map["find_basins"] ||
          this_bool_map["print_chi_data_maps"])
@@ -739,6 +737,9 @@ int main (int nNumberofArgs,char *argv[])
           BaselevelJunctions_file = this_string_map["BaselevelJunctions_file"];
           cout << "The junctions file I am using is: " <<  BaselevelJunctions_file << endl;
         }
+        // now check to see if there is a full path
+        cout << endl << endl << "I need to check your baselevel junctions file, to see if it is in the correct path. " << endl;
+        BaselevelJunctions_file = LSDPP.check_for_path_and_add_read_path_if_required(BaselevelJunctions_file);
         
         // Now we try to get the basins using 
         //Check to see if a list of junctions for extraction exists
@@ -754,7 +755,7 @@ int main (int nNumberofArgs,char *argv[])
         else
         {
           cout << "I am attempting to read base level junctions from a base level junction list." << endl;
-          cout << "If this is not a simple text file that only contains itegers there will be problems!" << endl;
+          cout << "If this is not a simple text file that only contains integers there will be problems!" << endl;
       
           //specify junctions to work on from a list file
           //string JunctionsFile = DATA_DIR+BaselevelJunctions_file;

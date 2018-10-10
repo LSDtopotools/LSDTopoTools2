@@ -261,6 +261,14 @@ class LSDParameterParser
     /// @date 02/11/2016
     void check_file_extensions_and_paths();
 
+
+    /// @brief A routine that checks to see if the filename has a path
+    ///  If it doesn't, adds the read path
+    /// @param this_string The string to check for the path
+    /// @author SMM
+    /// @date 10/10/2018
+    string check_for_path_and_add_read_path_if_required(string this_string);
+
     /// @brief this returns the string before the last dot in a string.
     /// so for example if you gave it paramfile.param it would return paramfile
     /// @param this_string the string you want truncated

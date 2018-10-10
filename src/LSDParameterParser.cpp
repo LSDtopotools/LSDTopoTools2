@@ -881,6 +881,32 @@ void LSDParameterParser::check_file_extensions_and_paths()
 }
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
+
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// This function checks filenames to see if they include a path. 
+// If not it add the read path
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+string LSDParameterParser::check_for_path_and_add_read_path_if_required(string this_string)
+{
+  string sl_dot = "/";
+  string new_string;
+
+  if (this_string.find(sl_dot) != std::string::npos)
+  {
+    cout << "This filename includes a path. I am not going to modify it." << endl;
+  } 
+  else
+  {
+    cout << "This finlename doesn't have a path. I am adding the read path." << endl;
+    new_string = read_path+this_string;
+    cout << "The new filename is: " << new_string << endl;
+
+  } 
+
+  return new_string;
+
+}
+
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // This function strips the text after the final dot in a string
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

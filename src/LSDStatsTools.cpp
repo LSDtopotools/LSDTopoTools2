@@ -8336,6 +8336,16 @@ vector<double> TV1D_denoise_v2(vector<double> input,  double lambda) {
     cout << "Lambda = 0, TVD will only be a minimization by the sum of squares" << endl ;
   }
 
+  // TESTING FOR NO DATA IN THE INPUT IF REQUIRED
+  // int n_nd = 0;
+  // for (size_t tedd = 0; tedd<input.size(); tedd++)
+  // {
+  //   if(input[tedd]==-9999)
+  //   {
+  //     n_nd++;
+  //   }
+  // }
+  // cout << "No data_founded: " << n_nd << endl;
 
   unsigned int width = input.size();
   vector<double> output(width);

@@ -60,6 +60,7 @@
 #include "LSDStatsTools.hpp"
 #include "LSDParticle.hpp"
 #include "LSDCRNParameters.hpp"
+#include "LSDSpatialCSVReader.hpp"
 using namespace std;
 using namespace TNT;
 
@@ -199,6 +200,7 @@ class LSDBasin
   /// @author SWDG
   /// @date 11/12/13
   float CalculateBasinMean(LSDFlowInfo& FlowInfo, LSDRaster Data);
+  float CalculateBasinMean(LSDFlowInfo& FlowInfo, LSDIndexRaster Data);
 
   /// @brief Calculate the max value of an LSDRaster which falls inside a basin.
   /// @param FlowInfo Flowinfo object.
@@ -870,6 +872,14 @@ vector<int> get_source_node_from_perimeter(vector<int> perimeter, LSDFlowInfo& f
   /// @author FJC
   /// @date 18/08/18
   void write_channel_network(string csv_name, LSDFlowInfo& FlowInfo, LSDJunctionNetwork& JunctionNetwork);
+
+  /// @brief Get the mean data within a basin from a csv file
+  /// @param FlowInfo
+  /// @param CSV LSDSpatialCSVReader with the csv data
+  /// @param column_name name of the column with the data
+  /// @author FJC
+  /// @date 29/09/18
+  float get_basin_mean_from_csv(LSDFlowInfo& FlowInfo, LSDSpatialCSVReader& CSV, string column_name);
 
   protected:
 

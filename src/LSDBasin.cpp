@@ -65,6 +65,7 @@
 #include "LSDBasin.hpp"
 #include "LSDParticle.hpp"
 #include "LSDCRNParameters.hpp"
+#include "LSDSpatialCSVReader.hpp"
 using namespace std;
 using namespace TNT;
 
@@ -245,6 +246,37 @@ float LSDBasin::CalculateBasinMean(LSDFlowInfo& FlowInfo, LSDRaster Data){
 
   return BasinAverage;
 }
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Calculate mean basin value. overloaded for lsdindexraster - FJC
+// SWDG 12/12/13
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+float LSDBasin::CalculateBasinMean(LSDFlowInfo& FlowInfo, LSDIndexRaster Data){
+
+  int i;
+  int j;
+  int TotalData = 0;
+  int CountNDV = 0;
+  float BasinAverage;
+
+  for (int q = 0; q < int(BasinNodes.size()); ++q){
+
+    FlowInfo.retrieve_current_row_and_col(BasinNodes[q], i, j);
+
+    //exclude NDV from average
+    if (Data.get_data_element(i,j) != NoDataValue){
+      TotalData += Data.get_data_element(i,j);
+    }
+    else {
+      ++CountNDV;
+    }
+  }
+
+  BasinAverage = TotalData/(NumberOfCells-CountNDV);
+
+  return BasinAverage;
+}
+
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -2639,7 +2671,37 @@ void LSDBasin::write_channel_network(string csv_name, LSDFlowInfo& FlowInfo, LSD
 //
 // }
 
+//----------------------------------------------------------------------------//
+// Take points from a LSDSpatialCSVReader and calculate the mean of the points
+// within the basin
+// FJC 28/09/18
+//----------------------------------------------------------------------------//
+float LSDBasin::get_basin_mean_from_csv(LSDFlowInfo& FlowInfo, LSDSpatialCSVReader& CSV, string column_name)
+{
+  // get the latitude, longitude, and data column from the csv
+  vector<int> nodes = CSV.get_nodeindices_from_lat_long(FlowInfo);
+  vector<float> data = CSV.data_column_to_float(column_name);
 
+  float TotalData = 0;
+  int Count = 0;
+
+  // loop through the points and find which ones are in the basin
+  for (int i =0; i < int(data.size()); i++)
+  {
+    if (data[i] != NoDataValue)
+    {
+      // check if this node is in the basin
+      int test = is_node_in_basin(nodes[i]);
+      if (test == 1)
+      {
+        TotalData += data[i];
+        Count++;
+      }
+    }
+  }
+  float MeanData = TotalData/Count;
+  return MeanData;
+}
 
 
 
@@ -2790,7 +2852,7 @@ void LSDCosmoBasin::create(int JunctionNumber, LSDFlowInfo& FlowInfo,
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //  This function populates the topographic and production shielding
 // It sets the snow shielding to a default of 1
-// You need a sheilding raster: we need to implement without one in the near future. 
+// You need a sheilding raster: we need to implement without one in the near future.
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDCosmoBasin::populate_scaling_vectors(LSDFlowInfo& FlowInfo,
                                                LSDRaster& Elevation_Data,

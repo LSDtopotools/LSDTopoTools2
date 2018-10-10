@@ -338,6 +338,9 @@ int main (int nNumberofArgs,char *argv[])
     BaselevelJunctions_file = this_string_map["BaselevelJunctions_file"];
     cout << "The junctions file I am using is: " <<  BaselevelJunctions_file << endl;
   }
+  // now check to see if there is a full path
+  cout << endl << endl << "I need to check your baselevel junctions file, to see if it is in the correct path. " << endl;
+  BaselevelJunctions_file = LSDPP.check_for_path_and_add_read_path_if_required(BaselevelJunctions_file);
 
 
   //----------------------------------------------------------------------------//

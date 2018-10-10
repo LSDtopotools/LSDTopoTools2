@@ -2903,68 +2903,24 @@ void  LSDChiTools::TVD_on_my_ksn( float lambda, float lambda_TVD_b_chi)
   // Set the variables
   map<int,vector<int> >::iterator chirac;
   vector<int> this_vec;
+  int this_river = 0;
   // int max_node = 500;
   // Looping through the source key and getting the associated vector of river nodes
   for(chirac = map_node_source_key.begin(); chirac != map_node_source_key.end() ; chirac ++)
   {
+    // cout << "Denoising river #" << this_river << endl;
     // int this_SK = chirac->first; // we don't need it, but maybe at some points
     this_vec = chirac->second; // the vector of node
     vector<float> gros_test; // Debugging purposes
     // this next function Apply the TVD on the vector. It directly save the results in a global map and return general informations for debugging
+    cout << "Denoising river #" << this_river << "with size " << this_vec.size() << "\r";
+
     if(this_vec.size()>20){
+
       gros_test = TVD_this_vec(this_vec, lambda, lambda_TVD_b_chi);
     }
+  this_river++ ;
 
-
-    // I am planning a test -> TO KEEP it would be an improvment of the denoising
-    // if(int(this_vec.size()) <= max_node)
-    // {
-    
-    //   gros_test = TVD_this_vec(this_vec, lambda, lambda_TVD_b_chi);
-
-    // }
-    // else
-    // {
-    //   //testing here a TVD improvement 
-    //   int n_nodes_processed = 0, threshold_node_to_end = this_vec.size()-int(0.4*max_node);
-    //   vector<float> intermediate_values;
-    //   // Setting the first vector and the last one
-    //   vector<int>::const_iterator first = this_vec.begin() + max_node, last = this_vec.end() - max_node, begin = this_vec.begin(),ending = this_vec.end();
-      
-    //   vector<int> first_vec(begin, first), last_vec(last,ending);
-
-
-    //   // processing to a first TVD
-    //   while(n_nodes_processed<this_vec.size())
-    //   {
-    //     if(n_nodes_processed == 0)
-    //     {
-    //       TVD_this_vec_v2(first_vec, lambda, lambda_TVD_b_chi, max_node, "begin");
-    //     }
-    //     else if(n_nodes_processed < (threshold_node_to_end))
-    //     {
-    //       int slider = (n_nodes_processed - int(( 0.2 * n_nodes_processed)));
-    //       vector<int>::const_iterator beg = this_vec.begin() + slider;
-    //       slider += max_node ;
-    //       vector<int>::const_iterator  end = this_vec.begin() + slider;
-    //       vector<int> interm_vec(beg,end);
-    //       TVD_this_vec_v2(interm_vec, lambda, lambda_TVD_b_chi, max_node, "middle");
-    //     }
-    //     else if(n_nodes_processed >= (threshold_node_to_end))
-    //     {
-    //       TVD_this_vec_v2(last_vec, lambda, lambda_TVD_b_chi, max_node, "end");
-
-    //     }
-    //     else
-    //     {
-    //       cout << "Something went wrong during the TVD segmentation, I am aborting. Contact Boris if this happens to you twice on a row" << endl;
-    //       exit(EXIT_FAILURE);
-    //     }
-
-    //     n_nodes_processed += 0.6 * max_node;
-
-    //   }
-    // }
   }
 
 }
@@ -2991,35 +2947,42 @@ vector<float>  LSDChiTools::TVD_this_vec(vector<int> this_vec, float lambda, flo
 
 
       this_val_mchi.push_back((double)M_chi_data_map[this_node]);
-      this_val_bchi.push_back((double)b_chi_data_map[this_node]);
-      this_val_segelev.push_back((double)segelev_diff[this_node]);
+      // this_val_bchi.push_back((double)b_chi_data_map[this_node]);
+      // this_val_segelev.push_back((double)segelev_diff[this_node]);
       // NOTE: We recast everythin to double, floating points somehow generate bugs, in rare cases.
     }
 
 
   }
-
   // Calling the actual denoising coded in Stat tools
   double clambda = lambda, dlamda = lambda_TVD_b_chi;
-  vector<double> this_val_mchi_TVDed = TV1D_denoise_v2(this_val_mchi, clambda);
-  vector<double> this_val_bchi_TVDed = TV1D_denoise_v2(this_val_bchi, dlamda);
-  vector<double> this_val_segelev_TVDed = TV1D_denoise_v2(this_val_segelev, 5);
-
-  // Our data is Denoised, yaaaay. Let's implement the global map to save it.
-  for(size_t plo = 0; plo < this_vec.size() ; plo++ )
+  vector<float> outtemp;
+  if(this_val_mchi.size()>0)
   {
-    int this_node = this_vec[plo];
-    TVD_m_chi_map[this_node] = (float)this_val_mchi_TVDed[plo];
-    TVD_b_chi_map[this_node] = (float)this_val_bchi_TVDed[plo];
-    TVD_segelev_diff[this_node] = (float)this_val_segelev_TVDed[plo];
+    vector<double> this_val_mchi_TVDed = TV1D_denoise_v2(this_val_mchi, clambda);
+  
+    // vector<double> this_val_bchi_TVDed = TV1D_denoise_v2(this_val_bchi, dlamda);
+    // vector<double> this_val_segelev_TVDed = TV1D_denoise_v2(this_val_segelev, 5);
+  
+    // Our data is Denoised, yaaaay. Let's implement the global map to save it.
+    for(size_t plo = 0; plo < this_vec.size() ; plo++ )
+    {
+      int this_node = this_vec[plo];
+      TVD_m_chi_map[this_node] = (float)this_val_mchi_TVDed[plo];
+      // TVD_b_chi_map[this_node] = (float)this_val_bchi_TVDed[plo];
+      // TVD_segelev_diff[this_node] = (float)this_val_segelev_TVDed[plo];
+    }
+  
+    // Formatting a debugging vector that I sometime use. Ignore that.
+    vector<float> outtemp(this_val_mchi_TVDed.begin(),this_val_mchi_TVDed.end());
+
   }
 
-  // Formatting a debugging vector that I sometime use. Ignore that.
-  vector<float> outtemp(this_val_mchi_TVDed.begin(),this_val_mchi_TVDed.end());
   return outtemp;
   // Done, EZPZ
 }
 
+/// Test function to adapat the denoising size but not working at the moment.
 void  LSDChiTools::TVD_this_vec_v2(vector<int> this_vec, float lambda, float lambda_TVD_b_chi, int max_node, string type)
 {
 
@@ -3080,8 +3043,8 @@ void  LSDChiTools::TVD_this_vec_v2(vector<int> this_vec, float lambda, float lam
     // to switch to intermediate after test
     int this_node = *plo;
     TVD_m_chi_map[this_node] = (float)this_val_mchi_TVDed[beginning_index];
-    TVD_b_chi_map[this_node] = (float)this_val_bchi_TVDed[beginning_index];
-    TVD_segelev_diff[this_node] = (float)this_val_segelev_TVDed[beginning_index];
+    // TVD_b_chi_map[this_node] = (float)this_val_bchi_TVDed[beginning_index];
+    // TVD_segelev_diff[this_node] = (float)this_val_segelev_TVDed[beginning_index];
 
     // TVD_m_chi_map_non_corrected[this_node] = (float)this_val_TVDed[plo];
   }
@@ -4301,6 +4264,68 @@ void LSDChiTools::print_knickpoint_to_csv(LSDFlowInfo& FlowInfo, string filename
                      << ksn_cumul_knickpoint_map[this_node] << ","
                      << rksn_cumul_knickpoint_map[this_node] << ","
                      << rad_cumul_knickpoint_map[this_node] << ","
+                     << source_keys_map[this_node] << ","
+                     << baselevel_keys_map[this_node];
+        chi_data_out << endl;
+    }
+  }
+
+  chi_data_out.close();
+  cout << "I am done, your file is:" << endl;
+  cout << filename << endl;
+
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Print data maps to file - knickpoint version
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDChiTools::print_segmented_gradient_to_csv(LSDFlowInfo& FlowInfo, string filename)
+{
+
+  // these are for extracting element-wise data from the channel profiles.
+  cout << "I am now writing your segmented gradient file:" << endl;
+  int this_node, row,col;
+  double latitude,longitude, this_x, this_y;;
+  LSDCoordinateConverterLLandUTM Converter;
+
+  // find the number of nodes
+  int n_nodes = (node_sequence.size());
+
+  // open the data file
+  ofstream  chi_data_out;
+  chi_data_out.open(filename.c_str());
+  chi_data_out << "Y,X,latitude,longitude,elevation,flow_distance,drainage_area,segmented_gradient,source_key,basin_key";
+
+  chi_data_out << endl;
+
+
+
+
+  if (n_nodes <= 0)
+  {
+    cout << "Cannot print since you have not calculated channel properties yet." << endl;
+  }
+  else
+  {
+    map<int,float>::iterator iter;
+
+    for (iter = M_chi_data_map.begin(); iter != M_chi_data_map.end(); iter++)
+    {
+        this_node = iter->first;
+        FlowInfo.retrieve_current_row_and_col(this_node,row,col);
+        get_lat_and_long_locations(row, col, latitude, longitude, Converter);
+        get_x_and_y_locations(row, col, this_x, this_y);
+        
+        chi_data_out.precision(9);
+        chi_data_out << this_y << ","
+                     << this_x << ","
+                     << latitude << ","
+                     << longitude << ",";
+        chi_data_out.precision(5);
+        chi_data_out << elev_data_map[this_node] << ","
+                     << flow_distance_data_map[this_node] << ","
+                     << drainage_area_data_map[this_node] << ","
+                     << M_chi_data_map[this_node] << ","
                      << source_keys_map[this_node] << ","
                      << baselevel_keys_map[this_node];
         chi_data_out << endl;

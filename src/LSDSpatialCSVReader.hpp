@@ -232,6 +232,14 @@ class LSDSpatialCSVReader
     /// @date 17/02/2017
     vector<int> data_column_to_int(string column_name);
 
+    /// @brief This gets a data column from the csv file, and converts it to an
+    ///   double vector
+    /// @param column_name a string that holds the column name
+    /// @return a vector of ints: this holds the data.
+    /// @author FJC
+    /// @date 27/09/2018
+    vector<double> data_column_to_double(string column_name);
+
 
     /// @brief this check to see if a point is within the raster
     /// @param X_coordinate the x location of the point
@@ -254,6 +262,12 @@ class LSDSpatialCSVReader
     /// @author FJC
     /// @date 21/02/17
     void get_nodeindices_from_x_and_y_coords(LSDFlowInfo& FlowInfo, vector<float>& X_coords, vector<float>& Y_coords, vector<int>& NodeIndices);
+
+    /// @brief Function to get vector of node indices from the csv file
+    /// @param: FlowInfo LSDFlowInfo object
+    /// @author: FJC
+    /// @date: 28/09/18
+    vector<int> get_nodeindices_from_lat_long(LSDFlowInfo& FlowInfo);
 
     /// @brief This selects specified data and crease a new csv object with just that data
     /// @param selection_column The name of the column from which the data will be selected

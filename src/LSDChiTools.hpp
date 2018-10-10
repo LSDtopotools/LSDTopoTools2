@@ -1155,6 +1155,16 @@ class LSDChiTools
     /// @date 06/06/2017
     void print_knickpoint_to_csv(LSDFlowInfo& FlowInfo, string filename);
 
+    /// @brief This prints a csv file with all the segmented gradient data (adaptation of Mudd et al., for river gradient )
+    ///  the columns are what they are
+    /// @param FlowInfo an LSDFlowInfo object
+    /// @param filename The name of the filename to print to (should have full
+    ///   path and the extension .csv
+    /// @author BG
+    /// @date Today
+    void print_segmented_gradient_to_csv(LSDFlowInfo& FlowInfo, string filename);
+
+
     /// @brief This prints a csv file with all the knickzones raw data
     ///  the columns are:
     ///  latitude,longitude,elevation,flow distance,drainage area,ratio,diff,sign
