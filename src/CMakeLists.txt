@@ -46,6 +46,7 @@ set(EXE_SOURCES
   lsdtt-drivers/lsdtt-basic-metrics.cpp
   lsdtt-drivers/lsdtt-channel-extraction.cpp
   lsdtt-drivers/lsdtt-chi-mapping.cpp
+  lsdtt-drivers/lsdtt-river-clusters.cpp
 )
 
 set(EXE_FILES)

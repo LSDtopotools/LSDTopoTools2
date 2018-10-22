@@ -2,7 +2,7 @@
 
 # This is a startup script for LSDTopoTools
 # It clones the LSDTopoTools2 repository into your home directory
-# it then builds the code from there. 
+# it then builds the code from there.
 # Author: SMM
 # Date: 15/10/2018
 
@@ -46,7 +46,7 @@ sh build.sh
 
 # Now update the path
 echo "Now I'll add the LSDTopoTools command line programs to your path."
-export PATH=/LSDTopoTools/LSDTopoTools2/bin:$PATH
+export PATH=$HOME/LSDTopoTools/LSDTopoTools2/bin:$PATH
 echo "Your path is now:"
 echo $PATH
 exec /bin/bash
