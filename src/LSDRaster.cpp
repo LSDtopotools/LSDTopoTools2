@@ -100,6 +100,7 @@
 #include <omp.h>
 #include <ctime>
 #include <sys/stat.h>
+#include <stdint.h>
 #include "TNT/tnt.h"
 #include "TNT/jama_lu.h"
 #include "TNT/jama_eig.h"
@@ -110,6 +111,19 @@
 using namespace std;
 using namespace TNT;
 using namespace JAMA;
+
+#ifdef _WIN32
+#ifndef M_PI
+double M_PI = 3.14159265358979323846;
+#endif
+#endif
+// Sorting compiling problems with MSVC
+// #ifdef _WIN32
+// #ifndef(M_PI)
+// extern double M_PI;
+// #endif
+// #endif
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // operators
@@ -412,7 +426,7 @@ void LSDRaster::read_raster(string filename, string extension)
       {
         // the the rest of the lines
         int NChars = 5000; // need a big buffer beacause of the projection string
-        char thisline[NChars];
+        char* thisline = new char[NChars]; //char thisline[NChars]; MSVC/Clang uniformisation
         vector<string> lines;
         while( ifs.getline(thisline, NChars) )
         {
@@ -2185,7 +2199,7 @@ float LSDRaster::max_elevation( void )
   {
     for (int j=0; j<NCols; ++j)
     {
-      if (not found)
+      if (found==false)
       {
         if (RasterData[i][j] != NoDataValue)
         {
@@ -13999,6 +14013,196 @@ LSDRaster LSDRaster::convert_from_centimetres_to_metres()
 
   LSDRaster output(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,elev_in_metres,GeoReferencingStrings);
   return output;
+
+}
+
+
+//-----------------------------------------------------------------------------//
+// Attempt to port the breaching algorithm from RichDEM without getting the entire package
+// Probably still experimental
+// Original method from Lindsay et al., 2016 DOI:https://doi.org/10.1002/hyp.10648
+// BG 2018
+//-----------------------------------------------------------------------------//
+LSDRaster LSDRaster::Breaching_Lindsay2016()
+{
+  cout << "I am going to carve/breach your depressions in order to force flow paths." << endl;
+  cout << "I am using an algorithm from Lindsay et al., 2016 DOI:https://doi.org/10.1002/hyp.10648" << endl;
+  cout << "Implementation adapted from RichDEM: https://github.com/r-barnes/richdem" << endl;
+  cout << "Not widely tested yet, It may break..." << endl;
+
+  const uint32_t NO_BACK_LINK = std::numeric_limits<uint32_t>::max();
+
+  Array2D<float> tRasterData = RasterData.copy();
+
+  LSDIndexRaster izEDj = find_cells_bordered_by_nodata();
+
+  // This raster is a bit obscur to me so far
+  Array2D<uint32_t> backlinks(NRows,NCols, NO_BACK_LINK);
+  // Visited represent the stage of all cells
+  // 0-> Unprocessed
+  // 1-> EDGE 
+  Array2D<uint8_t> visited(NRows,NCols);
+  Array2D<uint8_t> pits(NRows,NCols);
+  // cout << "1" << endl;
+  for(size_t i=0;i<NRows;i++)
+  for(size_t j=0;j<NCols;j++)
+  {
+    visited[i][j] = 0;
+    pits[i][j] = 0;
+  }
+  // cout << "2" << endl;
+
+  vector<uint32_t> flood_array;
+  priority_queue< FillNode, vector<FillNode>, greater<FillNode> > pq;
+  uint32_t total_pits = 0;
+
+  // visited.setAll(LindsayCellType::UNVISITED);
+
+  // cout << "3" << endl;
+
+  //Seed the priority queue
+  // RDLOG_PROGRESS<<"Identifying pits and edge cells...";
+  for(int y=0;y<NRows;y++)
+  for(int x=0;x<NCols;x++)
+  {
+    // cout << "5" << endl;
+
+    if(tRasterData[y][x]==NoDataValue)             //Don't evaluate NoData cells
+    {
+      continue;
+    }
+      FillNode guest;
+      guest.RowIndex = y;
+      guest.ColIndex = x;
+      guest.Zeta = tRasterData[y][x];
+
+    if(izEDj.get_data_element(y,x)==1)
+    {
+      //Valid edge cells go on priority-queue
+      pq.push(guest);
+      visited[y][x] = 1;
+      continue;
+    }
+    // cout << "6" << endl;
+
+    //Determine if this is an edge cell, gather information used to determine if
+    //it is a pit cell
+    float lowest_neighbour = std::numeric_limits<float>::max();    
+    for(int n=-1;n<=1;n++)
+    for(int n2=-1;n2<=1;n2++)
+    {
+      if(n==0 && n2==0)
+        continue;
+
+      const int nx = x+n;
+      const int ny = y+n2;
+      
+      //No need for an inGrid check here because edge cells are filtered above
+      // TOCHECK -> BG
+
+      //Cells which can drain into NoData go on priority-queue as edge cells
+      if(tRasterData[y][x]==NoDataValue){        
+        pq.push(guest);
+        visited[y][x] = 1;
+        goto nextcell;                //VELOCIRAPTOR
+      }
+
+      //Used for identifying the lowest neighbour
+      lowest_neighbour = std::min(tRasterData[y][x],lowest_neighbour);
+    }
+    // cout << "7" << endl;
+
+    //This is a pit cell if it is lower than any of its neighbours. In this
+    //case: raise the cell to be just lower than its lowest neighbour. This
+    //makes the breaching/tunneling procedures work better. Since depressions
+    //might have flat bottoms, we treat flats as pits. Mark flat/pits as such
+    //now.
+    if(tRasterData[y][x]<=lowest_neighbour){
+      tRasterData[y][x] = lowest_neighbour;
+      pits[y][x] = 1;
+      total_pits++; //TODO: May not need this
+    }
+
+    nextcell:;
+  }
+    // cout << "8" << endl;
+
+  //The Priority-Flood operation assures that we reach pit cells by passing into
+  //depressions over the outlet of minimal elevation on their edge.
+  // RDLOG_PROGRESS<<"Breaching...";
+  while(!pq.empty())
+  {
+
+    const FillNode c = pq.top();
+    pq.pop();
+    // cout << "9" << endl;
+
+    //This cell is a pit: let's consider doing some breaching
+    if(pits[c.RowIndex][c.ColIndex]!=0){
+      //Locate a cell that is lower than the pit cell, or an edge cell
+      int cc = c.ColIndex +  c.RowIndex * NCols;               //Current cell on the path
+      float target_height = tRasterData[c.RowIndex][c.ColIndex];                     //Depth to which the cell currently being considered should be carved
+
+      //Trace path back to a cell low enough for the path to drain into it, or
+      //to an edge of the DEM
+      size_t ti = c.RowIndex, tj = c.ColIndex;
+      while(cc!=NO_BACK_LINK && tRasterData[ti][tj]>=target_height){
+
+        tRasterData[ti][tj] = target_height;
+        cc      = backlinks[ti][tj]; //Follow path back
+        tj = cc % NCols;
+        ti = size_t(cc/NCols);
+
+      }
+
+      --total_pits;
+      if(total_pits==0)
+        break;
+    }
+    // cout << "10" << endl;
+
+    //Looks for neighbours which are either unvisited or pits
+    for(int n=-1;n<=1;n++)
+    for(int n2=-1;n2<=1;n2++)    
+    {
+      if(n==0 && n2==0)
+        continue;
+      // cout << "10.1" << endl;
+
+      const int nx = c.ColIndex+n;
+      const int ny = c.RowIndex+n2;
+
+      if(nx<0 || nx>=NCols || ny<0 || ny>=NRows)
+        continue;
+      // cout << "10.2" << endl;
+      // cout << nx <<" || " << ny << endl;
+
+      if(tRasterData[ny][nx] == NoDataValue)
+        continue;
+      // cout << "10.3" << endl;
+
+      if(visited[ny][nx]!=0)
+        continue;
+      // cout << "10.4" << endl;
+
+      const float my_e = tRasterData[ny][nx];
+      // cout << "11" << endl;
+
+      //The neighbour is unvisited. Add it to the queue
+      FillNode tg;
+      tg.RowIndex = ny;
+      tg.ColIndex = nx;
+      tg.Zeta = my_e;
+      pq.push(tg);
+      visited[ny][nx]   = 2;
+      backlinks[ny][nx] = c.ColIndex +  c.RowIndex * NCols;
+      // cout << "12" << endl;
+    }
+  }
+
+  LSDRaster carved(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, tRasterData, GeoReferencingStrings);
+
+  return carved;
 
 }
 

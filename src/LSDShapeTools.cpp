@@ -68,6 +68,9 @@ using namespace std;
 #define ShapeTools_CPP
 
 
+
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Method to test the Byte order of the system.
 // Returns a boolean value where true is little endian.
@@ -1098,7 +1101,7 @@ void LSDCoordinateConverterLLandUTM::UTMtoLL(int eId, double UTMNorthing, double
   y = UTMNorthing;
 
   ZoneNumber = UTMZone;
-  if(not isNorth)
+  if(isNorth == false)
   {
     //cout << "Line 1010, you are in the Southern hemisphere!"<< endl;
     //remove 10,000,000 meter offset used for southern hemisphere

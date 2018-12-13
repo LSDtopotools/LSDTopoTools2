@@ -427,7 +427,7 @@ void LSDIndexRaster::read_raster(string filename, string extension)
       {
         // the the rest of the lines
         int NChars = 5000; // need a big buffer beacause of the projection string
-        char thisline[NChars];
+        char* thisline = new char[NChars]; // char thisline[NChars]; <- ADAPTATION TO clang and MSVC
         vector<string> lines;
         while( ifs.getline(thisline, NChars) )
         {

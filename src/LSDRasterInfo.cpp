@@ -303,7 +303,7 @@ void LSDRasterInfo::read_header(string filename, string extension)
       {
         // the the rest of the lines
         int NChars = 5000; // need a big buffer beacause of the projection string
-        char thisline[NChars];  
+        char* thisline = new char[NChars]; //char thisline[NChars]; MSVC/Clang uniformisation
         vector<string> lines;
         while( ifs.getline(thisline, NChars) )
         {

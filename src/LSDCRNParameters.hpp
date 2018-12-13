@@ -59,6 +59,14 @@
 using namespace std;
 using namespace TNT;
 
+// Sorting compiling problems with MSVC
+#ifdef _WIN32
+#ifndef M_PI
+extern double M_PI;
+#endif
+#endif
+
+
 #ifndef LSDCRNParameters_H
 #define LSDCRNParameters_H
 

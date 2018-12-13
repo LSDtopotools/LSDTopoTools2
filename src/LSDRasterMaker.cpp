@@ -34,6 +34,8 @@ using namespace TNT;
 #define LSDRasterMaker_CPP
 
 
+
+
 void LSDRasterMaker::create()
 {
   NRows = 100;
@@ -157,6 +159,26 @@ vector<float> LSDRasterMaker::minimum_and_maximum_value()
   return min_max;
 
 }
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function resets all non nodata nodes to a constant value
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterMaker::set_to_constant_value(float new_value)
+{
+  // now loop through the matrix rescaling the values.
+  for (int row = 0; row< NRows; row++)
+  {
+    for(int col = 0; col < NCols; col++)
+    {
+      if(RasterData[row][col] != NoDataValue)
+      {
+        RasterData[row][col] = new_value;
+      }
+    }
+  }
+}
+
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This function takes the existing raster data and then linearly scales it

@@ -4757,6 +4757,88 @@ void LSDJunctionNetwork::GetChannelNodesAndJunctions(LSDFlowInfo& flowinfo, vect
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+// Return a map of all nodes in the channel, useful to just chek if me node is a CNode or not
+// B.G. 12/11/2018
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+map<int,bool> LSDJunctionNetwork::GetMapOfChannelNodes(LSDFlowInfo& flowinfo)
+{
+  
+  map<int,bool> is_node_in_channel;
+  int row = 0;  //ints to store the row and col of the current px
+  int col = 0;
+
+  //cout << "I am going to go through " << NJunctions << " Junctions for you." << endl;
+
+  for (int q = 0; q < NJunctions; ++q)
+  {
+
+    if (q % 100 == 0)
+    {
+      cout << "\tJunction = " << q << " / " << NJunctions << "    \r";
+    }
+    //cout << "Junction is: " << q << " ";
+
+    int sourcenodeindex = JunctionVector[q]; //first cell of segment
+    int recieverjunction = ReceiverVector[q];
+    int recievernodeindex = JunctionVector[recieverjunction]; //last cell of segment
+
+    //cout << "Source NI : " << sourcenodeindex << " and receiver NI: " << recievernodeindex << endl;
+
+    //cout << "reciever is:"  <<  recieverjunction << " ";
+    //get row and col of last px in junction. This location should not be written,
+    //as it is the start of a new junction.
+    int lp_row = 0;
+    int lp_col = 0;
+    flowinfo.retrieve_current_row_and_col(recievernodeindex,lp_row,lp_col);
+
+    //write first pixel
+    flowinfo.retrieve_current_row_and_col(sourcenodeindex,row,col);
+    is_node_in_channel[sourcenodeindex] = true;
+
+    bool Flag = false; //Flag used to indicate if end of stream segemnt has been reached
+    int CurrentNodeIndex = 0;
+
+    if(recieverjunction == q)
+    {
+      //cout << "You are on a baselevel junction" << endl;
+      Flag = true;
+    }
+
+    int next_receiver;
+    while(Flag == false)
+    {
+
+      CurrentNodeIndex = flowinfo.NodeIndex[row][col]; //update node index to move 1 px downstream
+      flowinfo.retrieve_receiver_information(CurrentNodeIndex, next_receiver, row, col);
+
+      //cout << "CNI: " <<  CurrentNodeIndex << " and RNI: " << recievernodeindex << endl;
+
+      if (CurrentNodeIndex == next_receiver)
+      {
+        //need to stop 1 px before node
+        //cout << "I found the base level" << endl;
+        Flag = true;
+      }
+      else if(recievernodeindex== next_receiver)
+      {
+        //cout << "I found the receiver" << endl;
+        Flag = true;
+      }
+      else
+      {
+        is_node_in_channel[next_receiver] = true;
+      }
+    }
+  }
+  //cout << "Okay, I've got the nodes" << endl;
+
+
+  return is_node_in_channel;
+
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
@@ -6442,7 +6524,7 @@ vector<int> LSDJunctionNetwork::Prune_To_Largest_Complete_Basins(vector<int>& Ba
       bool is_influenced_by_nodata = FlowInfo.is_upstream_influenced_by_nodata(this_NI, TestRaster);
 
       // only record data if it is not influenced by nodata
-      if (not is_influenced_by_nodata)
+      if (is_influenced_by_nodata == false)
       {
         // only record data if it is bigger than the previous biggest node
         if( contributing_pixels_junctions[this_junc_index] > max_contributing_pixels)
@@ -6568,7 +6650,7 @@ vector<int> LSDJunctionNetwork::Prune_Junctions_By_Contributing_Pixel_Window_Rem
     bool is_influenced_by_nodata = FlowInfo.is_upstream_influenced_by_nodata(this_NI, TestRaster);
 
     // only record data if it is not influenced by nodata
-    if (not is_influenced_by_nodata)
+    if (is_influenced_by_nodata == false)
     {
       second_pruning.push_back( first_pruning[this_junc_index] );
     }
@@ -8409,16 +8491,17 @@ vector<int> LSDJunctionNetwork::get_channel_pixels_along_line(vector<int> line_r
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDJunctionNetwork::write_river_profiles_to_csv(vector<int>& BasinJunctions, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& Elevation, string csv_filename)
 {
-  int this_node, row, col;
-  double latitude, longitude, x_loc, y_loc;
-  float this_length, drainage_area;
+  int this_node, row, col, stream_order;
+  double latitude, longitude;
+  float dist_from_outlet, drainage_area;
   LSDCoordinateConverterLLandUTM Converter;
 
   // open the csv
   ofstream chan_out;
-  chan_out.open(csv_filename.c_str());
+  string this_fname = csv_filename+".csv";
+  chan_out.open(this_fname.c_str());
 
-  chan_out << "id,node,row,column,distance_from_source,elevation,drainage_area,latitude,longitude,easting,northing" << endl;
+  chan_out << "basin_id,id,node,distance_from_outlet,elevation,drainage_area,stream_order,latitude,longitude" << endl;
 
   // for each basin, get the profile
   for (int i = 0; i < int(BasinJunctions.size()); i++)
@@ -8427,27 +8510,25 @@ void LSDJunctionNetwork::write_river_profiles_to_csv(vector<int>& BasinJunctions
     LSDIndexChannel ThisChannel = generate_longest_index_channel_in_basin(BasinJunctions[i],FlowInfo,DistanceFromOutlet);
     vector<int> NodeSequence = ThisChannel.get_NodeSequence();
     int UpstreamNode = NodeSequence.front();
+    int DownstreamNode = NodeSequence.back();
     for (int n = 0; n < int(NodeSequence.size()); n++)
     {
       this_node = NodeSequence[n];
       FlowInfo.retrieve_current_row_and_col(this_node,row,col);
       FlowInfo.get_lat_and_long_locations(row, col, latitude, longitude, Converter);
-      FlowInfo.get_x_and_y_locations(row, col, x_loc, y_loc);
-      this_length = FlowInfo.get_flow_length_between_nodes(UpstreamNode,this_node);
       drainage_area = FlowInfo.get_DrainageArea_square_m(this_node);
+      stream_order = get_StreamOrder_of_Node(FlowInfo, this_node);
+      dist_from_outlet = FlowInfo.get_flow_length_between_nodes(this_node, DownstreamNode);
 
       chan_out << BasinJunctions[i] << ","
+               << UpstreamNode << ","
                << this_node << ","
-               << row << ","
-               << col << ","
-               << this_length << ","
+               << dist_from_outlet << ","
                << Elevation.get_data_element(row,col) << ","
-               << drainage_area << ",";
+               << drainage_area << ","
+               << stream_order << ",";
       chan_out.precision(9);
-      chan_out << latitude << ","
-               << longitude << ",";
-      chan_out.precision(9);
-      chan_out << x_loc << "," << y_loc << endl;
+      chan_out << latitude << "," << longitude << endl;
     }
   }
 

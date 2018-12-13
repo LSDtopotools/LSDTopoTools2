@@ -87,6 +87,15 @@ using namespace std;
 using namespace TNT;
 
 
+// Sorting compiling problems with MSVC
+#ifdef _WIN32
+#ifndef M_PI
+extern double M_PI;
+#endif
+#endif
+
+
+
 /// @brief Object to perform flow routing.
 class LSDFlowInfo
 {
@@ -522,6 +531,13 @@ class LSDFlowInfo
   /// @author FJC
   /// @date 28/11/16
   vector<int> Ingest_Channel_Heads_OS(string csv_filename);
+
+  //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  // Minimalistic method to ingest the channel heads from vectors of x y coordinates
+  // Using xy allows a "universal" method that can ingest external or internal data
+  // B.G. 11/11/2018
+  //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  vector<int> Ingest_Channel_Heads(vector<float>& x_coord, vector<float>& y_coord);          
 
   // functions for getting flow, discharge, sediment flux, etc
 
@@ -1246,6 +1262,19 @@ void get_nodeindices_from_csv(string csv_filename, vector<int>& NIs, vector<floa
   /// @date 23/1/17
   void snap_to_hilltops(vector<float> x_locs, vector<float> y_locs, int search_radius, LSDRaster& Hilltops, vector<int>& SnappedNodes, vector<int>& Valid_node_IDs);
 
+  /// @brief Extract distinct vector of flows for the entire landscape.
+  /// @return Avector of vector of node index
+  /// @author BG
+  /// @date 29/10/2018
+  vector<vector<int> > get_vectors_of_flow(LSDRaster& topo);
+
+  /// Accessor for the DonorStackVector()
+  vector<int> get_DonorStackVector() {return DonorStackVector;}  
+  /// Accessor for the DonorStackVector()
+  vector<int> get_RowIndex() {return RowIndex;}  
+  /// Accessor for the DonorStackVector()
+  vector<int> get_ColIndex() {return ColIndex;}  
+
   protected:
 
   ///Number of rows.
@@ -1343,6 +1372,9 @@ void get_nodeindices_from_csv(string csv_filename, vector<int>& NIs, vector<floa
   /// The strings can be any length, as long as the first letter corresponds to the
   /// first letter of the boundary condition. It is not case sensitive.
   vector<string> BoundaryConditions;
+
+  /// @brief map of donorless nodes. Key is node index, val is pair of row,col.
+  map<int, pair<int,int> > No_Donor_Map;
 
   private:
     void create();

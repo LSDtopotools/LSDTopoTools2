@@ -84,6 +84,14 @@
 using namespace std;
 using namespace TNT;
 
+// Sorting compiling problems with MSVC
+#ifdef _WIN32
+#ifndef M_PI
+extern double M_PI;
+#endif
+#endif
+
+
 class LSDRaster;        // do not include since it wouldn't compile since there
                         // would be a looped dependency
 

@@ -100,6 +100,7 @@ int main (int nNumberofArgs,char *argv[])
   float_default_map["maximum_elevation"] = 30000;
   float_default_map["min_slope_for_fill"] = 0.0001;
   bool_default_map["raster_is_filled"] = false; // assume base raster is already filled
+  bool_default_map["carve_before_fill"] = false; // Implements a carving algorithm
   bool_default_map["remove_seas"] = true; // elevations above minimum and maximum will be changed to nodata
   string_default_map["CHeads_file"] = "NULL";
   bool_default_map["only_check_parameters"] = false;
@@ -510,7 +511,8 @@ int main (int nNumberofArgs,char *argv[])
     //==========================================================================
     // Fill the raster
     //==========================================================================
-    LSDRaster filled_topography;
+    LSDRaster filled_topography,carved_topography;
+    // now get the flow info object
     if ( this_bool_map["raster_is_filled"] )
     {
       cout << "You have chosen to use a filled raster." << endl;
@@ -520,7 +522,15 @@ int main (int nNumberofArgs,char *argv[])
     {
       cout << "Let me fill that raster for you, the min slope is: "
            << this_float_map["min_slope_for_fill"] << endl;
-      filled_topography = topography_raster.fill(this_float_map["min_slope_for_fill"]);
+      if(this_bool_map["carve_before_fill"])
+      {
+       carved_topography = topography_raster.Breaching_Lindsay2016();
+        filled_topography = carved_topography.fill(this_float_map["min_slope_for_fill"]);
+      }
+      else
+      {
+        filled_topography = topography_raster.fill(this_float_map["min_slope_for_fill"]);
+      }
     }
   
     if (this_bool_map["print_fill_raster"])

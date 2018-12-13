@@ -116,6 +116,11 @@ class LSDChiTools
     /// @date 24/05/2016
     LSDChiTools(LSDJunctionNetwork& ThisJN)  { create(ThisJN); }
 
+    /// @brief empty constructor needed to incorporate ChiTools object in other objects. Throw an error;
+    /// @author BG
+    /// @date 10/12/2018
+    LSDChiTools(){create();}
+
     /// @brief This resets all the data maps
     /// @author SMM
     /// :date 02/06/2016
@@ -1231,7 +1236,9 @@ class LSDChiTools
     /// @param OUT_ID: string containing the output prefix
     /// @author BG
     /// @date 05/01/2018
-    void ksn_knickpoint_automator(LSDFlowInfo& FlowInfo, string OUT_DIR, string OUT_ID, float MZS_th, float lambda_TVD, float lambda_TVD_b_chi,int stepped_combining_window,int window_stepped, float n_std_dev, int kp_node_search);
+    void ksn_knickpoint_automator(LSDFlowInfo& FlowInfo, string OUT_DIR, string OUT_ID, float MZS_th, float lambda_TVD, int stepped_combining_window,int window_stepped, float n_std_dev, int kp_node_search);
+
+    void ksn_knickpoint_automator_no_file(LSDFlowInfo& FlowInfo, float MZS_th, float lambda_TVD,int stepped_combining_window,int window_stepped, float n_std_dev, int kp_node_search);
 
     void ksn_knickpoint_outlier_automator(LSDFlowInfo& FlowInfo, float MZS_th);
 
@@ -1308,29 +1315,168 @@ class LSDChiTools
     /// @param n_nodlump: the lumping half_window (number of nodes)
     /// @author BG
     /// @date 08/01/2018
-    void TVD_on_my_ksn(const float lambda, float lambda_TVD_b_chi);
+    void TVD_on_my_ksn(const float lambda);
 
-    vector<float> TVD_this_vec(vector<int> this_vec, const float lambda, float lambda_TVD_b_chi);
+
+    /// @brief Apply the TVD on a single vector of nodes
+    /// @param this_vec: vector of int containing the node index
+    /// @param lambda: regulator param from Condat et al., 2013
+    /// @author BG
+    /// @date 2018
+    vector<float> TVD_this_vec(vector<int> this_vec, const float lambda);
+
+    /// @brief Deprecated function that applyied a correction on the TVD, I'll keep it for few times in case
+    /// @param this_vec: vector of int containing the node index
+    /// @author BG
+    /// @date 2018
     vector<double> correct_TVD_vec(vector<double> this_val);
+
+    /// @brief Function applying part of the knickpoitn combining processes
+    /// @param this_vec: vector of int containing the node index
+    /// @author BG
+    /// @date 2018
     float get_dksn_from_composite_kp(vector<int> vecnode);
+
+    /// @brief Function applying part of the knickpoitn combining processes
+    /// @param this_vec: vector of int containing the node index
+    /// @author BG
+    /// @date 2018
     float get_dseg_drop_from_composite_kp(vector<int> vecnode);
+
+    /// @brief Function applying part of the knickpoitn combining processes
+    /// @param this_vec: vector of int containing the node index
+    /// @param FlowInfo: FlowInfo object used to navigate through the flow
+    /// @author BG
+    /// @date 2018
     float get_kp_sharpness_length(vector<int> vecnode, LSDFlowInfo& Flowinfo);
+
+    /// @brief Get the location of the knickpoitn combined using a barycenter approach
+    /// @param this_vec: vector of int containing the node index
+    /// @param FlowInfo: FlowInfo object used to navigate through the flow
+    /// @author BG
+    /// @date 2018
     int get_ksn_centroid_coordinates(LSDFlowInfo& Flowinfo, vector<int> vecnode,vector<int> vecnode_river, float total_dksn);
+
+    /// @brief Function applying part of the knickpoitn combining processes
+    /// @param this_vec: vector of int containing the node index
+    /// @param FlowInfo: FlowInfo object used to navigate through the flow
+    /// @author BG
+    /// @date 2018
     vector<vector<int> > group_local_kp(vector<int> vecnode_kp, vector<int> vecnode_river,LSDFlowInfo& Flowinfo, int kp_node_search);
+
+    /// @brief DEPRECATED function attempting grouping
+    /// @author BG
+    /// @date 2018
     vector<vector<int> > old_group_local_kp(vector<int> vecnode_kp, vector<int> vecnode_river,LSDFlowInfo& Flowinfo);
+
+    /// @brief Function applying first order derivative (node to node) on the segmented elevation (z_seg)
+    /// @author BG
+    /// @date 2018
+    void denoise_river_profiles();
+
     void derive_the_segmented_elevation();
+
+    /// @brief Isolate part of a river 
+    /// @param this_vec: vector of int containing the node index
+    /// @param first_node 
+    /// @author BG
+    /// @date 2018
     vector<int> get_vecnode_river_from_extent(int first_node, int last_node, vector<int> vecnode_river);
     
-    
+    /// @brief Print one the knickpoint csv file
+    /// @param FlowInfo: FlowInfo object used to navigate through the flow
+    /// @param filename: the full path/name of the csv file
+    /// @author BG
+    /// @date 2018
     void print_final_ksn_knickpoint(LSDFlowInfo& FlowInfo, string filename);
+
+    /// @brief Apply the winow detection of stepped knickpoitn
+    /// @param SK: It needs the source key (implement some of the global map)
+    /// @param vecnode: Vector of node idexes
+    /// @author BG
+    /// @date 2018
     void raw_stepped_knickpoint_detection(int SK, vector<int> vecnode);
+    
+    /// @brief DEPRECATED Apply combination on stepped knickpoints
+    /// @param FlowInfo: FlowInfo object used to navigate through the flow
+    /// @param kp_node_search: the node size of the combining windows
+    /// @author BG
+    /// @date 2018
     void stepped_knickpoints_combining(LSDFlowInfo& Flowinfo, int kp_node_search);
-    void TVD_this_vec_v2(vector<int> this_vec, float lambda, float lambda_TVD_b_chi, int max_node, string type);
+
+    /// @brief EXPERIMENTAL AND UNSUSED function to try a adapative denoising regulation on rivers
+    /// @param Lot of quickly evolving param, I'll detail if it gives relevant results at some points
+    /// @author BG
+    /// @date 2018
+    void TVD_this_vec_v2(vector<int> this_vec, float lambda, int max_node, string type);
+
+    /// @brief Apply combination on stepped knickpoints
+    /// @param FlowInfo: FlowInfo object used to navigate through the flow
+    /// @param window: the node size of the combining windows
+    /// @param n_std_dev: Coefficiant applied to the standard deviation
+    /// @author BG
+    /// @date 2018
     void stepped_knickpoints_detection_v2(LSDFlowInfo& Flowinfo, int window, float n_std_dev);
+
+    /// @brief Preprocess statistics for the windows stepped knickpoint detections
+    /// @param vecnode: vector of node index
+    /// @param HW: size of half-window
+    /// @author BG
+    /// @date 2018
     map<string,vector<float> > get_windowed_stats_for_knickpoints(vector<int> vecnode,int HW);
 
+    /// Function to test TVD on elevation
+    /// This test is after submission to answer to WS comments
+    /// There is great potential in suck a method, let see how sensitive to lambda elevation is
+    /// The trickiest part would be to adpat lambda, I am afraid that the TVD might just try to flatten the thing
+    /// Boris
+    void TVD_on_segelev(LSDFlowInfo& Flowinfo);
+
+    /// @brief Print one the knickpoint csv file
+    /// @param FlowInfo: FlowInfo object used to navigate through the flow
+    /// @param filename: the full path/name of the csv file
+    /// @author BG
+    /// @date 2018
+    void print_mchisegmented_knickpoint_version_test_on_segmented_elevation(LSDFlowInfo& FlowInfo, string filename);
 
 
+    void generate_knickpoint_overview(LSDFlowInfo& FlowInfo, LSDRaster& Elevation, LSDIndexRaster& FlowAcc , float movern, float tA0, string filename);
+    LSDRaster prefilter_river_topography(LSDRaster& filled_topography, LSDFlowInfo& FlowInfo, double lambda_TVD);
+
+    /// Hacky version of the chi_automator when applying a filtering to the topography
+    /// Reason is that the entire knicpoint algorithm is built on map preprocessed by this function, but I need them before doing the segmentation
+    /// I'll make that more elegant when time will allow it
+    /// BG
+    void chi_map_pre_automator(LSDFlowInfo& FlowInfo,
+                                        vector<int> source_nodes,
+                                        vector<int> outlet_nodes,
+                                        vector<int> baselevel_node_of_each_basin,
+                                        LSDRaster& Elevation, LSDRaster& FlowDistance,
+                                        LSDRaster& DrainageArea, LSDRaster& chi_coordinate,
+                                        int target_nodes,
+                                        int n_iterations, int skip,
+                                        int minimum_segment_length, float sigma);
+
+    ///@brief Return a map of useful maps
+    ///@author B.G.
+    ///@date 21/11/2018
+    map<string, map<int,float> > get_data_maps();
+
+    ///@brief return vectors of integer data calculated by Mudd et al., 2014 JGR.
+    ///@author B.G.
+    ///@date 21/11/2018
+    map<string, vector<int> > get_integer_vecdata_for_m_chi(LSDFlowInfo &Flowinfo);
+
+    ///@brief return vectors of floating point data calculated by Mudd et al., 2014 JGR.
+    ///@author B.G.
+    ///@date 21/11/2018
+    map<string, vector<float> > get_float_vecdata_for_m_chi(LSDFlowInfo &Flowinfo);
+
+
+    ///@brief Return the node sequence
+    ///@author B.G.
+    ///@date 21/11/2018
+    vector<int> get_vectors_of_node();
 
 
 
@@ -1375,6 +1521,14 @@ class LSDChiTools
     /// A map that holds segment numbers: used with skip = 0. Can be used to map
     /// distinct segments
     map<int,int> segment_counter_map;
+
+
+
+
+    // -#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
+    // The following attributes have been created by B.G for the knickpoint paper
+    // -#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
+
     /// A map that holds knickpoints information
     map<int,float> segment_counter_knickpoint_map;
     /// A map that holds knickpoints signs
@@ -1480,6 +1634,39 @@ class LSDChiTools
     map<int,float> mean_for_kp;
     map<int,float> std_for_kp;
 
+    // Maps used to test TVD denoising on segmented elevation. 
+    // (Response to WS for the paper)
+    // the key is a pair containing the lambda used and the node and the value is the denoised value 
+    //-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
+    /// Denoised map of segmented elevation (after Mudd et al., 2014) -> gives weird results
+    map<pair<double,int>,double> TVD_segelev;
+    /// Denoised map of elevation (bad Idea, does not work) 
+    map<pair<double,int>,double> TVD_elev;
+    /// Denoised map of detrended elevation (Delta elev) -> Nice results
+    map<pair<double,int>,double> TVD_delev;
+    /// map of detrended elevation (no denoising here, but used to denoise)
+    map<pair<double,int>,double> delev;
+    /// map of retrended elevation after applying the TVD on the detrended
+    map<pair<double,int>,double> TVD_retrend;
+    /// map of chi-z gradient calculated from first derivative of retrended elevation
+    map<pair<double,int>,double> globmap_mchi_z_from_retrend;
+    /// map of Chi-z curvature calculated from retrended elevation (second derivative)
+    map<pair<double,int>,double> globmap_cchi_from_retrend;
+
+    // Some global arrays for knickpoint overview
+    Array2D<float> denoised_elevation;
+    Array2D<float> kp_overview_chi_coordinates;
+    // Array2D<float> Cx_TVD_map;
+    map<int,double> Cx_TVD_map;
+    Array2D<float> Cx_2TVD_map;
+    Array2D<float> Mx_TVD_map;
+
+    bool knickpoint_prefiltering = false;
+
+
+    // -#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
+    // END of knickpoint stuff
+    // -#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 
 
 
@@ -1533,6 +1720,7 @@ class LSDChiTools
     void create(LSDIndexRaster& Raster);
     void create(LSDFlowInfo& FlowInfo);
     void create(LSDJunctionNetwork& JN);
+    void create();
 };
 
 #endif

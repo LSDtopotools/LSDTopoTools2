@@ -57,6 +57,13 @@
 using namespace std;
 using namespace TNT;
 
+// Sorting compiling problems with MSVC
+#ifdef _WIN32
+#ifndef M_PI
+extern double M_PI;
+#endif
+#endif
+
 
 #ifndef StatsTools_H
 #define StatsTools_H
@@ -463,7 +470,7 @@ void matlab_float_sort_descending(vector<float>& unsorted, vector<float>& sorted
 void matlab_int_sort(vector<int>& unsorted, vector<int>& sorted, vector<size_t>& index_map); // added 27/11/13 SWDG
 void matlab_int_reorder(std::vector<int> & unordered, std::vector<size_t> const & index_map, std::vector<int> & ordered);
 
-
+double get_median(vector<double> y_data);
 
 //Get vector of unique values in an input array of ints
 vector<int> Unique(Array2D<int> InputArray, int NoDataValue);

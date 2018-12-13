@@ -25,6 +25,13 @@
 using namespace std;
 using namespace TNT;
 
+// Sorting compiling problems with MSVC
+#ifdef _WIN32
+#ifndef M_PI
+extern double M_PI;
+#endif
+#endif
+
 #ifndef LSDRasterMaker_H
 #define LSDRasterMaker_H
 
@@ -94,6 +101,12 @@ class LSDRasterMaker: public LSDRaster
     /// @author SMM
     /// @date 03/09/2017
     vector<float> minimum_and_maximum_value();
+ 
+    /// @brief This sets all non nodata pixels to a constant value
+    /// @param new_value does what it says on the tin.
+    /// @author SMM
+    /// @date 18/11/2018    
+    void set_to_constant_value(float new_value);
 
     /// @brief This linearly scales the raster to new minimum and maximum values
     /// @param new_minimum does what it says on the tin.
@@ -101,7 +114,6 @@ class LSDRasterMaker: public LSDRaster
     /// @author SMM
     /// @date 03/09/2017
     void scale_to_new_minimum_and_maximum_value(float new_minimum, float new_maximum);
-
 
     /// @brief This smooths the raster. At some point in the future I'll
     ///  add more options but at the moment it just uses 4 neighbours and has

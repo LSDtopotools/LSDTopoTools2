@@ -110,6 +110,13 @@ Tools are included to:
 #include "LSDShapeTools.hpp"
 using namespace std;
 using namespace TNT;
+// Sorting compiling problems with MSVC
+#ifdef _WIN32
+#ifndef M_PI
+extern double M_PI;
+#endif
+#endif
+
 
 ///@brief Main analysis object to interface with other LSD objects.
 class LSDRaster
@@ -2352,6 +2359,15 @@ class LSDRaster
   /// @author FJC
   /// @date 18/10/17
   LSDRaster convert_from_centimetres_to_metres();
+
+
+  /// @brief EXPERIMENTAL: Implementation of RichDEM breaching algorithm
+  /// @Brief originally from Lindsay et al., 2016 DOI: DOI:https://doi.org/10.1002/hyp.10648
+  /// @return LSDRaster carved
+  /// @author BG
+  /// @date 31/10/2018 (spooky!)
+  LSDRaster Breaching_Lindsay2016();
+
 
 protected:
 

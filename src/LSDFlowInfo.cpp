@@ -88,6 +88,7 @@
 #include <map>
 #include <string>
 #include <cstring>
+#include <queue>
 #include <algorithm>
 #include <math.h>
 #include "TNT/tnt.h"
@@ -1861,6 +1862,53 @@ vector<int> LSDFlowInfo::Ingest_Channel_Heads(string filename, string extension,
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// Minimalistic method to ingest the channel heads from vectors of x y coordinates
+// Using xy allows a "universal" method that can ingest external or internal data
+// B.G. 11/11/2018
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+vector<int> LSDFlowInfo::Ingest_Channel_Heads(vector<float>& x_coord, vector<float>& y_coord)
+{
+
+  vector<int> Sources, TempSources;
+  int node;
+  vector<int> Sources_temp;
+  int N_coords = x_coord.size();
+  int N_sources_1 = 0;
+  for(int i = 0; i < N_coords; ++i)
+  {
+    node = get_node_index_of_coordinate_point(x_coord[i], y_coord[i]);
+    if (node != NoDataValue)
+    {
+      // Test 1 - Check for channel heads that fall in same pixel
+      int test1 = 0;
+      N_sources_1 = Sources_temp.size();
+      for(int i_test=0; i_test<N_sources_1;++i_test)
+      {
+        if(node==Sources_temp[i_test]) test1 = 1;
+      }
+      if(test1==0) Sources_temp.push_back(node);
+      //else cout << "\t\t ! removed node from sources list - coincident with another source node" << endl;
+    }
+  }
+  // Test 2 - Need to do some extra checks to load sources correctly.
+  int N_sources_2 = Sources_temp.size();
+  for(int i = 0; i<N_sources_2; ++i)
+  {
+    int test2 = 0;
+    for(int i_test = 0; i_test<int(Sources_temp.size()); ++i_test)
+    {
+      if(i!=i_test)
+      {
+        if(is_node_upstream(Sources_temp[i],Sources_temp[i_test])==true) test2 = 1;
+      }
+    }
+    if(test2 ==0) Sources.push_back(Sources_temp[i]);
+    //else cout << "\t\t ! removed node from sources list - other sources upstream" << endl;
+  }
+  return Sources;
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Method to ingest the channel heads raster generated using channel_heads_driver.cpp
 // into a vector of source nodes so that an LSDJunctionNetwork can be created easily
 // from them. Assumes the FlowInfo object has the same dimensions as the channel
@@ -1996,7 +2044,7 @@ vector<int> LSDFlowInfo::Ingest_Channel_Heads_OS(string csv_filename)
 
   input_csv.open(fname.c_str());
   // check for correct input
-  if (not input_csv.good())
+  if (input_csv.good() == false)
   {
     cout << "I can't read the CSV file! Check your filename." << endl;
   }
@@ -8355,6 +8403,281 @@ float LSDFlowInfo::get_slope_between_nodes(int upslope_node, int downslope_node,
     slope = (upslope_elev - downslope_elev)/FlowDist;
   }
   return slope;
+}
+
+
+
+/// @brief Structure used to sort vectors of flow
+struct vector_PQ
+{
+  float base_elevation;
+  vector<int> nodes;
+};
+
+bool operator>( const vector_PQ& lhs, const vector_PQ& rhs )
+{
+  return lhs.base_elevation > rhs.base_elevation;
+}
+bool operator<( const vector_PQ& lhs, const vector_PQ& rhs )
+{
+  return lhs.base_elevation < rhs.base_elevation;
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Get separated vector of flow for the entire landscape
+// BG 10/2018
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector< vector<int> > LSDFlowInfo::get_vectors_of_flow(LSDRaster& topo)
+{
+  vector<int> No_donors ;
+  vector<vector<int> > out_vector;
+  priority_queue< vector_PQ, vector<vector_PQ>, greater<vector_PQ> > processing_PQ;
+
+  // Preparing a raster to check who has been processed
+  Array2D<short> processed(NRows,NCols,NoDataValue);
+  for(size_t i=0;i<NRows;i++)
+  {
+    for(size_t j=0;j<NCols;j++)
+    {
+      if(topo.get_data_element(i,j)!=NoDataValue)
+      {
+        processed[i][j] = 0;
+      }
+    }
+  }
+  // ofstream  data_out;
+  // string filename = "/home/s1675537/PhD/LSDTopoData/knickpoint/test_location_paper/Smugglers_SC/Response_To_WS/TESTAGUL.csv";
+  // data_out.open(filename.c_str());
+  // data_out << "row,col,x,y,z" << endl;
+  // data_out.precision(9);
+  for(size_t i=0; i<RowIndex.size();i++)
+  {
+    int tRow = RowIndex[i];
+    int tCol = ColIndex[i];
+    int NDonors_here = NDonorsVector[i];
+    int this_node = int(i);
+
+    if(NDonors_here == 0)
+    {
+      float x,y;
+      get_x_and_y_locations(tRow,tCol,x,y);
+      // data_out << tRow << ",";
+      // data_out << tCol << ",";
+      // data_out << x << ",";
+      // data_out << y << ",";
+      // data_out << topo.get_data_element(tRow,tCol) << endl;
+      No_donors.push_back(this_node);
+    }
+
+  }
+  // data_out.close();
+  int cpt = 1, ma = No_donors.size();
+  for(vector<int>::iterator olga=No_donors.begin();olga!=No_donors.end(); olga++)
+  {
+    cout << "Processing #" << cpt <<"/"<<ma << "\r";
+    cpt++;
+    int this_node = *olga;
+    vector<int> this_vector;
+    this_vector.push_back(this_node);
+    int row,col;
+    retrieve_current_row_and_col(this_node,row,col);
+    processed[row][col] = 1;
+    bool proc = true;
+    do
+    {
+      int this_receiver;
+      retrieve_receiver_information(this_node,this_receiver,row,col);
+
+      if(this_node != this_receiver && processed[row][col] != 1)
+      {
+        processed[row][col] = 1;
+        this_vector.push_back(this_receiver);
+        this_node = this_receiver;
+      }
+      else
+      {
+        reverse(this_vector.begin(),this_vector.end());
+        out_vector.push_back(this_vector);
+        proc = false;
+        this_vector.clear();
+      }
+    }
+    while(proc);
+
+
+  }
+  cout << endl;
+  // OK now I am getting all the vector in order
+  // the iterator is just the name of a book in front of me
+  cout << "I got the flow vectors, I am now sorting it per base elevation to make sure it is processing first the bases" << endl;
+  for(vector<vector<int> >::iterator Introduction_to_Differentail_Equations_by_Mark_h_Holmes = out_vector.begin(); Introduction_to_Differentail_Equations_by_Mark_h_Holmes != out_vector.end(); Introduction_to_Differentail_Equations_by_Mark_h_Holmes++)
+  {
+    vector<int> this_vector = *Introduction_to_Differentail_Equations_by_Mark_h_Holmes;
+    vector_PQ this_inclusion;
+    int row,col;
+    int this_node = this_vector[0];
+    retrieve_current_row_and_col(this_node,row,col);
+    float this_elevation = topo.get_data_element(row,col);
+    this_inclusion.base_elevation = this_elevation;
+    this_inclusion.nodes = this_vector;
+    processing_PQ.push(this_inclusion);
+  }
+  out_vector.clear();
+
+  while(processing_PQ.size()>0)
+  {
+    vector_PQ this_inclusion;
+    this_inclusion = processing_PQ.top();
+    processing_PQ.pop();
+    vector<int> this_vector =  this_inclusion.nodes;
+    out_vector.push_back(this_vector);
+  }
+
+
+  return out_vector;  
+
+  // Old attempts
+
+  // Vector to return
+  // vector< vector<int> > out_vector;
+  // // Temp vector for each 
+  // vector<int> this_vector;
+  // cout<< "Preprocessing ordering nodes first"<< endl;
+  // priority_queue< node_to_process_PQPN, vector<node_to_process_PQPN>, greater<node_to_process_PQPN> > processing_PQ;
+  // map<int,bool> is_processed;
+
+  // for(size_t i=0; i<NRows;i++)
+  // {
+  //   for(size_t j=0; j<NCols;j++)
+  //   {
+  //     if(NodeIndex[i][j] != NoDataValue)
+  //     {
+  //       int this_node = NodeIndex[i][j];
+  //       is_processed[this_node] = false;
+  //       node_to_process_PQPN NTP;
+  //       NTP.index = this_node;
+  //       NTP.elevation = topo.get_data_element(i,j);
+  //       processing_PQ.push(NTP);
+  //     }
+  //   }
+  // }
+
+  // while(processing_PQ.size() > 0)
+  // {
+  //   // getting the top PQ
+  //   node_to_process_PQPN this_pop;
+  //   if(processing_PQ.size() % 1000 == 0)
+  //   cout<< processing_PQ.size() << "\r";
+
+  //   do
+  //   {
+  //     // cout<< "A" << endl;
+  //     this_pop = processing_PQ.top();
+  //     processing_PQ.pop();
+  //   }
+  //   while(is_processed[this_pop.index]) ; 
+
+  //   int this_node = this_pop.index;
+  //   this_vector.push_back(this_node);
+  //   is_processed[this_node] = true;
+  //   bool keep_on = true;
+  //   do
+  //   {
+  //     // cout<< "B" << endl;
+
+  //     int this_RecNode;
+  //     retrieve_receiver_information(this_node,this_RecNode);
+  //     if(this_RecNode != this_node)
+  //     {
+  //       this_vector.push_back(this_RecNode);
+  //       this_node = this_RecNode;
+  //       is_processed[this_node] = true;
+  //     }
+  //     else
+  //     {
+  //       out_vector.push_back(this_vector);
+  //       this_vector.clear();
+  //       keep_on = false;
+  //     }
+  //   }
+  //   while(keep_on);
+
+  // }
+
+  // cout<< "Getting vectors of flows...";
+
+  // vector<int> RSVector = SVector;
+  // vector<int> RSVectorindex = SVectorIndex;
+  // reverse(RSVector.begin(),RSVector.end());
+  // reverse(RSVectorindex.begin(),RSVectorindex.end());
+  // int hjhjhj = 0;
+  // int this_node = 0;
+  // int row,col,lrow,lcol;
+  // float this_elev =0, last_elev = -9999;
+  // for(size_t i=0;i<SVector.size();i++)
+  // {
+  //   this_node = SVector[i];
+  //   retrieve_current_row_and_col(this_node,row,col);
+  //   this_elev = topo.get_data_element(row,col);
+  //   int this_idx_vec = SVectorIndex[i];
+  //   int NDonors_here = NDonorsVector[this_idx_vec];
+  //   cout << hjhjhj << " || " << topo.get_data_element(row,col) << " || " << NDonors_here << endl;
+
+  //   if(this_elev > last_elev or abs(lrow-row)>1 or abs(lcol-col)>1 )
+  //   {
+  //     // Top level
+  //     // this_vector.push_back(SVector[i]);
+  //     out_vector.push_back(this_vector);
+  //     this_vector.clear();
+  //     this_vector.push_back(SVector[i]);
+
+  //     hjhjhj++;
+
+  //     if(i%10000==0){cout<< ".";}
+  //   }
+  //   else
+  //   {
+  //     this_vector.push_back(SVector[i]);
+  //   }
+  //   last_elev = this_elev;
+  //   lrow = row;
+  //   lcol = col;
+
+  // }
+
+
+
+
+
+  // vector<int> RSVector = SVector;
+  // reverse(RSVector.begin(),RSVector.end());
+
+  
+  // for(size_t i =0; i<RSVector.size(); i++)
+  // {
+  //   int this_node = RSVector[i];
+  //   // int row,col;
+  //   // retrieve_current_row_and_col(this_node,row,col);
+  //   int NDonors_here = NDonorsVector[this_node];
+  //   if(NDonors_here == 0)
+  //   {
+  //     // Top level
+  //     this_vector.push_back(RSVector[i]);
+  //     // reverse(this_vector.begin(),this_vector.end());
+
+  //     out_vector.push_back(this_vector);
+  //     this_vector.clear();
+  //     if(i%10000==0){cout<< ".";}
+  //   }
+  //   else
+  //   {
+  //     this_vector.push_back(RSVector[i]);
+  //   }
+  // }
+  // cout << "done!" << endl;
+  // return out_vector;
+
 }
 
 

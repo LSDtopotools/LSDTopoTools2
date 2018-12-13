@@ -84,12 +84,6 @@ class LSDRasterAggregator
     /// @author SMM
     /// @date 10/02/2016
     void load_raster_filenames(string filename);
-    
-    /// @brief This loads parameters It creates a map of parameter values
-    /// @param filename a string of the full filename
-    /// @author SMM
-    /// @date 10/02/2016
-    void load_parameters(string filename);
    
     /// @brief this function checks the existence and georeferencing of 
     ///  the rasters outlined in the file list
@@ -97,6 +91,26 @@ class LSDRasterAggregator
     /// @date 10/02/2016
     void check_rasters();
 
+    /// @brief Prints the raster names and types to screen
+    /// @detail you must have loaded the rasters first
+    /// @author SMM
+    /// @date 28/11/2018
+    void print_raster_names_and_types_to_screen();
+
+    /// @brief You suply a vector of strings with raster types and this 
+    /// return true if all of those raster types are present in the raster list
+    /// @param raster_types a vector of raster type strings
+    /// @return a bool: true if all types are in the list, false if not
+    /// @author SMM
+    /// @date 08/12/2018
+    bool check_raster_types(vector<string> raster_types);
+
+    /// @brief This computes the flux from each pixel in a raster
+    /// @param raster_types a vector of raster type strings
+    /// @return A raster of the fluxes
+    /// @author SMM
+    /// @date 13/12/2018
+    LSDRaster create_flux_raster(vector<string> raster_types);
 
   protected:
     
@@ -150,7 +164,7 @@ class LSDSedimentRouting: public LSDRasterAggregator
     /// @author SMM
     /// @date 10/02/2016
     LSDSedimentRouting( string path, string file_prefix)  { create(path,file_prefix); }
-  #
+
     /// @brief This checks for the parameter values specific to the sediment routing routines
     /// @author SMM
     /// @date 10/02/2016
@@ -160,6 +174,10 @@ class LSDSedimentRouting: public LSDRasterAggregator
     /// @author SMM
     /// @date 10/02/2016
     void print_parameter_values_to_screen();
+
+    // WILL NEED TO WORK ON THIS
+    vector<LSDRaster> get_required_rasters(LSDFlowInfo& FlowInfo);
+
 
     /// @brief This calculates the suspended and bedload for a given node in the DEM
     ///  It can be called repeatedly to get the entire DEM
@@ -172,7 +190,7 @@ class LSDSedimentRouting: public LSDRasterAggregator
     /// @author SMM
     /// @date 22/03/2016
     vector<float> calculate_suspended_and_bedload(int node, LSDFlowInfo& FlowInfo,
-                                                    vector<LSDRaster> RasterVec)
+                                                    vector<LSDRaster> RasterVec);
 
 
   protected:

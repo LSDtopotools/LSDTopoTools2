@@ -116,75 +116,19 @@ void LSDRasterAggregator::create(string path_name, string param_name_prefix)
   cout << "Loading the names of the rasters." << endl;
   load_raster_filenames(rasters_fname);
 
-  cout << "Loading parameters" << endl;
-  load_parameters(parameters_fname);
 
   // check the rasters
   cout << "Hold on while I check the rasters. I don't want to eat dirty rasters!" << endl;
   check_rasters();
-  cout << "The rasters seem okay. Mmmm, rasters." << endl;
+  cout << "The rasters seem okay. Mmmm, rasters." << endl << endl;
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// This function loads parameters
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDRasterAggregator::load_parameters(string filename)
-{
-  map<string,string> temp_map;
-  
-  ifstream infile;
-  infile.open(filename.c_str());
-  string parameter, value, lower;
-
-  if( infile.fail() )
-  {
-    cout << "Parameter file: " << filename << " does not exist." << endl;
-    cout << "Using default parameters." << endl;
-  }
-
-  // now ingest parameters
-  while (infile.good())
-  {
-    parse_line(infile, parameter, value);
-    lower = parameter;
-    if (parameter == "NULL")
-      continue;
-    for (unsigned int i=0; i<parameter.length(); ++i)
-    {
-      lower[i] = tolower(parameter[i]);
-    }
-
-    cout << "parameter is: " << lower << " and value is: " << value << endl;
-
-    // get rid of control characters
-    value = RemoveControlCharactersFromEndOfString(value);
-    
-    // add the parameter to the map
-    if(temp_map.find(parameter) == temp_map.end())
-    {
-      temp_map[parameter] = value;
-    }
-    else
-    {
-      cout << "WARNING; you have two parameters with the same name." << endl;
-      cout << "Using the most recent parameter value" << endl;
-      temp_map[parameter] = value;
-    }
-  }
-  infile.close();
-  parameter_map = temp_map;
-
-}
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This function loads the filenames 
 // of the rasters. The input file is a csv file with the first line being
-// the comumn names and the data thereafter
+// the column names and the data thereafter
 // The file should have two columns, comma seperated, with the raster
 // type first and the raster name second. 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -243,16 +187,7 @@ void LSDRasterAggregator::check_rasters()
   
   string bil_ext = "bil";
   string null_str = "NULL";
-  string raster_ext;
-  if(parameter_map.find("dem read extension") == parameter_map.end())
-  {
-    cout << "You did not set the read extension. Defaulting to bil" << endl;
-    raster_ext = bil_ext;
-  }
-  else
-  {
-    raster_ext = parameter_map["dem read extension"];
-  }
+  string raster_ext = bil_ext;
   
   // check to make sure the read extension make sense
   if (raster_ext != "asc" && raster_ext != "flt" && raster_ext != "bil")
@@ -281,21 +216,21 @@ void LSDRasterAggregator::check_rasters()
   {
     // get the information from the DEM
     // get the info from the DEM
-    LSDRasterInfo DEM_info(raster_filenames[0],raster_ext);
-    
-    for(int iRaster = 1; iRaster<N_rasters; iRaster++)
+    map<string, string >::iterator it = raster_filenames.begin();
+    string this_raster_name = path+(it->second);
+    cout << "The first raster is: " << this_raster_name << endl;
+    cout << "All other rasters need to match the size of this raster" << endl; 
+    LSDRasterInfo DEM_info(this_raster_name,raster_ext);
+
+    // now loop through the rasters checking if they are the same size as the original raster
+    for( it = raster_filenames.begin(); it != raster_filenames.end(); ++it)
     {
-      // now compare with the other DEMs
-      // first snow shielding
-      if(raster_filenames[iRaster] != null_str)
+      this_raster_name = path+(it->second);
+      LSDRasterInfo ThisRaster_info(it->second,bil_ext);
+      if( ThisRaster_info!=DEM_info)
       {
-        LSDRasterInfo ThisRaster_info(raster_filenames[iRaster],bil_ext);
-        if( ThisRaster_info!=DEM_info)
-        {
-          cout << "A raster " <<raster_filenames[iRaster] << " is not same shape and size as the DEM!" << endl;
-          cout << "Setting it to NULL" << endl;
-          raster_filenames[iRaster] = null_str;
-        }
+        cout << "A raster " << it->second << " is not same shape and size as the DEM!" << endl;
+        cout << "THIS WILL NOT WORK!!!" <<endl;
       }
     }
   }
@@ -303,11 +238,114 @@ void LSDRasterAggregator::check_rasters()
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This prints out the various rasters and their type to screen
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterAggregator::print_raster_names_and_types_to_screen()
+{
+  // Loop through the raster list printing out the types and filenames.
+  for( map<string, string >::iterator it = raster_filenames.begin(); it != raster_filenames.end(); ++it)
+  {
+    string key = it->first;
+    cout << "Raster type is: " <<it->first << " and name is: " << it->second << endl;
+  }
+  cout << endl;
+}
 
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function is provided a vector of strings that contains raster types
+// These are arbitrary, but we do have some naming conventions (which I'll write later,
+// but some are DEM, SLOPE, CURV, HS, PROD, SHIELD, etc). 
+// The function then looks for these keys in the data map and if they are all there, 
+// then it returns true, if not false. 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+bool LSDRasterAggregator::check_raster_types(vector<string> raster_types)
+{
+  cout << "Let me check the raster types for you. " << endl;
+  int n_types = int(raster_types.size());
+  string this_type;
+  bool all_there = true;
+  for (int i = 0; i< n_types; i++)
+  {
+    this_type = raster_types[i];
+    cout << "I'm checking the type " << this_type << "; ";
+    if(raster_filenames.find(this_type) == raster_filenames.end())
+    {
+      cout << "I am sad because I didn't find that type." << endl;
+      all_there = false;
+    }
+    else
+    {
+      cout << "Good news, I found this raster type!" << endl;
+    }
+  }
 
+  return all_there;
+}
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// THis function takes a list of raster types and crease
+// a flux raster that represents the flux
+// (usually either mass per time for solids or atoms per time for cosmo)
+// This is done by mulitplying relevant rasters
+//
+// For example, for cosmo applications, you would want a mass flux of quartz
+// and a concentration flux of 10Be
+// 
+// So the mass flux of quartz is the erosion rate (in g/m^2/time)
+// times the quartz fraction
+// 
+// The flux of atoms is the erosion rate times the quartz fraction
+// times the concentration 
+// 
+// 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDRaster LSDRasterAggregator::create_flux_raster(vector<string> raster_types)
+{
+  cout << "Let me check the raster types for you. " << endl;
+  bool can_proceed = check_raster_types(raster_types);
 
+  string raster_ext = "bil";
+  float multiplier;
+
+  vector<LSDRaster> RasterVec;
+  if(can_proceed)
+  {
+    cout << "The rasters exist, I will continue." << endl;
+    int n_types = int(raster_types.size());
+    string this_type;
+
+    // This loads the rasters
+    for (int i = 0; i< n_types; i++)
+    {
+      string full_raster_name = path+raster_filenames[raster_types[i]];
+      LSDRaster this_raster(full_raster_name,raster_ext); 
+      RasterVec.push_back(this_raster);  
+    }
+
+    // now loop through the rasters, multiplying them
+    int NRows = RasterVec[0].get_NRows();
+    int NCols = RasterVec[0].get_NCols();
+    for(int row = 0; row<NRows; row++)
+    {
+      for(int col = 0; col<NCols; col++)
+      {
+        cout << "WORKING HERE LINE 334" << endl;
+
+      }
+
+    }
+  }
+  else
+  {
+    cout << "You can't perform this operation since I don't have the rasters." << endl;
+
+  }
+
+  
+
+}
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This creates and LSDSedimentRouting function
@@ -353,13 +391,6 @@ void LSDSedimentRouting::create(string path_name, string param_name_prefix)
   cout << "Loading the names of the rasters." << endl;
   load_raster_filenames(rasters_fname);
 
-  cout << "Loading parameters" << endl;
-  load_parameters(parameters_fname);
-  
-  cout << "I am going to check the parameter values now. " << endl;
-  check_parameter_values();
-  print_parameter_values_to_screen();
-
   // check the rasters
   cout << "Hold on while I check the rasters. I don't want to eat dirty rasters!" << endl;
   check_rasters();
@@ -370,7 +401,7 @@ void LSDSedimentRouting::create(string path_name, string param_name_prefix)
 // TODO
 // Currently the create function is loading the parameters for fertility etc
 // into vectoers but these need to be changed to maps so we can have different
-// lithologies where there is an integrer index into each lithology
+// lithologies where there is an integer index into each lithology
 
 
 
@@ -596,14 +627,16 @@ void LSDSedimentRouting::print_parameter_values_to_screen()
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// This checks to make sure there are the correct number of rasters
-// You should have at a minimum a DEM and a lithology raster
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDSedimentRouting::check_rasters_for_routing()
-{
-  
-}
+
+
+
+
+
+
+
+/*
+
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This gets the required rasters
@@ -712,7 +745,7 @@ vector<LSDRaster> LSDSedimentRouting::get_required_rasters(LSDFlowInfo& FlowInfo
 //-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This calculates the bedload from a given node
 //-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-vector<float> LSDSedimentRouting::calculate_suspended_and_bedload(int node, LSDFlowInfo& FlowInfo,
+vector<float> LSDSedimentRouting::calculate_suspended_and_bedload(int node, LSDFlowInfo& FI,
                                                     vector<LSDRaster> RasterVec)
 {
   // See if there is an erosion rate raster
@@ -801,5 +834,6 @@ vector<float> LSDSedimentRouting::calculate_suspended_and_bedload(int node, LSDF
 
   }
 }
+*/
 
 #endif

@@ -2512,7 +2512,7 @@ void LSDCosmoData::full_shielding_cosmogenic_analysis_nested(vector<string> Rast
       {
         cout << "I'm writing a basin index number for you" << endl;
       
-        if (not written_inital_basin_index)
+        if (written_inital_basin_index == false)
         {
         
           basin_number = valid_cosmo_points[samp];
@@ -2869,7 +2869,7 @@ void LSDCosmoData::full_shielding_cosmogenic_analysis(vector<string> Raster_name
       {
         cout << "I'm writing a basin index number for you" << endl;
       
-        if (not written_inital_basin_index)
+        if (written_inital_basin_index==false)
         {
         
           basin_number = valid_cosmo_points[samp];
@@ -3302,7 +3302,7 @@ void LSDCosmoData::full_shielding_cosmogenic_analysis_for_spawned(vector<string>
       // write the index basin if flag is set to true
       if(write_basin_index_raster)
       {
-        if (not written_inital_basin_index)
+        if (written_inital_basin_index == false)
         {
         
           basin_number = valid_cosmo_points[samp];
@@ -5164,7 +5164,7 @@ void LSDCosmoData::full_shielding_CRN_concentration_predictor(vector<string> Ras
       {
         cout << "I'm writing a basin index number for you" << endl;
       
-        if (not written_inital_basin_index)
+        if ( written_inital_basin_index == false)
         {
         
           basin_number = valid_cosmo_points[samp];

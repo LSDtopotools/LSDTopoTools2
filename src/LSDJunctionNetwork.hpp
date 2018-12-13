@@ -1644,6 +1644,9 @@ vector<int> GetChannelHeadsChiMethodFromValleys(vector<int> ValleyNodes,
   /// @return The vector of sources. The vector is composed of node indices
   vector<int> get_SourcesVector() const { return SourcesVector; }
 
+  /// @return The SVector
+  vector<int> get_SVector() const { return SVector; }
+
 	/// @return the stream order array
 	Array2D<int> get_StreamOrderArray() const { return StreamOrderArray; }
 
@@ -1825,6 +1828,14 @@ float GetTotalChannelLengthUpstream(int this_node, LSDFlowInfo& FlowInfo);
 /// @author FJC
 /// @date 02/05/18
 void write_river_profiles_to_csv_all_sources(float channel_length, int slope_window_size, LSDFlowInfo& FlowInfo, LSDRaster& Elevation, string csv_filename);
+
+
+/// @brief Return a map of all nodes in the channel, useful to just chek if me node is a CNode or not
+/// @param FlowInfo
+/// @author B.G. 
+/// @date 12/11/2018
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+map<int,bool> GetMapOfChannelNodes(LSDFlowInfo& flowinfo);
 
   protected:
 

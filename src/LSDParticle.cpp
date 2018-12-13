@@ -57,6 +57,13 @@ using namespace std;
 #ifndef LSDParticle_CPP
 #define LSDParticle_CPP
 
+// Sorting compiling problems with MSVC
+#ifdef _WIN32
+#ifndef M_PI
+extern double M_PI;
+#endif
+#endif
+
 
 const double one_min_exp_neg_2 = 1-exp(-2);
 const double one_min_exp_neg_5 = 1-exp(-5);

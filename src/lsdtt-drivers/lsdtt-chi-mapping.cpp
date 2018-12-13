@@ -106,6 +106,7 @@ int main (int nNumberofArgs,char *argv[])
   float_default_map["maximum_elevation"] = 30000;
   float_default_map["min_slope_for_fill"] = 0.0001;
   bool_default_map["raster_is_filled"] = false; // assume base raster is already filled
+  bool_default_map["carve_before_fill"] = false; // Will carve your depression before applying a minimal slope
   bool_default_map["remove_seas"] = true; // elevations above minimum and maximum will be changed to nodata
   bool_default_map["only_check_parameters"] = false;
   string_default_map["CHeads_file"] = "NULL";
@@ -624,7 +625,7 @@ int main (int nNumberofArgs,char *argv[])
   //============================================================================
   // Start gathering necessary rasters
   //============================================================================
-  LSDRaster filled_topography;
+  LSDRaster filled_topography,carved_topography;
   // now get the flow info object
   if ( this_bool_map["raster_is_filled"] )
   {
@@ -635,7 +636,16 @@ int main (int nNumberofArgs,char *argv[])
   {
     cout << "Let me fill that raster for you, the min slope is: "
          << this_float_map["min_slope_for_fill"] << endl;
-    filled_topography = topography_raster.fill(this_float_map["min_slope_for_fill"]);
+    if(this_bool_map["carve_before_fill"])
+    {
+      carved_topography = topography_raster.Breaching_Lindsay2016();
+      filled_topography = carved_topography.fill(this_float_map["min_slope_for_fill"]);
+    }
+    else
+    {
+      filled_topography = topography_raster.fill(this_float_map["min_slope_for_fill"]);
+
+    }
   }
 
   if (this_bool_map["print_fill_raster"])
@@ -2078,7 +2088,8 @@ int main (int nNumberofArgs,char *argv[])
       TVD_lambda = this_float_map["TVD_lambda"];
     }
     // Actual knickpoint calculation
-    ChiTool.ksn_knickpoint_automator(FlowInfo, OUT_DIR, OUT_ID,this_float_map["MZS_threshold"], TVD_lambda, this_float_map["TVD_lambda_bchi"], this_int_map["stepped_combining_window"], this_int_map["window_stepped_kp_detection"], this_float_map["std_dev_coeff_stepped_kp"], this_int_map["kp_node_combining"]);
+    ChiTool.ksn_knickpoint_automator(FlowInfo, OUT_DIR, OUT_ID,this_float_map["MZS_threshold"], TVD_lambda,  this_int_map["stepped_combining_window"], this_int_map["window_stepped_kp_detection"], this_float_map["std_dev_coeff_stepped_kp"], this_int_map["kp_node_combining"]);
+
 
     // Print the segments to a csv file
     string csv_full_fname = OUT_DIR+OUT_ID+"_KP_MChiSegmented.csv";

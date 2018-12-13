@@ -19,25 +19,30 @@ project(LSDTopoTools)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-invalid-offsetof")
 
 set(LIB_HEADERS
-  LSDRaster.hpp
-  LSDRasterSpectral.hpp
-  LSDRasterInfo.hpp
-  LSDIndexRaster.hpp
-  LSDFlowInfo.hpp
-  LSDStatsTools.hpp
-  LSDShapeTools.hpp
-  LSDJunctionNetwork.hpp
-  LSDIndexChannel.hpp
-  LSDChannel.hpp
-  LSDMostLikelyPartitionsFinder.hpp
-  LSDParameterParser.hpp
-  LSDSpatialCSVReader.hpp
-  LSDIndexChannelTree.hpp
+  LSDBasin.hpp
   LSDChiTools.hpp
   LSDChiNetwork.hpp
-  LSDBasin.hpp
+  LSDChannel.hpp 
+  LSDCosmoData.hpp
+  LSDCosmoRaster.hpp 
+  LSDCRNParameters.hpp 
+  LSDFlowInfo.hpp
+  LSDIndexChannel.hpp
+  LSDIndexChannelTree.hpp
+  LSDIndexRaster.hpp 
+  LSDJunctionNetwork.hpp   
+  LSDMostLikelyPartitionsFinder.hpp  
+  LSDParameterParser.hpp 
   LSDParticle.hpp
-  LSDCRNParameters.hpp
+  LSDRaster.hpp
+  LSDRasterAggregator.hpp
+  LSDRasterInfo.hpp
+  LSDRasterMaker.hpp 
+  LSDRasterSpectral.hpp  
+  LSDStatsTools.hpp
+  LSDShapeTools.hpp 
+  LSDSpatialCSVReader.hpp
+  LSDStrahlerLinks.hpp
 )
 
 string(REGEX REPLACE "([^;]+).hpp" "\\1.cpp" LIB_SOURCES "${LIB_HEADERS}")

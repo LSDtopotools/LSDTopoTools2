@@ -62,6 +62,14 @@ using namespace std;
 #include <fstream>
 #include <cmath>
 
+// Sorting compiling problems with MSVC
+#ifdef _WIN32
+#ifndef M_PI
+extern double M_PI;
+#endif
+#endif
+
+
 #ifndef ShapeTools_H
 #define ShapeTools_H
 

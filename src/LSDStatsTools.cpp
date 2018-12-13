@@ -79,6 +79,9 @@ using namespace JAMA;
 #define  P_UL 500
 #define  R 1.0
 
+
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 /*********************************************************\
 **  ran3
@@ -434,6 +437,27 @@ float get_median(vector<float> y_data)
   sort(y_data.begin(),y_data.end());
 
   float dMedian = 0.0;
+  if ( (n_data_points % 2) == 0)
+  {
+    dMedian = ( (y_data[n_data_points/2] + (y_data[(n_data_points/2) - 1]))/2.0 );
+  }
+  else
+  {
+    dMedian = (y_data[n_data_points/2]);
+  }
+
+  return dMedian;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// gets the median
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+double get_median(vector<double> y_data)
+{
+  int n_data_points = y_data.size();
+
+  sort(y_data.begin(),y_data.end());
+
+  double dMedian = 0.0;
   if ( (n_data_points % 2) == 0)
   {
     dMedian = ( (y_data[n_data_points/2] + (y_data[(n_data_points/2) - 1]))/2.0 );
@@ -7654,7 +7678,7 @@ vector<int> is_outlier_MZS(vector<float> vecval, float NDV, float threshold)
   {
     this_val = *malme;
 
-    if(this_val > threshold or this_val < -1 * threshold)
+    if(this_val > threshold || this_val < -1 * threshold)
     {
       vecout.push_back(1);
     }

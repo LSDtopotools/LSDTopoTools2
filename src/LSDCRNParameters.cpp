@@ -66,6 +66,7 @@ using namespace TNT;
 #ifndef LSDCRNParameters_CPP
 #define LSDCRNParameters_CPP
 
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // the LSDCRNParameters object
@@ -647,7 +648,7 @@ void LSDCRNParameters::P_mu_total(double z,double h)
                   - phi_vert_site*(-2*M_PI*(1/((nofz+1.0)*(nofz+1.0))))*dndz;
     
   // convert to negative muons/g/yr
-  double R = R_temp*0.44*60.0*60.0*24.0*365.0;
+  double this_R = R_temp*0.44*60.0*60.0*24.0*365.0;
 
   // Now calculate the production rates. 
   // Depth-dependent parts of the fast muon reaction cross-section
@@ -683,8 +684,8 @@ void LSDCRNParameters::P_mu_total(double z,double h)
   //cout << "Pfast26Al: " << P_fast_Al26 << " P2: " << P2_26Al << endl;
   
   // negative muon capture
-  double P_neg_Be10 = R*CRONUS_data_map["k_neg10"];
-  double P_neg_Al26 = R*CRONUS_data_map["k_neg26"];
+  double P_neg_Be10 = this_R*CRONUS_data_map["k_neg10"];
+  double P_neg_Al26 = this_R*CRONUS_data_map["k_neg26"];
 
   //cout << "Sig0: " << sigma0_Be10 << " Pfast: " << P_fast_Be10 << " P_neg: " << P_neg_Be10 << endl;
 
@@ -693,7 +694,7 @@ void LSDCRNParameters::P_mu_total(double z,double h)
   temp_data_map["phi_vert_site"] = phi_vert_site;
   temp_data_map["R_vert_site"] = R_vert_site;
   temp_data_map["phi"] = phi;
-  temp_data_map["R"] = R;
+  temp_data_map["R"] = this_R;
   temp_data_map["Beta"] = Beta;
   temp_data_map["Ebar"] = Ebar;
   temp_data_map["P_fast_10Be"] = P_fast_Be10;

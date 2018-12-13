@@ -15,6 +15,7 @@
 //  Stuart W.D. Grieve
 //  Declan A. Valters
 //  Fiona Clubb
+//  Boris Gailleton
 //
 // Copyright (C) 2016 Simon M. Mudd 2016
 //
@@ -150,6 +151,16 @@ void LSDChiTools::create(LSDJunctionNetwork& ThisJN)
   GeoReferencingStrings = ThisJN.get_GeoReferencingStrings();
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// the create function. This is default and throws an error
+// SMM 2012
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDChiTools::create()
+{
+  // cout << "LSDChiTools line 64 Warning you have an empty LSDChiTools!" << endl;
+  // exit(EXIT_FAILURE);
+}
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
@@ -1109,6 +1120,115 @@ void LSDChiTools::chi_map_automator(LSDFlowInfo& FlowInfo,
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Hacky version of the chi_automator when applying a filtering to the topography
+// Reason is that the entire knicpoint algorithm is built on map preprocessed by this function, but I need them before doing the segmentation
+// I'll make that more elegant when time will allow it
+// BG
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDChiTools::chi_map_pre_automator(LSDFlowInfo& FlowInfo,
+                                    vector<int> source_nodes,
+                                    vector<int> outlet_nodes,
+                                    vector<int> baselevel_node_of_each_basin,
+                                    LSDRaster& Elevation, LSDRaster& FlowDistance,
+                                    LSDRaster& DrainageArea, LSDRaster& chi_coordinate,
+                                    int target_nodes,
+                                    int n_iterations, int skip,
+                                    int minimum_segment_length, float sigma)
+{
+  vector< vector<int> > chi_node_indices;
+  vector<int> these_chi_node_indices;
+  vector<int> node_sequence_vec;
+  map<int,int> these_source_keys;
+  map<int,int> these_baselevel_keys;
+  map<int,int> this_key_to_source_map;
+  map<int,int> this_key_to_baselevel_map;
+
+  // these are for working with the FlowInfo object
+  int this_node,row,col;
+  int this_base_level, this_source_node;
+
+  // get the number of channels
+  int source_node_tracker = -1;
+  int baselevel_tracker = -1;
+  int ranked_source_node_tracker = -1;
+  int n_channels = int(source_nodes.size());
+  for(int chan = 0; chan<n_channels; chan++)
+  {
+    //cout << "Sampling channel " << chan+1 << " of " << n_channels << endl;
+
+    // get the base level
+    this_base_level = baselevel_node_of_each_basin[chan];
+    //cout << "Got the base level" << endl;
+
+    // If a key to this base level does not exist, add one.
+    if ( this_key_to_baselevel_map.find(this_base_level) == this_key_to_baselevel_map.end() )
+    {
+      baselevel_tracker++;
+      // this resets the ranked source node tracker
+      ranked_source_node_tracker = -1;
+      //cout << "Found a new baselevel. The node is: " << this_base_level << " and key is: " << baselevel_tracker << endl;
+      this_key_to_baselevel_map[this_base_level] = baselevel_tracker;
+      ordered_baselevel_nodes.push_back(this_base_level);
+
+      // Get the node of the source to the mainstem. This works because the
+      // mainstem is always the first channel listed in a basin.
+      source_node_of_mainstem_map[baselevel_tracker] = source_nodes[chan];
+    }
+
+    // now add the source tracker
+    source_node_tracker++;
+    ranked_source_node_tracker++;
+
+    // get the source node
+    this_source_node = source_nodes[chan];
+
+    // add the node to the trackers so that we can trace individual basin nodes
+    // for m over n calculations
+    ordered_source_nodes.push_back(this_source_node);
+    source_nodes_ranked_by_basin.push_back(ranked_source_node_tracker);
+
+    // now add the source node to the data map
+    this_key_to_source_map[this_source_node] = source_node_tracker;
+
+    //cout << "The source key is: " << source_node_tracker << " and basin key is: " << baselevel_tracker << endl;
+
+    // get this particular channel (it is a chi network with only one channel)
+    LSDChiNetwork ThisChiChannel(FlowInfo, source_nodes[chan], outlet_nodes[chan],
+                                Elevation, FlowDistance, DrainageArea,chi_coordinate);
+    chi_node_indices = ThisChiChannel.get_node_indices();
+    these_chi_node_indices = chi_node_indices[0];
+
+    //cout << "I have " << these_chi_m_means.size() << " nodes." << endl;
+
+
+    int n_nodes_in_channel = int(these_chi_node_indices.size());
+    for (int node = 0; node< n_nodes_in_channel; node++)
+    {
+
+      this_node =  these_chi_node_indices[node];
+      //cout << "This node is " << this_node << endl;
+
+      FlowInfo.retrieve_current_row_and_col(this_node,row,col);
+
+      node_sequence_vec.push_back(this_node);
+
+      these_source_keys[this_node] = source_node_tracker;
+      these_baselevel_keys[this_node] = baselevel_tracker;
+
+    }
+  }
+
+ 
+  node_sequence = node_sequence_vec;
+  source_keys_map = these_source_keys;
+  baselevel_keys_map = these_baselevel_keys;
+  key_to_source_map = this_key_to_source_map;
+  key_to_baselevel_map = this_key_to_baselevel_map;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This function is a much more rudimentary version that mimics the
@@ -1244,7 +1364,7 @@ void LSDChiTools::chi_map_automator_rudimentary(LSDFlowInfo& FlowInfo,
 
     // we search down the channel, collecting linear regressions at the
     // midpoint of the intervals
-    while (not is_end_of_channel)
+    while (is_end_of_channel == false)
     {
       // get a vector of chi and elevation from the start node to the end node
       chi_vec = empty_vec;
@@ -2039,6 +2159,142 @@ void LSDChiTools::get_previous_mchi_for_all_sources(LSDFlowInfo& Flowinfo)
 
 }
 
+LSDRaster LSDChiTools::prefilter_river_topography(LSDRaster& filled_topography, LSDFlowInfo& FlowInfo, double lambda_TVD)
+{
+  // cout << "Work in progress, But first Lunch" << endl;
+    // preparing the needed iterators
+  vector<int> ordered_source_keys;
+  Array2D<float> next_topo = filled_topography.get_RasterData();
+  set_map_of_source_and_node(FlowInfo,5);
+
+
+  // getiing the SK in the right order to make sure I am processing it bottom to top
+  int n_nodes = (node_sequence.size());
+  int last_SK = -9999;
+  int this_SK = 0;
+  for(int n=0; n<n_nodes ;n++)
+  {
+    this_SK = source_keys_map[node_sequence[n]];
+    if(this_SK != last_SK)
+    {
+      ordered_source_keys.push_back(this_SK);
+      last_SK = this_SK;
+    }
+  }
+
+  // Initializing some variables
+  vector<int> vecnode;
+
+  // Looping through all the sources key
+  float this_base_elevation = 0, retrend_bae_elevation = 0;
+  for(vector<int>::iterator tit = ordered_source_keys.begin(); tit != ordered_source_keys.end(); tit++)
+  {
+
+    this_SK = *tit;
+    vecnode = map_node_source_key[this_SK]; // getting the vector of river node to check
+    // exit(EXIT_FAILURE);
+    
+    vector<double> detrend(vecnode.size()), denoised(vecnode.size()), retrend(vecnode.size());
+    int fnode = vecnode.back();
+    int recnode,rrow, rcol,row,col;
+
+    // First step is to determine our boundary condition -> the base elevation that will be retrended
+    FlowInfo.retrieve_current_row_and_col(fnode,row,col);
+    FlowInfo.retrieve_receiver_information(fnode,recnode,rrow, rcol);
+    if(fnode == recnode || filled_topography.get_data_element(row,col) == NoDataValue)
+    {
+      // If baselevel
+      this_base_elevation = filled_topography.get_data_element(row,col);
+
+    }
+    else
+    {
+      // Else getting the receiver
+      this_base_elevation = filled_topography.get_data_element(rrow,rcol);
+      retrend_bae_elevation = next_topo[row][col];
+
+    }
+
+    // Going through the vector of nodes
+    size_t rit_a = vecnode.size() - 1;
+    int last_node; 
+    float last_elev;
+    for(vector<int>::reverse_iterator ti2 = vecnode.rbegin(); ti2 != vecnode.rend(); ++ti2)
+    {
+      int this_node = *ti2;
+
+      FlowInfo.retrieve_current_row_and_col(this_node,row,col);
+      // FlowInfo.retrieve_receiver_information(this_node,recnode,rrow, rcol);
+
+      if(ti2 == vecnode.rbegin())
+      {
+        detrend[rit_a] = filled_topography.get_data_element(row,col) - this_base_elevation;
+      }
+      else
+      {
+
+        FlowInfo.retrieve_current_row_and_col(this_node,row,col);
+        detrend[rit_a] = filled_topography.get_data_element(row,col) - last_elev;
+        // cout << "D:" << detrend[rit_a] << endl;
+        // cout << "LE:" << last_elev << endl;
+      }
+      last_node = this_node;
+      last_elev = filled_topography.get_data_element(row,col);
+      rit_a--;
+    }
+    // exit(EXIT_FAILURE);
+
+
+    // Denoising
+    if(vecnode.size()>1)
+    {
+      denoised = TV1D_denoise_v2(detrend, lambda_TVD);
+    }
+    else
+    {
+      denoised = detrend;
+    }
+
+    // Now retrending
+
+    for(int rit_b = int(vecnode.size()) - 1 ; rit_b >= 0; --rit_b)
+    {
+
+      if(rit_b == vecnode.size() - 1)
+      {
+        // cout << "Premier node: " << this_base_elevation << endl;
+        int tnode = vecnode[rit_b], trow=0,tcol=0;
+        FlowInfo.retrieve_receiver_information(tnode,recnode,trow, tcol);
+        retrend_bae_elevation = next_topo[trow][tcol];
+        retrend[rit_b] = retrend_bae_elevation + denoised[rit_b];
+      }
+      else
+      {
+        retrend[rit_b] = retrend[rit_b+1] + denoised[rit_b];
+      }
+      int this_node = vecnode[rit_b];
+
+
+      FlowInfo.retrieve_current_row_and_col(this_node,row,col);
+
+      if(row>=0 && col>=0 && row<NRows && col<NCols)
+      {
+
+        next_topo[row][col] = retrend[rit_b];
+      }
+      else{cout<<"DEBUGWARNING::Unreal Node here ?!" << endl;}
+    }
+    cout << "done" << endl;
+
+  }
+
+  
+  LSDRaster ThisRaster(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, next_topo, GeoReferencingStrings);
+
+  return ThisRaster;
+
+}
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 // Rather than recreating, changing and messing wiht knickpoints functions during developent,
@@ -2046,7 +2302,7 @@ void LSDChiTools::get_previous_mchi_for_all_sources(LSDFlowInfo& Flowinfo)
 // Leaving me time to develop what will be the final cleanest one and making easier the subdivision
 // in loads of little functions rather than one big script-like one. OBJECT ORIENTED POWER ˁ˚ᴥ˚ˀ
 // BG 
-void LSDChiTools::ksn_knickpoint_automator(LSDFlowInfo& FlowInfo, string OUT_DIR, string OUT_ID, float MZS_th, float lambda_TVD, float lambda_TVD_b_chi,int stepped_combining_window,int window_stepped, float n_std_dev, int kp_node_search)
+void LSDChiTools::ksn_knickpoint_automator(LSDFlowInfo& FlowInfo, string OUT_DIR, string OUT_ID, float MZS_th, float lambda_TVD,int stepped_combining_window,int window_stepped, float n_std_dev, int kp_node_search)
 {
 
   cout << "Getting ready for the knickpoint detection algorithm ...";
@@ -2055,22 +2311,22 @@ void LSDChiTools::ksn_knickpoint_automator(LSDFlowInfo& FlowInfo, string OUT_DIR
   // this first function fill a map[source key] = vector<node for this rive including the receiver node>
   set_map_of_source_and_node(FlowInfo,5);
 
-  // Optional (?) lumping of the m_chi to get more deterministic segments
-  // I let that here but we gave up on this option, the signal is to smooth
-  // lump_my_ksn(5);
-
   // We need to set the d(Segmented_elevation) to get the stepped knickpoints
   derive_the_segmented_elevation();
   cout << " OK" << endl ;
 
-  // We preprocessed the metrics we need, let's get into the Data!
+  // vector<int> dsaf = FlowInfo.get_DonorStackVector();
 
+  // We preprocessed the metrics we need, let's get into the Data!
+  // cout << "Experimentaion on TVD on elevation here" << endl;
+  // TVD_on_segelev(FlowInfo);
+  // cout << " JUMANGI" << endl ;
 
 
   cout << " Denoising the ksn or mchi and the differential segmenting elevation (Total Variation Denoising adapted from Condat, 2013) ..." << endl;
   // Applying the Total_variation_denoising on m_chi.
   // This is really efficient Algorithm, I am denoising the b_chi as well, for testing purposes
-  TVD_on_my_ksn(lambda_TVD, lambda_TVD_b_chi);
+  TVD_on_my_ksn(lambda_TVD);
   cout << " OK" << endl ;
 
 
@@ -2083,7 +2339,7 @@ void LSDChiTools::ksn_knickpoint_automator(LSDFlowInfo& FlowInfo, string OUT_DIR
 
   // main function that increment the map_of_knickpoints by detecting the changes in ksn within rivers
   // /!\ Contain a cout statement
-  cout << "Detecting raw ksn knickpoints and stepped knickpoints for each source ...";
+  cout << "Detecting raw ksn knickpoints and stepped knickpoints for each source ..." << endl;
   ksn_knickpoint_detection_new(FlowInfo);
   cout << " OK" << endl;
 
@@ -2115,17 +2371,98 @@ void LSDChiTools::ksn_knickpoint_automator(LSDFlowInfo& FlowInfo, string OUT_DIR
 
   //printing the raw ksn knickpoint file
   string this_name = OUT_DIR + OUT_ID + "_ksnkp_raw.csv";
-  cout << "Printing data into csv files ...";
+  cout << "Printing data into csv files ..." << endl;
+  cout << "Raw..." << endl;
   print_raw_ksn_knickpoint(FlowInfo, this_name);
   this_name = OUT_DIR + OUT_ID + "_ksnkp_SK.csv";
+  cout << "SK..." << endl;
   print_bandwidth_ksn_knickpoint(this_name);
   this_name = OUT_DIR + OUT_ID + "_ksnkp_mchi.csv";
+  cout << "mchi/ksn..." << endl;
   print_mchisegmented_knickpoint_version(FlowInfo, this_name);
   this_name = OUT_DIR + OUT_ID + "_ksnkp.csv";
+  cout << "knickpoints..." << endl;
   print_final_ksn_knickpoint(FlowInfo, this_name);
   cout << " OK" << endl ;
 
+  // Old to keep
+  // this_name = OUT_DIR + OUT_ID + "_ksnkp_SEGELEV.csv";
+  // print_mchisegmented_knickpoint_version_test_on_segmented_elevation(FlowInfo, this_name);
 
+
+}
+
+
+// Rather than recreating, changing and messing wiht knickpoints functions during developent,
+// Eveything will now be controlled from this function calling the adapted and up-to-date function
+// Leaving me time to develop what will be the final cleanest one and making easier the subdivision
+// in loads of little functions rather than one big script-like one. OBJECT ORIENTED POWER ˁ˚ᴥ˚ˀ
+// BG 
+void LSDChiTools::ksn_knickpoint_automator_no_file(LSDFlowInfo& FlowInfo, float MZS_th, float lambda_TVD,int stepped_combining_window,int window_stepped, float n_std_dev, int kp_node_search)
+{
+
+  cout << "Getting ready for the knickpoint detection algorithm ...";
+  // The first preprocessing step is to preselect the river we want to process
+  // Potentially data selection function to be added here, exempli gratia lenght threshold for tributaries
+  // this first function fill a map[source key] = vector<node for this rive including the receiver node>
+  set_map_of_source_and_node(FlowInfo,5);
+
+  // We need to set the d(Segmented_elevation) to get the stepped knickpoints
+  derive_the_segmented_elevation();
+  cout << " OK" << endl ;
+
+  // vector<int> dsaf = FlowInfo.get_DonorStackVector();
+
+  // We preprocessed the metrics we need, let's get into the Data!
+  // cout << "Experimentaion on TVD on elevation here" << endl;
+  // TVD_on_segelev(FlowInfo);
+  // cout << " JUMANGI" << endl ;
+
+
+  cout << " Denoising the ksn or mchi and the differential segmenting elevation (Total Variation Denoising adapted from Condat, 2013) ..." << endl;
+  // Applying the Total_variation_denoising on m_chi.
+  // This is really efficient Algorithm, I am denoising the b_chi as well, for testing purposes
+  TVD_on_my_ksn(lambda_TVD);
+  cout << " OK" << endl ;
+
+
+  cout << " Extracting general metrics for rivers ...";
+  // This will increment maps with source keys as key and various metrics such as river length, Chi lenght...
+  compute_basic_matrics_per_source_keys(FlowInfo);
+  cout << " OK" << endl ;
+
+
+
+  // main function that increment the map_of_knickpoints by detecting the changes in ksn within rivers
+  // /!\ Contain a cout statement
+  cout << "Detecting raw ksn knickpoints and stepped knickpoints for each source ..." << endl;
+  ksn_knickpoint_detection_new(FlowInfo);
+  cout << " OK" << endl;
+
+
+  // As proud as I was to have implement that, I unfortunately don't need it anymore...
+  // // Now dealing with outlier detection
+  // // first calculating the KDE
+  // cout << "Kernel Density Estimation per river (Deprecated, but I keep it for some debugging purposes) ...";
+  // ksn_kp_KDE();
+  // cout << " OK" << endl ;
+  // I just keep it for latter purposes, RIP AGU method.
+
+  // Processing the knickpoints to combine the composite knickpoints
+  cout << "Combining ksn knickpoints ..." << endl;
+  ksn_knickpoints_combining(FlowInfo,kp_node_search);
+  cout << " OK" << endl ;
+
+  cout << "Getting the stepped_knickpoints ..." << endl;
+  stepped_knickpoints_detection_v2(FlowInfo,window_stepped,n_std_dev);
+  // stepped_knickpoints_combining(FlowInfo, stepped_combining_window);
+  cout << " OK" << endl ;
+
+
+  // Ok let's detect oultliers here
+  cout << "Generating some stats ...";
+  ksn_knickpoint_outlier_automator(FlowInfo, MZS_th);
+  cout << " OK" << endl ;
 
 }
 
@@ -2146,8 +2483,12 @@ void LSDChiTools::ksn_knickpoint_detection_new(LSDFlowInfo& FlowInfo)
   for(SK = map_node_source_key.begin(); SK != map_node_source_key.end(); SK++)
   {
     this_SK = SK->first;
+    // cout << "this SK:" << this_SK << endl;
     vecnode = SK->second; // getting the vector of river node to check
-    ksn_knickpoint_raw_river(this_SK,vecnode);
+    // cout << "vecnode gottend:" << vecnode.size() << endl;
+
+    if(vecnode.size()>5)
+      ksn_knickpoint_raw_river(this_SK,vecnode);
   }
 
 }
@@ -2168,10 +2509,18 @@ void LSDChiTools::ksn_knickpoint_raw_river(int SK, vector<int> vecnode)
   vector<int> vecdif;
   // Bunch of floats
   //float dkdc = 0;     // Don't seem to need these (SMM)
-  //float dchi = 0;     // Don't seem to need these (SMM)
+  float dchi = 0;     // Don't seem to need these (SMM)
   float dksn = 0;
   float this_ksn = TVD_m_chi_map[this_node];
   float last_ksn = TVD_m_chi_map[last_node]; // Setting last and this ksn
+  // chi stuff
+  float this_chi = chi_data_map[this_node];
+  float last_chi = chi_data_map[last_node];
+  // elevation to get like
+
+    //REPLY TO REVIEW VARIABLES
+  // vector<int> node_to_imp;
+  // vector<double> temp_cx; 
 
   // Looping through the nodes from the second one
   for( ; node != vecnode.end(); node++) // the first ";" is normal: it states that I have no initial conditions 
@@ -2179,22 +2528,47 @@ void LSDChiTools::ksn_knickpoint_raw_river(int SK, vector<int> vecnode)
     // initializing the variables for this run
     this_node = *node;
     this_ksn = TVD_m_chi_map[this_node];
+    this_chi = chi_data_map[this_node];
     // dsegelev = segelev_diff[this_node];
+
+
+
     // if ksn has change, Implementing a raw knickpoint, quantifying it with delta ksn
     if((this_ksn != last_ksn) && this_ksn != -9999 && last_ksn != -9999 )
     {
+
       // deta ksn from bottom to top
       dksn = last_ksn - this_ksn;
+
+      dchi = this_chi - last_chi;
       // saving the value in the global raw_ksn_kp map
       raw_ksn_kp_map[this_node] =  dksn;
+      // RPLY TO REVIEW CX STUFF
+      Cx_TVD_map[this_node] = dksn / dchi;
       // saving the node to get the vector of ksn knickpoints per source, for later grouping purpose for example
       vecdif.push_back(this_node);
+
+      
     }
     // setting the next last variables
     last_node = this_node;
     last_ksn = this_ksn;
+    last_chi = this_chi;
 
   }
+  // vector<double> temp_cx_2;
+
+  // //Reply to review
+  // if(node_to_imp.size()>1)
+  // {
+  //   temp_cx_2 = TV1D_denoise_v2(temp_cx, 1);
+  //   for(size_t urugay=0;urugay<node_to_imp.size();urugay++)
+  //   {
+  //     this_node = node_to_imp[urugay];
+  //     Cx_2TVD_map[this_node] = 
+  //   }
+  // }
+
 
   // implementing the global map
   map_node_source_key_kp[SK] = vecdif;
@@ -2892,13 +3266,232 @@ vector<vector<int> > LSDChiTools::group_local_kp(vector<int> vecnode_kp, vector<
 
 }
 
+/// Function to test TVD on elevation
+/// This test is after submission to answer to WS comments
+/// There is great potential in suck a method, let see how sensitive to lambda elevation is
+/// The trickiest part would be to adpat lambda, I am afraid that the TVD might just try to flatten the thing
+/// I'll try to comment this function on the go
+/// Boris
+void  LSDChiTools::TVD_on_segelev(LSDFlowInfo& Flowinfo)
+{
+  // Set the variables
+  map<int,vector<int> >::iterator chirac;
+  vector<int> this_vec;
+  int this_river = 0;
+
+  // Looping through the source key and getting the associated vector of river nodes
+  for(chirac = map_node_source_key.begin(); chirac != map_node_source_key.end() ; chirac ++)
+  {
+    this_vec = chirac->second; // the vector of node
+    vector<float> gros_test; // Debugging purposes
+    // this next function Apply the TVD on the vector. It directly save the results in a global map and return general informations for debugging
+    cout << "Denoising river #" << this_river << " with size " << this_vec.size() << endl;
+
+    // Checking if the river isn't too small
+    if(this_vec.size()>20){
+
+      // I need a vector per data to TVD and for the corresponding resuslts
+      vector<double> this_segelev_to_TVD, the_TVDed_vector_segelev, this_elev_to_TVD, the_TVDed_vector_elev, this_delev_to_TVD, the_TVDed_vector_delev, retrended_elevation, this_delev, this_chi, m_chi_z_from_retrended,curv_chi_from_retrended;
+      // Pferd means Horse in German
+      size_t pferd;
+      // iterator through the node vector
+      vector<int>::iterator vlad = this_vec.begin();
+
+      // Vgetting the data to denoise
+      for(; vlad != this_vec.end() ; vlad++)
+      {
+        int this_node = *vlad;
+        this_segelev_to_TVD.push_back(double(segmented_elevation_map[this_node]));
+        this_elev_to_TVD.push_back(elev_data_map[this_node]);
+        this_delev_to_TVD.push_back(elev_data_map[this_node]); // storing the elevation before actually getting it 
+        this_chi.push_back(chi_data_map[this_node]);
+
+      }
+
+      // detrening the elevation here: Just a first order derivation
+      for(pferd = 0; pferd<this_vec.size()-1; pferd++)
+      {
+        this_delev_to_TVD[pferd] = this_elev_to_TVD[pferd] - this_elev_to_TVD[pferd + 1] ;
+      }
+
+      // This is just a Q&D way to initialize the vectors to the right format. Not proud of that but it's working.
+      this_delev = this_delev_to_TVD;
+      m_chi_z_from_retrended = this_delev_to_TVD;
+      curv_chi_from_retrended = this_delev_to_TVD;
+
+      // Dealing with the base node of each river: its derivation compare to its local receiver
+      int receiver;
+      Flowinfo.retrieve_receiver_information(this_vec[this_vec.size()-1],receiver);
+      // And applying it
+      this_delev_to_TVD[this_vec.size()-1] = elev_data_map[this_vec[this_vec.size()-1]] - elev_data_map[receiver];
+
+      // Getting the base elevation of this particular river
+      float base_elevation = elev_data_map[receiver]; // elevation at level -1
+
+      // range of lambda to test
+      static const double arr[] = {0,0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1.5,2,3,4,5,6,7,8,9,10,20};//,10,20,25,50,100,500};
+      vector<double> lambdac(arr, arr + sizeof(arr) / sizeof(arr[0]));
+
+      // OK now I am running the denoising on each vector and ...
+      double this_lambda = 0;
+      for(vector<double>::iterator jacques=lambdac.begin();jacques!=lambdac.end();jacques++)
+      {
+
+        this_lambda = *jacques; // This simply is the lambda currently tested
+        the_TVDed_vector_segelev = TV1D_denoise_v2(this_segelev_to_TVD, this_lambda);
+        the_TVDed_vector_elev = TV1D_denoise_v2(this_elev_to_TVD, this_lambda);
+        the_TVDed_vector_delev = TV1D_denoise_v2(this_delev_to_TVD, this_lambda);
+
+        // ... retrending the elevation
+        retrended_elevation.clear(); // safety first but probably useless
+        retrended_elevation = the_TVDed_vector_elev;
+        double last_retrended_elev = 0;
+        for (size_t jaguar=1;jaguar<=this_vec.size();jaguar++)
+        {
+          // inverting the iterator
+          size_t djag = this_vec.size() - jaguar;
+          // if this is the base I am detrending in regardfs to its receiver
+          if(djag == this_vec.size()-1)
+          {
+            retrended_elevation[djag] = base_elevation + the_TVDed_vector_delev[djag];
+          }
+          else
+          {
+            // otherwise I detrend from my last detrending
+            retrended_elevation[djag] = last_retrended_elev + the_TVDed_vector_delev[djag];
+          }
+          // Done, saving last step
+          last_retrended_elev = retrended_elevation[djag];
+        }
+
+
+
+        // Now I just have to save the results into global maps
+        int last_node = -9999; // forcing segfault in case it happens 
+        for(pferd=0; pferd<this_vec.size(); pferd++)
+        {
+          int this_node = this_vec[pferd];
+
+          pair<double,int> tkey(this_lambda,this_node);
+
+          pair<double,int> last_key;
+
+          TVD_segelev[tkey] = the_TVDed_vector_segelev[pferd];
+          TVD_elev[tkey] = the_TVDed_vector_elev[pferd];
+          TVD_delev[tkey] = the_TVDed_vector_delev[pferd];
+          delev[tkey] = this_delev[pferd];
+          TVD_retrend[tkey] = retrended_elevation[pferd];
+
+          last_key = tkey;
+        }
+        // cout << "GSDJKFSDFSDF" << endl;
+        // Calculating here the first derivative from chi-retrended profile (-> m_chi)
+        for (size_t jaguar=1;jaguar<=this_vec.size();jaguar++)
+        {
+          // inverting the iterator
+          size_t djag = this_vec.size() - jaguar;
+          // if this is the base I am deriving in regardfs to its receiver
+          if(djag == this_vec.size()-1)
+          {
+            pair<double,int> tpppp(this_lambda,receiver);
+            // cout << djag << endl;
+            // cout << TVD_retrend[tpppp] << endl;
+            // cout << this_chi[djag] << endl;
+            // cout << chi_data_map[receiver] << endl;
+            double this_elev_to_use = 0;
+            if(TVD_retrend.count(tpppp) == 0)
+            {
+              this_elev_to_use = elev_data_map[receiver];
+            }
+            else
+            {
+              this_elev_to_use = TVD_retrend[tpppp];
+            }
+
+            m_chi_z_from_retrended[djag] = abs((retrended_elevation[djag] - this_elev_to_use));///(this_chi[djag]-chi_data_map[receiver]));
+          }
+          else
+          {
+            // otherwise I detrend from my last detrending
+            m_chi_z_from_retrended[djag] = abs((retrended_elevation[djag] - retrended_elevation[djag+1]));///(this_chi[djag]-this_chi[djag+1]));
+          }
+          // Done, saving last step
+        }
+
+        //Saving the map
+        for(pferd=0; pferd<this_vec.size(); pferd++)
+        {
+          int this_node = this_vec[pferd];
+
+          pair<double,int> tkey(this_lambda,this_node);
+
+          pair<double,int> last_key;
+
+          globmap_mchi_z_from_retrend[tkey] = m_chi_z_from_retrended[pferd];
+
+          last_key = tkey;
+        }
+
+        // Calculating Now the curvature from mchi-from-retrended profile (-> C_chi)
+        for (size_t jaguar=1;jaguar<=this_vec.size();jaguar++)
+        {
+          // inverting the iterator
+          size_t djag = this_vec.size() - jaguar;
+          // if this is the base I am deriving in regardfs to its receiver
+          if(djag == this_vec.size()-1)
+          {
+            pair<double,int> tpppp(this_lambda,receiver);
+            double this_mchi_to_use = 0;
+
+            this_mchi_to_use = globmap_mchi_z_from_retrend[tpppp];
+
+            curv_chi_from_retrended[djag] = (m_chi_z_from_retrended[djag] - this_mchi_to_use);///(this_chi[djag]-chi_data_map[receiver]);
+          }
+          else
+          {
+            // otherwise I detrend from my last detrending
+            // cout << djag << endl;
+            curv_chi_from_retrended[djag] = (m_chi_z_from_retrended[djag] - m_chi_z_from_retrended[djag+1]);///(this_chi[djag]-this_chi[djag+1]);
+          }
+          // Done, saving last step
+        }
+
+        //Saving the map
+        for(pferd=0; pferd<this_vec.size(); pferd++)
+        {
+          int this_node = this_vec[pferd];
+
+          pair<double,int> tkey(this_lambda,this_node);
+
+          pair<double,int> last_key;
+
+          globmap_cchi_from_retrend[tkey] = curv_chi_from_retrended[pferd];
+
+          last_key = tkey;
+        }
+
+
+
+      }
+
+    }
+
+  // Next river
+  this_river++ ;
+
+  }
+
+}
+
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //  Apply a Total Variation Denoising filter on the data  =
 //    Coded in LSDStatTools adapted from Condat L.2013    =
 //            DOI: 10.1109/LSP.2013.2278339               =
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-void  LSDChiTools::TVD_on_my_ksn( float lambda, float lambda_TVD_b_chi)
+void  LSDChiTools::TVD_on_my_ksn( float lambda)
 {
   // Set the variables
   map<int,vector<int> >::iterator chirac;
@@ -2917,7 +3510,7 @@ void  LSDChiTools::TVD_on_my_ksn( float lambda, float lambda_TVD_b_chi)
 
     if(this_vec.size()>20){
 
-      gros_test = TVD_this_vec(this_vec, lambda, lambda_TVD_b_chi);
+      gros_test = TVD_this_vec(this_vec, lambda);
     }
   this_river++ ;
 
@@ -2931,7 +3524,7 @@ void  LSDChiTools::TVD_on_my_ksn( float lambda, float lambda_TVD_b_chi)
 //    Coded in LSDStatTools adapted from Condat L.2013            =
 //            DOI: 10.1109/LSP.2013.2278339                       =
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-vector<float>  LSDChiTools::TVD_this_vec(vector<int> this_vec, float lambda, float lambda_TVD_b_chi)
+vector<float>  LSDChiTools::TVD_this_vec(vector<int> this_vec, float lambda)
 {
 
   // Creating the containers I will need for the denoising
@@ -2955,22 +3548,17 @@ vector<float>  LSDChiTools::TVD_this_vec(vector<int> this_vec, float lambda, flo
 
   }
   // Calling the actual denoising coded in Stat tools
-  double clambda = lambda, dlamda = lambda_TVD_b_chi;
+  double clambda = lambda;
   vector<float> outtemp;
   if(this_val_mchi.size()>0)
   {
     vector<double> this_val_mchi_TVDed = TV1D_denoise_v2(this_val_mchi, clambda);
-  
-    // vector<double> this_val_bchi_TVDed = TV1D_denoise_v2(this_val_bchi, dlamda);
-    // vector<double> this_val_segelev_TVDed = TV1D_denoise_v2(this_val_segelev, 5);
   
     // Our data is Denoised, yaaaay. Let's implement the global map to save it.
     for(size_t plo = 0; plo < this_vec.size() ; plo++ )
     {
       int this_node = this_vec[plo];
       TVD_m_chi_map[this_node] = (float)this_val_mchi_TVDed[plo];
-      // TVD_b_chi_map[this_node] = (float)this_val_bchi_TVDed[plo];
-      // TVD_segelev_diff[this_node] = (float)this_val_segelev_TVDed[plo];
     }
   
     // Formatting a debugging vector that I sometime use. Ignore that.
@@ -2983,7 +3571,7 @@ vector<float>  LSDChiTools::TVD_this_vec(vector<int> this_vec, float lambda, flo
 }
 
 /// Test function to adapat the denoising size but not working at the moment.
-void  LSDChiTools::TVD_this_vec_v2(vector<int> this_vec, float lambda, float lambda_TVD_b_chi, int max_node, string type)
+void  LSDChiTools::TVD_this_vec_v2(vector<int> this_vec, float lambda, int max_node, string type)
 {
 
   // Creating the containers I will need for the denoising
@@ -3004,9 +3592,9 @@ void  LSDChiTools::TVD_this_vec_v2(vector<int> this_vec, float lambda, float lam
   }
 
   // Calling the actual denoising coded in Stat tools
-  double clambda = lambda, dlamda = lambda_TVD_b_chi;
+  double clambda = lambda;
   vector<double> this_val_mchi_TVDed = TV1D_denoise_v2(this_val_mchi, clambda);
-  vector<double> this_val_bchi_TVDed = TV1D_denoise_v2(this_val_bchi, dlamda);
+  // vector<double> this_val_bchi_TVDed = TV1D_denoise_v2(this_val_bchi, dlamda);
   vector<double> this_val_segelev_TVDed = TV1D_denoise_v2(this_val_segelev, 5);
 
 
@@ -3196,7 +3784,7 @@ void LSDChiTools::derive_the_segmented_elevation()
         {
           // i derive if this is not the last node
           this_node = *nonode;
-          segelev_diff[this_node] = (segmented_elevation_map[last_node] - segmented_elevation_map[this_node]); // ---> to had if we derive it to chi (chi_data_map[last_node] - chi_data_map[this_node]); 
+          segelev_diff[this_node] = (segmented_elevation_map[last_node] - segmented_elevation_map[this_node]); // ---> to add if we derive it to chi (chi_data_map[last_node] - chi_data_map[this_node]); 
           segelev_diff_second[this_node] = segelev_diff_second[last_node] - segelev_diff_second[this_node];
         }
         else
@@ -3343,7 +3931,7 @@ void LSDChiTools::print_bandwidth_ksn_knickpoint(string filename)
     // open the data file
   ofstream  file_out;
   file_out.open(filename.c_str());
-  file_out << "source_key,basin_key,length,chi,bandwidth" << endl;
+  file_out << "source_key,basin_key,length,chi" << endl;
 
   int this_source_key, this_basin_key, this_node = 0;
   float this_bandwidth = 0;
@@ -3351,15 +3939,18 @@ void LSDChiTools::print_bandwidth_ksn_knickpoint(string filename)
 
   for(OL = map_node_source_key.begin(); OL !=  map_node_source_key.end() ; OL++)
   {
-    this_source_key = OL->first;
-    this_node = OL->second[0];
-    this_basin_key = baselevel_keys_map[this_node];
-    this_bandwidth = KDE_bandwidth_per_source_key[this_source_key];
-    file_out << this_source_key << ","
-             << this_basin_key << ","
-             << map_flow_length_source_key[this_source_key] << ","
-             << map_chi_length_source_key[this_source_key] << ","
-             << this_bandwidth << endl;
+    vector<int> albert = OL->second;
+    if(albert.size()>0)
+    {
+      this_source_key = OL->first;
+      this_node = OL->second[0];
+      this_basin_key = baselevel_keys_map[this_node];
+      this_bandwidth = KDE_bandwidth_per_source_key[this_source_key];
+      file_out << this_source_key << ","
+               << this_basin_key << ","
+               << map_flow_length_source_key[this_source_key] << ","
+               << map_chi_length_source_key[this_source_key] << endl;
+    }
   }
   file_out.close();
 
@@ -3386,7 +3977,7 @@ void LSDChiTools::print_raw_ksn_knickpoint(LSDFlowInfo& FlowInfo, string filenam
   // open the data file
   ofstream  chi_data_out;
   chi_data_out.open(filename.c_str());
-  chi_data_out << "longitude,latitude,elevation,flow_distance,chi,drainage_area,delta_ksn,dksn/dchi,KDE,basin_key,out_MZS,source_key";
+  chi_data_out << "longitude,latitude,elevation,flow_distance,chi,drainage_area,delta_ksn,dksn/dchi,KDE,basin_key,out_MZS,Cx,source_key";
 
   chi_data_out << endl;
 
@@ -3420,6 +4011,7 @@ void LSDChiTools::print_raw_ksn_knickpoint(LSDFlowInfo& FlowInfo, string filenam
                      << raw_KDE_kp_map[this_node] << ","
                      << baselevel_keys_map[this_node]<< ","
                      << map_outlier_MZS_dksndchi[this_node] << ","
+                     << Cx_TVD_map[this_node] << ","
                      << source_keys_map[this_node];
 
         chi_data_out << endl;
@@ -3451,7 +4043,7 @@ void LSDChiTools::print_final_ksn_knickpoint(LSDFlowInfo& FlowInfo, string filen
   // open the data file
   ofstream  chi_data_out;
   chi_data_out.open(filename.c_str());
-  chi_data_out << "node,X,Y,latitude,longitude,elevation,flow_distance,chi,drainage_area,delta_ksn,delta_segelev,sharpness,sign,out,basin_key,source_key";
+  chi_data_out << "node,X,Y,latitude,longitude,elevation,flow_distance,chi,drainage_area,delta_ksn,delta_segelev,sharpness,sign,out,Cx,basin_key,source_key";
 
   chi_data_out << endl;
 
@@ -3505,6 +4097,7 @@ void LSDChiTools::print_final_ksn_knickpoint(LSDFlowInfo& FlowInfo, string filen
                      << sharpness_ksn_length[this_node] << ","
                      << this_sign << ","
                      << map_outlier_MZS_combined[this_node] << ","
+                     << Cx_TVD_map[this_node] << ","
                      << baselevel_keys_map[this_node]<< ","
                      << source_keys_map[this_node];
 
@@ -3573,6 +4166,385 @@ void LSDChiTools::print_final_ksn_knickpoint(LSDFlowInfo& FlowInfo, string filen
   
 }
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Print data maps to file for the knickpoint algorithm
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDChiTools::print_mchisegmented_knickpoint_version_test_on_segmented_elevation(LSDFlowInfo& FlowInfo, string filename)
+{
+
+  // these are for extracting element-wise data from the channel profiles.
+  int this_node, row, col;
+  double latitude,longitude;
+  double this_x,this_y;
+  LSDCoordinateConverterLLandUTM Converter;
+
+  // find the number of nodes
+  int n_nodes = (node_sequence.size());
+
+  // test to see if there is segment numbering
+  bool have_segments = false;
+  if( segment_counter_map.size() == node_sequence.size())
+  {
+    have_segments = true;
+  }
+
+  // test to see if the fitted elevations have been calculated
+  bool have_segmented_elevation = false;
+  have_segmented_elevation = true;
+  
+
+
+  // open the data file
+  ofstream  chi_data_out;
+  chi_data_out.open(filename.c_str());
+  chi_data_out << "node,X,Y,row,col,latitude,longitude,chi,elevation,flow_distance,drainage_area,lambda,TVD_segelev,TVD_elev,TVD_delev,TVD_retrend,delev,mchi_from_retrend,c_chi_from_retrend,source_key,basin_key";
+
+
+  if (n_nodes <= 0)
+  {
+    cout << "Cannot print since you have not calculated channel properties yet." << endl;
+  }
+  else
+  {
+    for (map<pair<double,int>, double>::iterator gala = TVD_segelev.begin(); gala!=TVD_segelev.end();gala++)
+    {
+      pair<double,int> this_pair;
+      this_pair = gala->first;
+      this_node = this_pair.second;
+      // pregetting the data
+      double this_lambda, this_TVDELEVTEST, this_TVD_elev, this_TVD_delev, this_TVD_retrend, this_delev, this_mchi_from_retrend, this_C_chi;
+      this_lambda = this_pair.first;
+      this_TVDELEVTEST = gala->second;
+      this_TVD_elev = TVD_elev[this_pair];
+      this_TVD_delev = TVD_delev[this_pair];
+      this_TVD_retrend = TVD_retrend[this_pair];
+      this_delev = delev[this_pair];
+      this_mchi_from_retrend = globmap_mchi_z_from_retrend[this_pair];
+      this_C_chi = globmap_cchi_from_retrend[this_pair];
+
+      FlowInfo.retrieve_current_row_and_col(this_node,row,col);
+      get_lat_and_long_locations(row, col, latitude, longitude, Converter);
+      get_x_and_y_locations(row, col, this_x, this_y);
+      int ksnkp = 0, segelevkp = 0; // 0 = no knickpoint, -1 negative, 1 positive
+      // checking if there is a raw knickpoint here
+      if(raw_ksn_kp_map.count(this_node)!=0) 
+      {
+        if(raw_ksn_kp_map[this_node]>0)
+        {
+          ksnkp = 1;
+        }
+        else if(raw_ksn_kp_map[this_node]<0)
+        {
+          ksnkp = -1;
+        }
+
+        if(segelev_diff[this_node]>0)
+        {
+          segelevkp = 1;
+        }
+        if(segelev_diff[this_node]>0)
+        {
+          segelevkp = -1;
+        }
+
+      }
+
+      chi_data_out << this_node << ","
+                   << this_x << ","
+                   << this_y << ","
+                   << row << ","
+                   << col << ",";
+
+      chi_data_out.precision(9);
+      chi_data_out << latitude << ","
+                   << longitude << ",";
+      chi_data_out.precision(5);
+      chi_data_out << chi_data_map[this_node] << ","
+                   << elev_data_map[this_node] << ","
+                   << flow_distance_data_map[this_node] << ","
+                   << drainage_area_data_map[this_node] << ","
+                   << this_lambda << ","
+                   << this_TVDELEVTEST << ","
+                   << this_TVD_elev << ','
+                   << this_TVD_delev << ','
+                   << this_TVD_retrend << ','
+                   << this_delev << ','
+                   << this_mchi_from_retrend << ','
+                   << this_C_chi << ','
+                   << source_keys_map[this_node] << ","
+                   << baselevel_keys_map[this_node];
+
+      chi_data_out << endl;
+    }
+  }
+
+  chi_data_out.close();
+
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+// Creating a new series of knickpoint extraction
+
+void LSDChiTools::generate_knickpoint_overview(LSDFlowInfo& FlowInfo, LSDRaster& Elevation, LSDIndexRaster& FlowAcc , float movern, float tA0, string filename)
+{
+
+  // Experimental function to respond to WS
+  cout << "Building knickpoint Overview metrics" << endl;
+  // Firstly I am getting the vector of separated flows
+  vector< vector<int> > vector_flow_route = FlowInfo.get_vectors_of_flow(Elevation);
+  // ;// = FlowInfo.get_vectors_of_flow(Elevation);
+  // cout << "DEBUG::Here " << endl;
+
+  // Going through it with a verry relevant iterator name (No incidence on code comprehension so:
+  Array2D<float> tdenoised_elevation(NRows,NCols,NoDataValue);
+  Array2D<float> tkp_overview_chi_coordinates(NRows,NCols,NoDataValue);
+  Array2D<float> tCx_TVD_map(NRows,NCols,NoDataValue);
+  Array2D<float> tMx_TVD_map(NRows,NCols,NoDataValue);
+
+  for(size_t h=0;h<NRows;h++)
+  {
+    for(size_t g=0;g<NCols;g++)
+    {
+      if(Elevation.get_data_element(h,g) != NoDataValue)
+      {
+        tdenoised_elevation[h][g] = 0;
+        tkp_overview_chi_coordinates[h][g] = 0;
+        tCx_TVD_map[h][g] = 0;
+        tMx_TVD_map[h][g] = 0;
+      }
+    }
+
+  }
+
+  cout << "Processing the metrics: I have to process " << vector_flow_route.size() << " flow vectors." << endl;
+  
+  int cpt = 1;
+  double lambda_TVD = 10;
+  for(vector< vector<int> >::iterator Hund_und_Katze =  vector_flow_route.begin(); Hund_und_Katze != vector_flow_route.end(); Hund_und_Katze++)
+  {
+    // if(cpt % 10 == 0)
+    // {
+    //   cout << cpt << "/" << vector_flow_route.size() << " processed" << "\r";
+    // }
+    // cpt++;
+
+
+    // this vector of connected node
+    vector<int> nodevec = *Hund_und_Katze;
+    vector<double> elevec;
+    vector<int> Vrow,Vcol;
+    vector<int> Vx,Vy;
+    // getting the elevation
+
+    for(size_t i=0; i<nodevec.size(); i++)
+    {
+      int row=0, col=0, this_node = nodevec[i];
+      double x=0,y=0;
+      // Getting the info
+      FlowInfo.retrieve_current_row_and_col(this_node,row,col);
+      FlowInfo.get_x_and_y_locations(row,col,x,y);
+      // Implementing the vectors
+      elevec.push_back(Elevation.get_data_element(row, col));
+      Vrow.push_back(row);
+      Vcol.push_back(col);      
+      Vx.push_back(x);
+      Vy.push_back(y);
+    }
+    // Now I have the info I need
+
+    // TVD on my elevation:
+
+    // first need to detrend
+    vector<double> this_detrend_elevec;
+    for(size_t i=0; i<nodevec.size(); i++)
+    {
+      int this_node = nodevec[i];
+      int row = Vrow[i];
+      int col = Vcol[i];
+      double this_detrend = 0;
+      double last_elev = 0;
+      if(i==0)
+      {
+        int receiver_id, receiver_row, receiver_col;
+        FlowInfo.retrieve_receiver_information(this_node,receiver_id,receiver_row,receiver_col);
+        last_elev = Elevation.get_data_element(receiver_row, receiver_col);
+      }
+      else
+      {
+        last_elev = elevec[i-1];
+      }
+      this_detrend_elevec.push_back(elevec[i] - last_elev);
+      // cout << this_detrend_elevec.back() << endl;
+      if(this_detrend_elevec.back()<0)
+      {
+        cout<< "Knickpoint overview failure: got contradictory elevations" << endl;
+        exit(EXIT_FAILURE);
+      }
+    }  
+    
+    vector<double> this_denoised_delevec;
+    if(this_detrend_elevec.size()>2)
+    {
+      this_denoised_delevec = TV1D_denoise_v2(this_detrend_elevec, lambda_TVD);
+    }
+    else
+    {
+      // No denoising if too small -> median of values
+      double med = get_median(this_detrend_elevec);
+      for(size_t yu=0; yu< this_detrend_elevec.size(); yu++)
+      {
+        this_denoised_delevec.push_back(med);
+      }
+    }
+
+    // Now I need to retrend:
+    vector<double> this_retrend_elevec = this_denoised_delevec;
+    for(size_t i=0; i<nodevec.size(); i++)
+    {
+      int this_node = nodevec[i];
+      int row = Vrow[i];
+      int col = Vcol[i];
+      double this_detrend = 0;
+      double last_elev = 0;
+      if(i==0)
+      {
+        int receiver_id, receiver_row, receiver_col;
+
+        FlowInfo.retrieve_receiver_information(this_node,receiver_id,receiver_row,receiver_col);
+        if(receiver_id == this_node || tdenoised_elevation[receiver_row][receiver_col] == NoDataValue)
+        {
+          // Base level node
+          tdenoised_elevation[row][col] = 0;
+          this_denoised_delevec[i] = 0;
+          last_elev = 0;
+        }
+        else
+        {
+
+          last_elev = tdenoised_elevation[receiver_row][receiver_col];
+        }
+      }
+      else
+      {
+
+        last_elev = this_retrend_elevec[i-1];
+      }
+      this_retrend_elevec[i] = this_detrend_elevec[i] + last_elev;
+      tdenoised_elevation[row][col] = this_detrend_elevec[i] + last_elev;
+
+    }  
+
+    // Lets reiterate through that shit and implement the metrics we need
+    // Thanks to the clever node ordering, I can calculate chi and stuffs confidently
+    // if all of that takes time I'll break it into several vector of nodes from their stream order or other things
+    // I also need two more additionnal vector!
+    vector<double> delta_chi, mchi_vec, mchi_vec_tvd;
+    for(size_t i=0; i<nodevec.size(); i++)
+    {
+      int this_node = nodevec[i];
+      int row = Vrow[i];
+      int col = Vcol[i];
+      
+      // receiver info
+      vector<double> steepness;
+      int receiver_id, receiver_row, receiver_col;
+      FlowInfo.retrieve_receiver_information(this_node,receiver_id,receiver_row,receiver_col);
+      if(receiver_id == this_node || tdenoised_elevation[receiver_row][receiver_col] == NoDataValue)
+      {
+        // I am a baselevel
+        tkp_overview_chi_coordinates[row][col] = 0;
+        delta_chi.push_back(0);
+        mchi_vec.push_back(0);
+      }
+      else
+      {
+        double rx,ry;
+        // getting the receiver/donors XY
+        FlowInfo.get_x_and_y_locations(receiver_row,receiver_col,rx,ry);
+        double dx = sqrt(pow(Vx[i]-rx, 2) + pow(Vy[i]-ry, 2));
+        // Calculating Chi
+        double tDA = FlowAcc.get_data_element(row,col);
+        double last_DA = FlowAcc.get_data_element(receiver_row,receiver_col);
+        double last_chi = tkp_overview_chi_coordinates[receiver_row][receiver_col];
+        double tchi = last_chi + pow((((tA0/last_DA)+(tA0/tDA))/2)*dx,movern);
+        tkp_overview_chi_coordinates[row][col] = tchi; // got it
+        double dchi = tchi - last_chi;
+        // double tdelev =
+        mchi_vec.push_back((tdenoised_elevation[row][col] - tdenoised_elevation[receiver_row][receiver_col])/dchi); 
+        delta_chi.push_back(dchi);
+        
+      }
+
+      // TVD on my Mchi
+      if(mchi_vec.size()>1) 
+      {
+        mchi_vec_tvd = TV1D_denoise_v2(mchi_vec, lambda_TVD);
+      }
+      else
+      { 
+        mchi_vec_tvd=mchi_vec;
+      }
+
+      // getting the rest
+      for(size_t i=0; i<nodevec.size(); i++)
+      {
+        int this_node = nodevec[i];
+        int row = Vrow[i];
+        int col = Vcol[i];
+        
+        // receiver info
+        vector<double> steepness;
+        int receiver_id, receiver_row, receiver_col;
+        FlowInfo.retrieve_receiver_information(this_node,receiver_id,receiver_row,receiver_col);
+        if(receiver_id == this_node || tdenoised_elevation[receiver_row][receiver_col] == NoDataValue)
+        {
+          // I am a baselevel
+          tMx_TVD_map[row][col] = 0;
+          tCx_TVD_map[row][col] = 0;
+        }
+        else
+        {
+          // Need to get everything now
+          tMx_TVD_map[row][col] = mchi_vec_tvd[i];
+          tCx_TVD_map[row][col] = (tMx_TVD_map[row][col] - tMx_TVD_map[receiver_row][receiver_col])/delta_chi[i];  
+        }
+      }
+    }
+
+
+
+      
+  }
+
+  cout << endl;
+  cout << "Done with calculation, now writing to file the different rasters ";
+  // Done with all the workable nodes
+
+  // Let's write the rasters now
+  LSDRaster Rdenoised_elevation(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, tdenoised_elevation,GeoReferencingStrings);
+  Rdenoised_elevation.write_raster(filename+"_denoised_dem","bil");
+  cout << " Denoised elevation OK ";
+
+  LSDRaster Rkp_overview_chi_coordinates(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, tkp_overview_chi_coordinates,GeoReferencingStrings);
+  Rkp_overview_chi_coordinates.write_raster(filename+"_chi_glob","bil");
+  cout << " Chi global raster OK ";
+
+  LSDRaster RCx_TVD_map(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, tCx_TVD_map,GeoReferencingStrings);
+  RCx_TVD_map.write_raster(filename+"_Cchi_TVD","bil");
+  cout << " Curvature from TVD elevation OK ";
+
+  LSDRaster RMx_TVD_map(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, tMx_TVD_map,GeoReferencingStrings);
+  RMx_TVD_map.write_raster(filename+"_Mchi_TVD","bil");
+  cout << " Chi-z gradient from TVD elevation OK " << endl;
+
+        
+     
+}
+
+
+
+
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // Print data maps to file for the knickpoint algorithm
@@ -3605,7 +4577,7 @@ void LSDChiTools::print_mchisegmented_knickpoint_version(LSDFlowInfo& FlowInfo, 
   // open the data file
   ofstream  chi_data_out;
   chi_data_out.open(filename.c_str());
-  chi_data_out << "node,X,Y,row,col,latitude,longitude,chi,elevation,flow_distance,drainage_area,m_chi,lumped_ksn,TVD_ksn,TVD_segelev_diff,b_chi,TVD_b_chi,ksnkp,segelevkp,source_key,basin_key";
+  chi_data_out << "node,X,Y,row,col,latitude,longitude,chi,elevation,flow_distance,drainage_area,m_chi,lumped_ksn,TVD_ksn,TVD_segelev_diff,b_chi,ksnkp,segelevkp,source_key,basin_key";
   if(have_segmented_elevation)
   {
     chi_data_out << ",segmented_elevation,mean_segdiff,std_segdiff,segdiff";
@@ -3675,7 +4647,6 @@ void LSDChiTools::print_mchisegmented_knickpoint_version(LSDFlowInfo& FlowInfo, 
                    << TVD_m_chi_map[this_node] << ","
                    << TVD_segelev_diff[this_node] << ","
                    << b_chi_data_map[this_node] << ","
-                   << TVD_b_chi_map[this_node] << ","
                    << ksnkp << ","
                    << segelevkp << ","                  
                    << source_keys_map[this_node] << ","
@@ -8044,7 +9015,7 @@ void LSDChiTools::get_chi_elevation_data_of_channel(LSDFlowInfo& FlowInfo, int s
   int current_node = starting_source;
   int receiver_node,receiver_row,receiver_col;
   int this_source_key;
-  while(not is_end)
+  while(is_end == false)
   {
     FlowInfo.retrieve_receiver_information(current_node,receiver_node, receiver_row,receiver_col);
 
@@ -8174,7 +9145,7 @@ vector<float> LSDChiTools::project_data_onto_reference_channel(vector<float>& re
       // we didn't find the chi, we need to move through the reference vector to find
       // the chi value
       bool found_ref_nodes = false;
-      while (end_ref_index < n_ref_nodes && not found_ref_nodes)
+      while (end_ref_index < n_ref_nodes && found_ref_nodes == false)
       {
         start_ref_index++;
         end_ref_index++;
@@ -8331,7 +9302,7 @@ vector<float> LSDChiTools::project_points_onto_reference_channel(vector<float>& 
       // need to get to the node in the trib that is less than the chi to test
       bool got_there_yet = false;
       int this_trib_node = 0;
-      while ( (not got_there_yet)  && this_trib_node!= n_trib_nodes)
+      while ( (got_there_yet == false)  && this_trib_node!= n_trib_nodes)
       {
         //cout << "chi distance: " << chi_upstream[this_trib_node] << endl;
         if(chi_distances_to_test[i] > chi_upstream[this_trib_node])
@@ -8376,7 +9347,7 @@ vector<float> LSDChiTools::project_points_onto_reference_channel(vector<float>& 
           // we didn't find the chi, we need to move through the reference vector to find
           // the chi value
           bool found_ref_nodes = false;
-          while (end_ref_index < n_ref_nodes && not found_ref_nodes)
+          while (end_ref_index < n_ref_nodes && found_ref_nodes==false)
           {
             start_ref_index++;
             end_ref_index++;
@@ -8544,7 +9515,7 @@ void LSDChiTools::get_slope_area_data(LSDFlowInfo& FlowInfo, float vertical_inte
     // the end point
     // if it encounters the end of the channel before it hits
     // the end point the loop exits
-    while (not is_this_final_node)
+    while (is_this_final_node == false)
     {
       // get the upstream elevation and flow distance
       upstream_elevation = elev_data_map[top_interval_node];
@@ -8575,13 +9546,13 @@ void LSDChiTools::get_slope_area_data(LSDFlowInfo& FlowInfo, float vertical_inte
         is_midpoint_interval = false;
 
         // now work downstream
-        while (not is_this_final_node && not is_end_interval)
+        while ( is_this_final_node == false &&  is_end_interval == false)
         {
           //cout << "search_node: " << search_node << " elev: " << elevations[chan][search_node]
           //     << " and target mp, end: " << target_mp_interval_elevations << " " << target_end_interval_elevations << endl;
 
           // see if search node is the midpoint node
-          if ( elev_data_map[search_node] <= target_midpoint_interval_elevation && not is_midpoint_interval)
+          if ( elev_data_map[search_node] <= target_midpoint_interval_elevation &&  is_midpoint_interval == false)
           {
             //midpoint_area = drainage_area_data_map[search_node];
             midpoint_node = search_node;
@@ -9859,6 +10830,117 @@ void LSDChiTools::print_data_maps_to_file_basic(LSDFlowInfo& FlowInfo, string fi
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+///@brief Return a map of useful maps
+///@author B.G.
+///@date 21/11/2018
+map<string, map<int,float> > LSDChiTools::get_data_maps()
+{
+  map<string, map<int,float> > output;
+  output["flow_distance"]=flow_distance_data_map;
+  output["elevation"] = elev_data_map;
+  output["chi"] = chi_data_map;
+  output["DA"] = drainage_area_data_map;
+  output["m_chi"] = M_chi_data_map;
+
+  map<int,float> tempmapsk;
+  for(map<int,int>::iterator it= source_keys_map.begin(); it!= source_keys_map.end(); it++)
+  {
+    tempmapsk[it->first]=float(it->second);
+  }
+  
+  output["SK"] = tempmapsk;
+
+  return output;
+}
+
+
+///@brief return vectors of integer data calculated by Mudd et al., 2014 JGR.
+///@author B.G.
+///@date 21/11/2018
+map<string, vector<int> > LSDChiTools::get_integer_vecdata_for_m_chi(LSDFlowInfo &Flowinfo)
+{
+  size_t size = node_sequence.size();
+  vector<int> arrnodeID(size), arrrow(size), arrcol(size), arrsource_key(size), arrbasin_key(size);
+  for (size_t n=0; n<size; n++)
+  {
+    int this_node = node_sequence[n];
+    arrnodeID[n] = this_node;
+    int trow,tcol;
+    Flowinfo.retrieve_current_row_and_col(this_node,trow,tcol);
+    arrrow[n] = trow; arrcol[n] = tcol;
+    arrsource_key[n] =  source_keys_map[this_node];
+    arrbasin_key[n] =  baselevel_keys_map[this_node];
+  }
+
+  map<string, vector<int> > output;
+  output["nodeID"] = arrnodeID;
+  output["row"] = arrrow;
+  output["col"] = arrcol;
+  output["source_key"] = arrsource_key;
+  output["basin_key"] = arrbasin_key;
+
+  return output;
+
+}
+
+///@brief return vectors of integer data calculated by Mudd et al., 2014 JGR.
+///@author B.G.
+///@date 21/11/2018
+map<string, vector<float> > LSDChiTools::get_float_vecdata_for_m_chi(LSDFlowInfo &Flowinfo)
+{
+  // Overall size
+  size_t size = node_sequence.size();
+  // Getting the data ready
+  vector<int> arrnodeID(size);
+  vector<float> this_m_chi(size), this_b_chi(size), this_x_coord(size), this_y_coord(size), this_elevation(size), this_drainage_area(size), this_flow_distance(size), this_chi(size);
+
+  // Looping through each nodes
+  for (size_t n=0; n<size; n++)
+  {
+    // getting node info
+    int this_node = node_sequence[n];
+    arrnodeID[n] = this_node;
+    int trow,tcol;
+    float this_x, this_y;
+    Flowinfo.retrieve_current_row_and_col(this_node,trow,tcol);
+    Flowinfo.get_x_and_y_from_current_node(this_node, this_x, this_y);
+
+    // feeding the vectors
+    this_m_chi[n] = M_chi_data_map[this_node];
+    this_b_chi[n] = b_chi_data_map[this_node];
+    this_x_coord[n] = this_x;
+    this_y_coord[n] = this_y;
+    this_elevation[n] = elev_data_map[this_node];
+    this_drainage_area[n] = drainage_area_data_map[this_node];
+    this_flow_distance[n] = flow_distance_data_map[this_node];
+    this_chi[n] = chi_data_map[this_node];
+
+
+  }
+
+  map<string, vector<float> > output;
+  output["m_chi"] = this_m_chi;
+  output["b_chi"] = this_b_chi;
+  output["x"] = this_x_coord;
+  output["y"] = this_y_coord;
+  output["elevation"] = this_elevation;
+  output["drainage_area"] = this_drainage_area;
+  output["flow_distance"] = this_flow_distance;
+  output["chi"] = this_chi;
+
+  return output;
+
+}
+
+///@brief Return the node sequence
+///@author B.G.
+///@date 21/11/2018
+vector<int> LSDChiTools::get_vectors_of_node()
+{
+  vector<int> output;
+  output = node_sequence;
+  return output;
+}
 
 
 

@@ -413,7 +413,7 @@ void LSDParameterParser::parse_file_IO()
   }
   else
   {
-    if(not found_cheads)
+    if(found_cheads == false)
     {
       CHeads_file = "NULL";
     }

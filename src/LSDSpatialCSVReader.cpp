@@ -804,7 +804,7 @@ void LSDSpatialCSVReader::burn_raster_data_to_csv(LSDRaster& ThisRaster,string c
   vector<string> new_column_data;
 
   // The csv file needs to have lat-long data
-  if (not check_if_latitude_and_longitude_exist())
+  if (check_if_latitude_and_longitude_exist() == false)
   {
     cout << "You must have lat-long data for burning to work. " << endl;
     exit(EXIT_FAILURE);
@@ -846,7 +846,7 @@ void LSDSpatialCSVReader::burn_raster_data_to_csv(LSDIndexRaster& ThisRaster,str
   vector<string> new_column_data;
 
   // The csv file needs to have lat-long data
-  if (not check_if_latitude_and_longitude_exist())
+  if (check_if_latitude_and_longitude_exist() == false)
   {
     cout << "You must have lat-long data for burning to work. " << endl;
     exit(EXIT_FAILURE);
