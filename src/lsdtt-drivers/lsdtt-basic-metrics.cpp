@@ -457,10 +457,10 @@ int main (int nNumberofArgs,char *argv[])
     vector<int> file_code;
     file_code.push_back(1);  file_code.push_back(1); file_code.push_back(1);
     string file_prefix = OUT_DIR+OUT_ID;
-    
-    // THe roughness radius should be around 3m for a 1m DEM: you get more diffuse "rocks with wider radii"
-    topography_raster.calculate_roughness_rasters(this_float_map["surface_fitting_radius"], this_float_map["roughness_radius"],
-                    file_prefix, file_code);
+
+    // The roughness radius should be around 3m for a 1m DEM: you get more diffuse "rocks with wider radii"
+    topography_raster.calculate_roughness_rasters(this_float_map["surface_fitting_radius"], this_float_map["roughness_radius"],file_prefix,file_code);
+
   }
 
 

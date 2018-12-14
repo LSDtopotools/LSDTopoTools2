@@ -6183,7 +6183,8 @@ void LSDRaster::calculate_orientation_matrix_eigenvalues(float window_radius,
 // This function is a wrapper to get the three roughness eigenvalues s1, s2 and
 // s3.
 //
-//DTM 15/07/2013
+//DTM 15/07/2013  Updated 14/12/2018 with the more recent roughness raster code
+// that has more error checking
 //
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -6234,38 +6235,26 @@ void LSDRaster::calculate_roughness_rasters(float window_radius, float roughness
     roughness_size_str = polystring+window_size_str+underscore+roughstring+roughness_size_str;
 
     // calcualte polyfit arrays
-    calculate_polyfit_coefficient_matrices(window_radius,a, b,c, d, e, f);
-      // analyse variability of normals
-      Array2D<float> l;
-    Array2D<float> m;
-    Array2D<float> n;
-    Array2D<float> s1;
-    Array2D<float> s2;
-    Array2D<float> s3;
-    calculate_polyfit_directional_cosines(d, e, l, m, n);
-    calculate_orientation_matrix_eigenvalues(roughness_radius,l,m,n,s1,s2,s3);
+    vector<LSDRaster> rough_rasters = calculate_polyfit_roughness_metrics(window_radius, roughness_radius, file_code);
 
     // now go through vector to see which files you want
     if (file_code[0] == 1)
     {
-      LSDRaster s1_raster(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,s1,GeoReferencingStrings);
-          string s1_name = "_s1_";
+      string s1_name = "_s1_";
       s1_name = file_prefix+s1_name+roughness_size_str;
-      s1_raster.write_raster(s1_name,DEM_flt_extension);
+      rough_rasters[0].write_raster(s1_name,DEM_flt_extension);
     }
     if (file_code[1] == 1)
     {
-      LSDRaster s2_raster(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,s2,GeoReferencingStrings);
-          string s2_name = "_s2_";
+      string s2_name = "_s2_";
       s2_name = file_prefix+s2_name+roughness_size_str;
-      s2_raster.write_raster(s2_name,DEM_flt_extension);
+      rough_rasters[1].write_raster(s2_name,DEM_flt_extension);
     }
     if (file_code[2] == 1)
     {
-      LSDRaster s3_raster(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,s3,GeoReferencingStrings);
-          string s3_name = "_s3_";
+      string s3_name = "_s3_";
       s3_name = file_prefix+s3_name+roughness_size_str;
-      s3_raster.write_raster(s3_name,DEM_flt_extension);
+      rough_rasters[2].write_raster(s3_name,DEM_flt_extension);
     }
   }
 }
