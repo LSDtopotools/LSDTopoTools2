@@ -153,8 +153,8 @@ int main (int nNumberofArgs,char *argv[])
   
   // Basin-based channel extraction
   bool_default_map["find_basins"] = false;
-  int_default_map["minimum_basin_size_pixels"] = 5000;
-  int_default_map["maximum_basin_size_pixels"] = 500000;
+  int_default_map["minimum_basin_size_pixels"] = 50000;
+  int_default_map["maximum_basin_size_pixels"] = 1000000;
   bool_default_map["only_take_largest_basin"] = false;
   string_default_map["BaselevelJunctions_file"] = "NULL";
   bool_default_map["extend_channel_to_node_before_receiver_junction"] = true;
@@ -375,77 +375,81 @@ int main (int nNumberofArgs,char *argv[])
     raster_selection[8] = 1;
     doing_polyfit = true;
   }
-  vector<LSDRaster> surface_fitting;
+  
   
   if (doing_polyfit)
   {
     cout << "I am running the polyfit function. This could take some time." << endl;
+    vector<LSDRaster> surface_fitting; 
+    surface_fitting = topography_raster.calculate_polyfit_surface_metrics_directional_gradients(this_float_map["surface_fitting_radius"], raster_selection);
+    if(this_bool_map["print_smoothed_elevation"])
+    {
+      cout << "Let me print the smoothed elevation raster for you."  << endl;
+      string this_raster_name = OUT_DIR+OUT_ID+"_SMOOTH";
+      surface_fitting[0].write_raster(this_raster_name,raster_ext);
+    }
+    if(this_bool_map["print_slope"])
+    {
+      cout << "Let me print the slope raster for you."  << endl;
+      string this_raster_name = OUT_DIR+OUT_ID+"_SLOPE"; 
+      surface_fitting[1].write_raster(this_raster_name,raster_ext);
+    }
+    if(this_bool_map["print_aspect"])
+    {
+      cout << "Let me print the aspect raster for you."  << endl;
+      string this_raster_name = OUT_DIR+OUT_ID+"_ASPECT";
+      surface_fitting[2].write_raster(this_raster_name,raster_ext);
+    }
+    if(this_bool_map["print_curvature"])
+    {
+      cout << "Let me print the curvature raster for you."  << endl;
+      string this_raster_name = OUT_DIR+OUT_ID+"_CURV";
+      surface_fitting[3].write_raster(this_raster_name,raster_ext);
+    }
+    if(this_bool_map["print_planform_curvature"])
+    {
+      cout << "Let me print the planform curvature raster for you."  << endl;
+      string this_raster_name = OUT_DIR+OUT_ID+"_PLFMCURV";
+      surface_fitting[4].write_raster(this_raster_name,raster_ext);
+    }
+    if(this_bool_map["print_profile_curvature"])
+    {
+      cout << "Let me print the profile curvature raster for you."  << endl;
+      string this_raster_name = OUT_DIR+OUT_ID+"_PROFCURV";
+      surface_fitting[5].write_raster(this_raster_name,raster_ext);
+    }
+    if(this_bool_map["print_tangential_curvature"])
+    {
+      cout << "Let me print the tangential curvature raster for you."  << endl;
+      string this_raster_name = OUT_DIR+OUT_ID+"_TANCURV";
+      surface_fitting[6].write_raster(this_raster_name,raster_ext);
+    }
+    if(this_bool_map["print_point_classification"])
+    {
+      cout << "Let me print the point classification curvature raster for you."  << endl;
+      string this_raster_name = OUT_DIR+OUT_ID+"_CLASS";
+      surface_fitting[7].write_raster(this_raster_name,raster_ext);
+    }
+    if(this_bool_map["print_directional_gradients"])
+    {
+      cout << "Let me print the directional gradient rasters for you."  << endl;
+      string this_raster_name1 = OUT_DIR+OUT_ID+"_DDX";
+      string this_raster_name2 = OUT_DIR+OUT_ID+"_DDY";
+      surface_fitting[8].write_raster(this_raster_name1,raster_ext);
+      surface_fitting[9].write_raster(this_raster_name2,raster_ext);
+    } 
   }
-  
-  surface_fitting = topography_raster.calculate_polyfit_surface_metrics_directional_gradients(this_float_map["surface_fitting_radius"], raster_selection);
-  if(this_bool_map["print_smoothed_elevation"])
+  else
   {
-    cout << "Let me print the smoothed elevation raster for you."  << endl;
-    string this_raster_name = OUT_DIR+OUT_ID+"_SMOOTH";
-    surface_fitting[0].write_raster(this_raster_name,raster_ext);
+    cout << "I won't be doing any polyfitting so you have saved yourself some time!" << endl;
   }
-  if(this_bool_map["print_slope"])
-  {
-    cout << "Let me print the slope raster for you."  << endl;
-    string this_raster_name = OUT_DIR+OUT_ID+"_SLOPE";
-    surface_fitting[1].write_raster(this_raster_name,raster_ext);
-  }
-  if(this_bool_map["print_aspect"])
-  {
-    cout << "Let me print the aspect raster for you."  << endl;
-    string this_raster_name = OUT_DIR+OUT_ID+"_ASPECT";
-    surface_fitting[2].write_raster(this_raster_name,raster_ext);
-  }
-  if(this_bool_map["print_curvature"])
-  {
-    cout << "Let me print the curvature raster for you."  << endl;
-    string this_raster_name = OUT_DIR+OUT_ID+"_CURV";
-    surface_fitting[3].write_raster(this_raster_name,raster_ext);
-  }
-  if(this_bool_map["print_planform_curvature"])
-  {
-    cout << "Let me print the planform curvature raster for you."  << endl;
-    string this_raster_name = OUT_DIR+OUT_ID+"_PLFMCURV";
-    surface_fitting[4].write_raster(this_raster_name,raster_ext);
-  }
-  if(this_bool_map["print_profile_curvature"])
-  {
-    cout << "Let me print the profile curvature raster for you."  << endl;
-    string this_raster_name = OUT_DIR+OUT_ID+"_PROFCURV";
-    surface_fitting[5].write_raster(this_raster_name,raster_ext);
-  }
-  if(this_bool_map["print_tangential_curvature"])
-  {
-    cout << "Let me print the tangential curvature raster for you."  << endl;
-    string this_raster_name = OUT_DIR+OUT_ID+"_TANCURV";
-    surface_fitting[6].write_raster(this_raster_name,raster_ext);
-  }
-  if(this_bool_map["print_point_classification"])
-  {
-    cout << "Let me print the point classification curvature raster for you."  << endl;
-    string this_raster_name = OUT_DIR+OUT_ID+"_CLASS";
-    surface_fitting[7].write_raster(this_raster_name,raster_ext);
-  }
-  if(this_bool_map["print_directional_gradients"])
-  {
-    cout << "Let me print the directional gradient rasters for you."  << endl;
-    string this_raster_name1 = OUT_DIR+OUT_ID+"_DDX";
-    string this_raster_name2 = OUT_DIR+OUT_ID+"_DDY";
-    surface_fitting[8].write_raster(this_raster_name1,raster_ext);
-    surface_fitting[9].write_raster(this_raster_name2,raster_ext);
-  }
-
   
   //============================================================================
   // Print the roughness rasters
   //============================================================================
   if(this_bool_map["print_REI_raster"])
   {
+    cout << "I am caluclating the REI raster." << endl;
     LSDRaster REI_raster = topography_raster.calculate_REI(this_float_map["REI_window_radius"], this_float_map["REI_critical_slope"]);
     string this_raster_name = OUT_DIR+OUT_ID+"_REI";
     REI_raster.write_raster(this_raster_name,raster_ext);
@@ -453,6 +457,8 @@ int main (int nNumberofArgs,char *argv[])
   
   if(this_bool_map["print_roughness_rasters"])
   {
+    cout << "I am printing the roughness rasters S1, S2, and S3. " << endl;
+    cout << "See Milodowski et al ESURF 2015 https://doi.org/10.5194/esurf-3-483-2015" << endl;
     // This just ensures all three roughness rasters are printed
     vector<int> file_code;
     file_code.push_back(1);  file_code.push_back(1); file_code.push_back(1);
@@ -504,7 +510,7 @@ int main (int nNumberofArgs,char *argv[])
         || this_bool_map["print_junction_index_raster"]
         || this_bool_map["print_junctions_to_csv"]
         || this_bool_map["find_basins"]
-        || this_bool_map["print_chi_data_map"]
+        || this_bool_map["print_chi_data_maps"]
         || this_bool_map["print_junction_angles_to_csv"])
   {
     cout << "I will need to compute flow information, because you are getting drainage area or channel networks." << endl;
