@@ -685,7 +685,7 @@ int main (int nNumberofArgs,char *argv[])
     DrainageArea.write_raster(DA_raster_name,raster_ext);
   }
 
-  // calcualte the distance from outlet
+  // calculate the distance from outlet
   cout << "\t Calculating flow distance..." << endl;
   LSDRaster DistanceFromOutlet = FlowInfo.distance_from_outlet();
 
@@ -897,7 +897,7 @@ int main (int nNumberofArgs,char *argv[])
     else
     {
       cout << "I am attempting to read base level junctions from a base level junction list." << endl;
-      cout << "If this is not a simple text file that only contains itegers there will be problems!" << endl;
+      cout << "If this is not a simple text file that only contains integers there will be problems!" << endl;
 
       //specify junctions to work on from a list file
       //string JunctionsFile = DATA_DIR+BaselevelJunctions_file;
@@ -910,7 +910,7 @@ int main (int nNumberofArgs,char *argv[])
       {
         cout << "Junctions File " << BaselevelJunctions_file << " exists" << endl;;
         int n;                                                                                                                                                                                                                                                                                                                                                                                                                                                   
-        while (infile >> n) BaseLevelJunctions_Initial.push_back(n);
+      while (infile >> n) BaseLevelJunctions_Initial.push_back(n);
       }
       else
       {
@@ -962,6 +962,15 @@ int main (int nNumberofArgs,char *argv[])
   {
     cout << "I am stopping here since I don't have any basins to analyse." << endl;
     exit(EXIT_FAILURE);
+  }
+  else 
+  {
+    cout << "The baselevel junction numbers are: " << endl;
+    for(int i = 0; i< N_BaseLevelJuncs; i++)
+    {
+      cout << BaseLevelJunctions[i] << ", ";  
+    }
+    cout << endl;
   }
   
 

@@ -602,10 +602,12 @@ int main (int nNumberofArgs,char *argv[])
     }
 
     // Get the distance from outet raster if you want it.
-     LSDRaster FD;
+    LSDRaster FD;
     if(this_bool_map["print_distance_from_outlet"] ||
-       this_bool_map["find_basins"])
+       this_bool_map["find_basins"] ||
+       this_bool_map["print_chi_data_maps"])
     {
+      cout << "I need to calculate the flow distance now." << endl;
       FD = FlowInfo.distance_from_outlet();
       
       if(this_bool_map["print_distance_from_outlet"])
@@ -820,12 +822,21 @@ int main (int nNumberofArgs,char *argv[])
           cout << "I am stopping here since I don't have any basins to analyse." << endl;
           exit(EXIT_FAILURE);
         }
+        else 
+        {
+          cout << "The baselevel junction numbers are: " << endl;
+          for(int i = 0; i< N_BaseLevelJuncs; i++)
+          {
+            cout << BaseLevelJunctions[i] << ", ";  
+          }
+          cout << endl;
+        }          
 
         // Now we get the channel segments. This information is used for plotting
         vector<int> source_nodes;
         vector<int> outlet_nodes;
         vector<int> baselevel_node_of_each_basin;
-        int n_nodes_to_visit = 5;
+        int n_nodes_to_visit = 10;
         if (this_bool_map["extend_channel_to_node_before_receiver_junction"])
         {
           cout << endl << endl << "=====================================================" << endl;
