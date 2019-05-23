@@ -407,22 +407,17 @@ for (int order = 0; order < int(SourceNodes.size()); order++){
   //        |                      \                   |                      \
   //        |                       \                  |                       \
   //        2                        3                 22                      33
+  //
+  //
+  // We want to find all cases where two (or more) links terminate at the same point
+  // and can do this by subtracting a set of all the node indexes from the vector containing
+  // all of the indexes - finding all of the duplicates.
 
+  vector<int> duplicate_nodes = duplicates(node_tracker);
 
-  vector<int> node_tracker_unique = Unique(node_tracker);
-  vector<int> set_diff = node_tracker;
+  for (int q = 0; q < int(duplicate_nodes.size()); ++q){
 
-  for (int w = 0; w < int(node_tracker_unique.size()); ++w){
-
-    vector<int>::iterator position = find(set_diff.begin(), set_diff.end(), node_tracker_unique[w]);
-    if (position != set_diff.end())
-        set_diff.erase(position);
-
-  }
-
-  for (int q = 0; q < int(set_diff.size()); ++q){ //loop over set difference between node_tracker and unique
-
-    int curr_node = set_diff[q];
+    int curr_node = duplicate_nodes[q];
     for (int n = 0; n < int(node_tracker.size()); ++n){
 
       if (curr_node == node_tracker[n]){
@@ -462,6 +457,7 @@ LSDIndexRaster LSDStrahlerLinks::WriteTokunagaRaster(LSDFlowInfo& FlowInfo){
       int next_node, next_row, next_col;
       int current_node = SourceNodes[t_order][t_segment];
 
+      // After storing the locations of the start and end of each link, now we fill in the gaps in between
       while (current_node != ReceiverNodes[t_order][t_segment]) {
         FlowInfo.retrieve_receiver_information(current_node, next_node, next_row, next_col);
 

@@ -5646,6 +5646,30 @@ vector<float> Unique(vector<float> InputVector){
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Given a vector of ints, return a new vector which only contains values that occur more than once.
+// The returned vector will contain one of each duplicate value. If there are no duplicates, an empty
+// vector will be returned.
+//
+// SWDG - 23/5/19
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<int> duplicates(vector<int> data){
+
+  vector<int> unique_data = Unique(data);
+  vector<int> duplicates = data;
+
+  for (int u = 0; u < int(unique_data.size()); ++u){
+
+    vector<int>::iterator position = find(duplicates.begin(), duplicates.end(), unique_data[u]);
+    if (position != duplicates.end())
+        duplicates.erase(position);
+
+  }
+  return duplicates;
+}
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // Simple linear spacing algorithm to return a vector of evenly spaced floats
 // between a min and max range (inclusive). Equivalent to np.linspace() in python
 // and linspace in Matlab.

@@ -488,6 +488,13 @@ vector<int> Unique(vector<int> InputVector);
 // SWDG - 22/7/16
 vector<float> Unique(vector<float> InputVector);
 
+// Given a vector of ints, return a new vector which only contains values that occur more than once.
+// The returned vector will contain one of each duplicate value. If there are no duplicates, an empty
+// vector will be returned.
+//
+// SWDG - 23/5/19
+vector<int> duplicates(vector<int> data);
+
 // Generate vector of evenly spaced numbers between two points
 vector<float> linspace(float min, float max, int n);
 
