@@ -346,11 +346,9 @@ void LSDStrahlerLinks::populate_NodeRowCol_vecvecs(LSDJunctionNetwork& JNetwork,
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-LSDIndexRaster LSDStrahlerLinks::testing(LSDJunctionNetwork& JNetwork,
-                                                   LSDFlowInfo& FlowInfo)
+void LSDStrahlerLinks::CalculateTokunagaIndexes(LSDJunctionNetwork& JNetwork,
+                                                LSDFlowInfo& FlowInfo)
 {
-
-vector< vector<int> > TokunagaValues;
 
 for (int order = 0; order < int(SourceNodes.size()); order++){
 
@@ -405,40 +403,41 @@ for (int order = 0; order < int(SourceNodes.size()); order++){
 
 }
 
-// **************** Below here we are working on writing the TokunagaValues to a stream network raster
-
-Array2D<int> data(NRows, NCols, NoDataValue);
-
-// first assign all sources their value in our output raster
-
-for (int t_order = 0; t_order < int(SourceNodes.size()); t_order++){
-  for (int t_segment = 0; t_segment < int(SourceNodes[t_order].size()); t_segment++){
-
-    int r_row, r_col;
-
-    FlowInfo.retrieve_current_row_and_col(SourceNodes[t_order][t_segment], r_row, r_col);
-    data[r_row][r_col] = TokunagaValues[t_order][t_segment];
-
-    FlowInfo.retrieve_current_row_and_col(ReceiverNodes[t_order][t_segment], r_row, r_col);
-    data[r_row][r_col] = TokunagaValues[t_order][t_segment];
-
-    int next_node, next_row, next_col;
-    int current_node = SourceNodes[t_order][t_segment];
-
-    while (current_node != ReceiverNodes[t_order][t_segment]) {
-      FlowInfo.retrieve_receiver_information(current_node, next_node, next_row, next_col);
-
-      data[next_row][next_col] = TokunagaValues[t_order][t_segment];
-      current_node = next_node;
-
-    }
-
-  }
 }
 
+LSDIndexRaster LSDStrahlerLinks::WriteTokunagaRaster(LSDFlowInfo& FlowInfo){
 
-LSDIndexRaster out(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,data,GeoReferencingStrings);
-return out;
+  Array2D<int> data(NRows, NCols, NoDataValue);
+
+  for (int t_order = 0; t_order < int(SourceNodes.size()); t_order++){
+    for (int t_segment = 0; t_segment < int(SourceNodes[t_order].size()); t_segment++){
+
+      int r_row, r_col;
+
+      FlowInfo.retrieve_current_row_and_col(SourceNodes[t_order][t_segment], r_row, r_col);
+      data[r_row][r_col] = TokunagaValues[t_order][t_segment];
+
+      FlowInfo.retrieve_current_row_and_col(ReceiverNodes[t_order][t_segment], r_row, r_col);
+      data[r_row][r_col] = TokunagaValues[t_order][t_segment];
+
+      int next_node, next_row, next_col;
+      int current_node = SourceNodes[t_order][t_segment];
+
+      while (current_node != ReceiverNodes[t_order][t_segment]) {
+        FlowInfo.retrieve_receiver_information(current_node, next_node, next_row, next_col);
+
+        data[next_row][next_col] = TokunagaValues[t_order][t_segment];
+        current_node = next_node;
+
+      }
+
+    }
+  }
+
+
+  LSDIndexRaster out(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,data,GeoReferencingStrings);
+  return out;
+
 
 
 }

@@ -186,8 +186,6 @@ class LSDStrahlerLinks
     /// @date 24/03/16
     void calculate_lengths(LSDFlowInfo& FlowInfo);
 
-    LSDIndexRaster testing(LSDJunctionNetwork& JNetwork, LSDFlowInfo& FlowInfo);
-
 	  /// @brief this function prints the lengths. Creates a different file for each stream order.
     /// @param data_directory a string containing the data dierctory. Should be
     ///  terminated with a slash
@@ -196,6 +194,24 @@ class LSDStrahlerLinks
     /// @author FJC
     /// @date 25/03/16
     void print_lengths(string data_directory, string DEM_name);
+
+    /// @brief Function to calculate Tokunaga indexes for each link.
+    ///
+    /// @detail See for details on this method
+    /// @param JNetwork a LSDJunctionNetwork object
+    /// @param FlowInfo LSDFlowInfo object
+    /// @author SWDG
+    /// @date 23/05/19
+    void CalculateTokunagaIndexes(LSDJunctionNetwork& JNetwork, LSDFlowInfo& FlowInfo);
+
+    /// @brief Function to  write Tokunaga indexes to a raster for visualisation.
+    ///
+    /// @detail Must run LSDStrahlerLinks.CalculateTokunagaIndexes() first
+    /// @author SWDG
+    /// @date 23/05/19
+    LSDIndexRaster WriteTokunagaRaster(LSDFlowInfo& FlowInfo);
+
+
 
 
   protected:
@@ -251,6 +267,9 @@ class LSDStrahlerLinks
 
     /// a vec vec containing lengths of every link - added FJC 24/03/16
     vector< vector<float> > LengthData;
+
+    // A vec vec containing the Tokunaga indexes of each link - SWDG 23/5/19
+    vector< vector<int> > TokunagaValues;
 
 
   private:
