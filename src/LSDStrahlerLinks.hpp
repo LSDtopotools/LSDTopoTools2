@@ -195,16 +195,20 @@ class LSDStrahlerLinks
     /// @date 25/03/16
     void print_lengths(string data_directory, string DEM_name);
 
-    /// @brief Function to calculate Tokunaga indexes for each link.
+    /// @brief Method to calculate Tokunaga indexes for each link.
     ///
-    /// @detail See for details on this method
+    /// @detail See this paper for details on this method:
+    //
+    // Zanardo, S., I. Zaliapin, and E. Foufoula-Georgiou (2013), Are American rivers Tokunaga self-similar? New results
+    // on fluvial network topology and its climatic dependence, J. Geophys. Res. Earth Surf., 118, 166–183, doi:10.1029/2012JF002392.
+    //
     /// @param JNetwork a LSDJunctionNetwork object
     /// @param FlowInfo LSDFlowInfo object
     /// @author SWDG
     /// @date 23/05/19
     void CalculateTokunagaIndexes(LSDJunctionNetwork& JNetwork, LSDFlowInfo& FlowInfo);
 
-    /// @brief Function to  write Tokunaga indexes to a raster for visualisation.
+    /// @brief Method to  write Tokunaga indexes to a raster for visualisation.
     ///
     /// @detail Must run LSDStrahlerLinks.CalculateTokunagaIndexes() first
     /// @author SWDG

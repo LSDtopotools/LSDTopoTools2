@@ -344,8 +344,16 @@ void LSDStrahlerLinks::populate_NodeRowCol_vecvecs(LSDJunctionNetwork& JNetwork,
   ReceiverCols = receiver_cols;
 
 }
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Method to calculate Tokunaga indexes for each link. Based on:
+//
+// Zanardo, S., I. Zaliapin, and E. Foufoula-Georgiou (2013), Are American rivers Tokunaga self-similar? New results
+// on fluvial network topology and its climatic dependence, J. Geophys. Res. Earth Surf., 118, 166–183, doi:10.1029/2012JF002392.
+//
+// and the references therein.
+// SWDG 23/05/19
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDStrahlerLinks::CalculateTokunagaIndexes(LSDJunctionNetwork& JNetwork,
                                                 LSDFlowInfo& FlowInfo)
 {
@@ -400,11 +408,17 @@ for (int order = 0; order < int(SourceNodes.size()); order++){
 
   }
 
-
 }
 
 }
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Method to write Tokunaga indexes to a raster for visualisation.
+//
+// Must run LSDStrahlerLinks.CalculateTokunagaIndexes() first.
+//
+// SWDG 23/05/19
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 LSDIndexRaster LSDStrahlerLinks::WriteTokunagaRaster(LSDFlowInfo& FlowInfo){
 
   Array2D<int> data(NRows, NCols, NoDataValue);
