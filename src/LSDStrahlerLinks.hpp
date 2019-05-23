@@ -136,7 +136,7 @@ class LSDStrahlerLinks
     void calculate_link_area(LSDFlowInfo& FlowInfo);
 
     /// @brief this function prints drops. Modified FJC 25/03/16.
-    /// @param data_directory a string containing the data dierctory. Should be
+    /// @param data_directory a string containing the data directory. Should be
     ///  terminated with a slash
     /// @param DEM_name a string that is used to identify the file
     ///  (typically this will be the name of the DEM)
@@ -187,7 +187,7 @@ class LSDStrahlerLinks
     void calculate_lengths(LSDFlowInfo& FlowInfo);
 
 	  /// @brief this function prints the lengths. Creates a different file for each stream order.
-    /// @param data_directory a string containing the data dierctory. Should be
+    /// @param data_directory a string containing the data directory. Should be
     ///  terminated with a slash
     /// @param DEM_name a string that is used to identify the file
     ///  (typically this will be the name of the DEM)
@@ -215,7 +215,13 @@ class LSDStrahlerLinks
     /// @date 23/05/19
     LSDIndexRaster WriteTokunagaRaster(LSDFlowInfo& FlowInfo);
 
-
+    /// @brief Write the TokunagaValues data to a csv file for analysis elsewhere.
+    /// @param data_directory a string containing the data directory. Should be
+    ///  terminated with a slash
+    /// @param label a string that is used to identify the file
+    /// @author swdg
+    /// @date 23/05/19
+    void WriteTokunagaData(string data_directory, string label);
 
 
   protected:
