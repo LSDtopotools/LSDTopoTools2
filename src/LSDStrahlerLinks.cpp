@@ -358,77 +358,77 @@ void LSDStrahlerLinks::CalculateTokunagaIndexes(LSDJunctionNetwork& JNetwork,
                                                 LSDFlowInfo& FlowInfo)
 {
 
-// We start by iterating over each strahler link, per each strahler order
-// The Tokunaga index is a pair of ints, the first (i) denotes the order of the current link,
-// the second (j) denotes the order the link flows into.
-for (int order = 0; order < int(SourceNodes.size()); order++){
+  // We start by iterating over each strahler link, per each strahler order
+  // The Tokunaga index is a pair of ints, the first (i) denotes the order of the current link,
+  // the second (j) denotes the order the link flows into.
+  for (int order = 0; order < int(SourceNodes.size()); order++){
 
-  vector<int> node_tracker;
-  vector<int> TValues_tmp;
+    vector<int> node_tracker;
+    vector<int> TValues_tmp;
 
-  for (int a = 0; a < SourceNodes[order].size(); ++a){
+    for (int a = 0; a < SourceNodes[order].size(); ++a){
 
-    // Get the node one node downstream of the reciever, the start of the next link
-    // This gives us the order the current link flows into
-    int node;
-    FlowInfo.retrieve_receiver_information(ReceiverNodes[order][a], node);
+      // Get the node one node downstream of the reciever, the start of the next link
+      // This gives us the order the current link flows into
+      int node;
+      FlowInfo.retrieve_receiver_information(ReceiverNodes[order][a], node);
 
-    int i = JNetwork.get_StreamOrder_of_Node(FlowInfo, SourceNodes[order][a]);
-    int j = JNetwork.get_StreamOrder_of_Node(FlowInfo, node);
+      int i = JNetwork.get_StreamOrder_of_Node(FlowInfo, SourceNodes[order][a]);
+      int j = JNetwork.get_StreamOrder_of_Node(FlowInfo, node);
 
-    node_tracker.push_back(node);
+      node_tracker.push_back(node);
 
-    // Convert our i and j values to strings, concatenate them and then cast back to an int
-    stringstream ss;
-    ss << i << j;
-    TValues_tmp.push_back(stoi(ss.str()));
-  }
+      // Convert our i and j values to strings, concatenate them and then cast back to an int
+      stringstream ss;
+      ss << i << j;
+      TValues_tmp.push_back(stoi(ss.str()));
+    }
 
-  TokunagaValues.push_back(TValues_tmp);
+    TokunagaValues.push_back(TValues_tmp);
 
-  // Finally, in cases where we have two streams of the same order meeting, we
-  // need to correct their Tokunaga values. Two strahler order 1 streams which
-  // meet, will result in a strahler order 2 stream, and based on the above logic
-  // will be coded with a Tokunaga value of 12, but should be coded as 11. This is
-  // an artefact of how fastscape represents networks.
-  //
-  //            Strahler:                                Tokunaga:
-  //
-  //  1            1      3             1       11           11     33            13
-  //  \           /       \            /         \           /       \            /
-  //   \         /         \          /           \         /         \          /
-  //    \       /           \        /             \       /           \        /
-  //     \     /             \      /               \     /             \      /
-  //      \   /               \    /                 \   /               \    /
-  //       \ /                 \  /                   \ /                 \  /
-  //        |                   \/                     |                   \/
-  //        |                    \                     |                    \
-  //        |                     \                    |                     \
-  //        |                      \                   |                      \
-  //        |                       \                  |                       \
-  //        2                        3                 22                      33
-  //
-  //
-  // We want to find all cases where two (or more) links terminate at the same point
-  // and can do this by subtracting a set of all the node indexes from the vector containing
-  // all of the indexes - finding all of the duplicates.
+    // Finally, in cases where we have two streams of the same order meeting, we
+    // need to correct their Tokunaga values. Two strahler order 1 streams which
+    // meet, will result in a strahler order 2 stream, and based on the above logic
+    // will be coded with a Tokunaga value of 12, but should be coded as 11. This is
+    // an artefact of how fastscape represents networks.
+    //
+    //            Strahler:                                Tokunaga:
+    //
+    //  1            1      3             1       11           11     33            13
+    //  \           /       \            /         \           /       \            /
+    //   \         /         \          /           \         /         \          /
+    //    \       /           \        /             \       /           \        /
+    //     \     /             \      /               \     /             \      /
+    //      \   /               \    /                 \   /               \    /
+    //       \ /                 \  /                   \ /                 \  /
+    //        |                   \/                     |                   \/
+    //        |                    \                     |                    \
+    //        |                     \                    |                     \
+    //        |                      \                   |                      \
+    //        |                       \                  |                       \
+    //        2                        3                 22                      33
+    //
+    //
+    // We want to find all cases where two (or more) links terminate at the same point
+    // and can do this by subtracting a set of all the node indexes from the vector containing
+    // all of the indexes - finding all of the duplicates.
 
-  vector<int> duplicate_nodes = duplicates(node_tracker);
+    vector<int> duplicate_nodes = duplicates(node_tracker);
 
-  for (int q = 0; q < int(duplicate_nodes.size()); ++q){
+    for (int q = 0; q < int(duplicate_nodes.size()); ++q){
 
-    int curr_node = duplicate_nodes[q];
-    for (int n = 0; n < int(node_tracker.size()); ++n){
+      int curr_node = duplicate_nodes[q];
+      for (int n = 0; n < int(node_tracker.size()); ++n){
 
-      if (curr_node == node_tracker[n]){
-        TokunagaValues[order][n] = 11 * (order + 1);
+        if (curr_node == node_tracker[n]){
+          TokunagaValues[order][n] = 11 * (order + 1);
+        }
+
       }
 
     }
 
   }
-
-}
 
 }
 
