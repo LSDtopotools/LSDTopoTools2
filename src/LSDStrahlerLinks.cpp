@@ -358,31 +358,56 @@ void LSDStrahlerLinks::CalculateTokunagaIndexes(LSDJunctionNetwork& JNetwork,
                                                 LSDFlowInfo& FlowInfo)
 {
 
+// We start by iterating over each strahler link, per each strahler order
+// The Tokunaga index is a pair of ints, the first (i) denotes the order of the current link,
+// the second (j) denotes the order the link flows into.
 for (int order = 0; order < int(SourceNodes.size()); order++){
 
   vector<int> node_tracker;
-  vector<int> segment_ids;
   vector<int> TValues_tmp;
 
   for (int a = 0; a < SourceNodes[order].size(); ++a){
 
-    int i = JNetwork.get_StreamOrder_of_Node(FlowInfo, SourceNodes[order][a]);
-
+    // Get the node one node downstream of the reciever, the start of the next link
+    // This gives us the order the current link flows into
     int node;
-
     FlowInfo.retrieve_receiver_information(ReceiverNodes[order][a], node);
+
+    int i = JNetwork.get_StreamOrder_of_Node(FlowInfo, SourceNodes[order][a]);
     int j = JNetwork.get_StreamOrder_of_Node(FlowInfo, node);
 
     node_tracker.push_back(node);
-    segment_ids.push_back(a);
 
+    // Convert our i and j values to strings, concatenate them and then cast back to an int
     stringstream ss;
     ss << i << j;
-
     TValues_tmp.push_back(stoi(ss.str()));
   }
 
   TokunagaValues.push_back(TValues_tmp);
+
+  // Finally, in cases where we have two streams of the same order meeting, we
+  // need to correct their Tokunaga values. Two strahler order 1 streams which
+  // meet, will result in a strahler order 2 stream, and based on the above logic
+  // will be coded with a Tokunaga value of 12, but should be coded as 11. This is
+  // an artefact of how fastscape represents networks.
+  //
+  //            Strahler:                                Tokunaga:
+  //
+  //  1            1      3             1       11           11     33            13
+  //  \           /       \            /         \           /       \            /
+  //   \         /         \          /           \         /         \          /
+  //    \       /           \        /             \       /           \        /
+  //     \     /             \      /               \     /             \      /
+  //      \   /               \    /                 \   /               \    /
+  //       \ /                 \  /                   \ /                 \  /
+  //        |                   \/                     |                   \/
+  //        |                    \                     |                    \
+  //        |                     \                    |                     \
+  //        |                      \                   |                      \
+  //        |                       \                  |                       \
+  //        2                        3                 22                      33
+
 
   vector<int> node_tracker_unique = Unique(node_tracker);
   vector<int> set_diff = node_tracker;
@@ -444,16 +469,11 @@ LSDIndexRaster LSDStrahlerLinks::WriteTokunagaRaster(LSDFlowInfo& FlowInfo){
         current_node = next_node;
 
       }
-
     }
   }
 
-
   LSDIndexRaster out(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,data,GeoReferencingStrings);
   return out;
-
-
-
 }
 
 
