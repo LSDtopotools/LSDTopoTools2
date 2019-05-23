@@ -92,7 +92,7 @@ using namespace std;
 
 ///@brief This object holds information on the Strahler links in a channel network
 /// whereas the LSDJunctionNetwork object stores every junction, this object
-/// stores information about the links that connect different strahelr orders:
+/// stores information about the links that connect different strahler orders:
 /// e.g. every 1st order channel, every 2nd order channel, etc.
 /// @author SMM
 /// @date 28/10/2014
