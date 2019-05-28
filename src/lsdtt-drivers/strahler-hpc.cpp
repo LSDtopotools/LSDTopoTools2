@@ -60,7 +60,9 @@ int main(int nNumberofArgs, char *argv[])
   // now get the junction network
   LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
 
-  vector<int> basin_junctions = ChanNetwork.ExtractBasinJunctionOrder(7, FlowInfo);
+  vector<int> basin_junctions = ChanNetwork.ExtractBasinJunctionOrderKeepEdgeBasins(7, FlowInfo);
+
+  std::cout << "Number of basins to process: " << basin_junctions.size() << '\n';
 
   for (int i = 0; i < int(basin_junctions.size()); ++i){
 
@@ -98,6 +100,6 @@ int main(int nNumberofArgs, char *argv[])
   float hs_z_factor = 1;
   LSDRaster hs_raster = FilledDEM.hillshade(hs_altitude,hs_azimuth,hs_z_factor);
 
-  FilledDEM.write_raster("/data/Geog-c2s2/toku/hillshade", DEM_Format);
+  hs_raster.write_raster("/data/Geog-c2s2/toku/hillshade", DEM_Format);
 
 }

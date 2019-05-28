@@ -98,6 +98,6 @@ int main(int nNumberofArgs, char *argv[])
   float hs_z_factor = 1;
   LSDRaster hs_raster = FilledDEM.hillshade(hs_altitude,hs_azimuth,hs_z_factor);
 
-  FilledDEM.write_raster("/LSDTopoTools/strahler/hillshade", DEM_Format);
+  hs_raster.write_raster("/LSDTopoTools/strahler/hillshade", DEM_Format);
 
 }
