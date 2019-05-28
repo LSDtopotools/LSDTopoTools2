@@ -9,4 +9,6 @@
 #$ -l h_rt=12:0:0
 #$ -l highmem
 
-./data/home/faw513/LSDTopoTools2/src/lsdtt-drivers/strahler-hpc.out
+cd /data/home/faw513/LSDTopoTools2/src/lsdtt-drivers
+
+./strahler-hpc.out

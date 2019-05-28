@@ -55,12 +55,12 @@ int main(int nNumberofArgs, char *argv[])
 
   //get the sources
   vector<int> sources;
-  sources = FlowInfo.get_sources_index_threshold(ContributingPixels, 10000);
+  sources = FlowInfo.get_sources_index_threshold(ContributingPixels, 3500);
 
   // now get the junction network
   LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
 
-  vector<int> basin_junctions = ChanNetwork.ExtractBasinJunctionOrderKeepEdgeBasins(7, FlowInfo);
+  vector<int> basin_junctions = ChanNetwork.ExtractBasinJunctionOrderKeepEdgeBasins(6, FlowInfo);
 
   std::cout << "Number of basins to process: " << basin_junctions.size() << '\n';
 
