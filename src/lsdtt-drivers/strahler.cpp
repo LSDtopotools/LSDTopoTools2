@@ -60,7 +60,7 @@ int main(int nNumberofArgs, char *argv[])
   // now get the junction network
   LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
 
-  vector<int> basin_junctions = ChanNetwork.ExtractBasinJunctionOrder(4, FlowInfo);
+  vector<int> basin_junctions = ChanNetwork.ExtractBasinJunctionOrderKeepEdgeBasins(4, FlowInfo);
 
   for (int i = 0; i < int(basin_junctions.size()); ++i){
 
