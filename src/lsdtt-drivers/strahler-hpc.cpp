@@ -60,46 +60,41 @@ int main(int nNumberofArgs, char *argv[])
   // now get the junction network
   LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
 
-  vector<int> basin_junctions = ChanNetwork.ExtractBasinJunctionOrderKeepEdgeBasins(6, FlowInfo);
+  int max_order = ChanNetwork.get_maximum_stream_order();
 
-  std::cout << "Number of basins to process: " << basin_junctions.size() << '\n';
+  if (max_order > 5){
 
-  for (int i = 0; i < int(basin_junctions.size()); ++i){
+    vector<int> basin_junctions = ChanNetwork.ExtractBasinJunctionOrderKeepEdgeBasins(max_order - 1, FlowInfo);
 
-    vector<int> sub_basin_sources = ChanNetwork.get_all_source_nodes_of_an_outlet_junction(basin_junctions[i]);
+    std::cout << "Number of basins to process: " << basin_junctions.size() << '\n';
 
-    LSDJunctionNetwork SubChanNetwork(sub_basin_sources, FlowInfo);
+    for (int i = 0; i < int(basin_junctions.size()); ++i){
 
-    LSDIndexRaster SOArray = SubChanNetwork.StreamOrderArray_to_LSDIndexRaster();
+      vector<int> sub_basin_sources = ChanNetwork.get_all_source_nodes_of_an_outlet_junction(basin_junctions[i]);
 
-    stringstream ss;
-    ss << "/data/Geog-c2s2/toku/sub_net_" << i;
+      LSDJunctionNetwork SubChanNetwork(sub_basin_sources, FlowInfo);
 
-    SOArray.write_raster(ss.str(), DEM_Format);
+      LSDStrahlerLinks Links(SubChanNetwork, FlowInfo);
+      Links.CalculateTokunagaIndexes(SubChanNetwork, FlowInfo);
 
-    LSDStrahlerLinks Links(SubChanNetwork, FlowInfo);
-    Links.CalculateTokunagaIndexes(SubChanNetwork, FlowInfo);
-
-    stringstream ss2;
-    ss2 << "toku_subnet_" << i;
-    Links.WriteTokunagaData("/data/Geog-c2s2/toku/", ss2.str());
+      stringstream ss2;
+      ss2 << "toku_subnet_" << i;
+      Links.WriteTokunagaData("/data/Geog-c2s2/toku/", ss2.str());
 
 
-    stringstream ss3;
-    ss3 << "/data/Geog-c2s2/toku/toku_orders_" << i;
-    LSDIndexRaster source_data = Links.WriteTokunagaRaster(FlowInfo);
-    source_data.write_raster(ss3.str(), DEM_Format);
+      stringstream ss3;
+      ss3 << "/data/Geog-c2s2/toku/toku_orders_" << i;
+      LSDIndexRaster source_data = Links.WriteTokunagaRaster(FlowInfo);
+      source_data.write_raster(ss3.str(), DEM_Format);
 
-  }
+    }
 
-  LSDIndexRaster SOArray = ChanNetwork.StreamOrderArray_to_LSDIndexRaster();
-  SOArray.write_raster("/data/Geog-c2s2/toku/main_net", DEM_Format);
+    LSDIndexRaster SOArray = ChanNetwork.StreamOrderArray_to_LSDIndexRaster();
+    SOArray.write_raster("/data/Geog-c2s2/toku/main_net", DEM_Format);
 
-  float hs_azimuth = 315;
-  float hs_altitude = 45;
-  float hs_z_factor = 1;
-  LSDRaster hs_raster = FilledDEM.hillshade(hs_altitude,hs_azimuth,hs_z_factor);
+    // Change ^^^ to StreamOrderArray_to_WGS84CSV
+    // Then create new method that does the same for tokunaga values
 
-  hs_raster.write_raster("/data/Geog-c2s2/toku/hillshade", DEM_Format);
+}
 
 }
