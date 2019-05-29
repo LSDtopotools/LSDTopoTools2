@@ -1,25 +1,3 @@
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-//
-// Compile_Dreich_lengths.cpp
-//
-// Driver created to generate channel length measurements data at a range of input resolutions.
-//
-// Driver expects unfilled DEMs at a range of grid resolutions in the input directory
-//
-// Run the driver with the following arguments:
-//
-// path to the DEM files with a trailing slash
-// output path with trailing slash
-// DEM filename Prefix
-// file extension without the dot
-//
-// DEM naming convention should be <prefix>_<resolution>_DEM
-//
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-// Stuart W.D. Grieve
-// University of Edinburgh
-// November 2015
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 #include <iostream>
 #include <string>
