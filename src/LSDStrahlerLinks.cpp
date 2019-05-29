@@ -495,8 +495,6 @@ LSDIndexRaster LSDStrahlerLinks::WriteTokunagaRaster(){
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDStrahlerLinks::WriteTokunagaChannelsCSV(LSDJunctionNetwork& JNetwork, string filename){
 
-  Array2D<int> data(NRows, NCols, NoDataValue);
-
   Array2D<int> StrahlerOrder = JNetwork.get_StreamOrderArray();
 
   // append csv to the filename
@@ -520,7 +518,7 @@ void LSDStrahlerLinks::WriteTokunagaChannelsCSV(LSDJunctionNetwork& JNetwork, st
   {
     for(int j = 0; j < NCols; ++j)
     {
-      if (data[i][j] != NoDataValue)
+      if (TokunagaOrderArray[i][j] != NoDataValue)
       {
         JNetwork.get_lat_and_long_locations(i, j, latitude, longitude, Converter);
 
