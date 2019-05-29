@@ -117,6 +117,10 @@ void LSDStrahlerLinks::create(LSDJunctionNetwork& JNetwork, LSDFlowInfo& FlowInf
 	NoDataValue = FlowInfo.get_NoDataValue();
   GeoReferencingStrings =  FlowInfo.get_GeoReferencingStrings();
 
+  // Initalise the tokunaga array with the correct dimensions
+  Array2D<int> TempArray(NRows, NCols, NoDataValue);
+  TokunagaOrderArray = TempArray.copy();
+
   // now get all the sources and loop through them to get the 1st order basins
   vector<int> thisOrderNISources = JNetwork.get_SourcesVector();
   int NThisOrderSources = int(thisOrderNISources.size());
@@ -430,18 +434,18 @@ void LSDStrahlerLinks::CalculateTokunagaIndexes(LSDJunctionNetwork& JNetwork,
 
   }
 
+PopulateTokunagaOrderArray(FlowInfo);
+
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// Method to write Tokunaga indexes to a raster for visualisation.
+// Method to populate the TokunagaOrderArray for use in visualisation.
 //
-// Must run LSDStrahlerLinks.CalculateTokunagaIndexes() first.
+// Called by CalculateTokunagaIndexes.
 //
-// SWDG 23/05/19
+// SWDG 29/05/19
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-LSDIndexRaster LSDStrahlerLinks::WriteTokunagaRaster(LSDFlowInfo& FlowInfo){
-
-  Array2D<int> data(NRows, NCols, NoDataValue);
+void LSDStrahlerLinks::PopulateTokunagaOrderArray(LSDFlowInfo& FlowInfo){
 
   for (int t_order = 0; t_order < int(SourceNodes.size()); t_order++){
     for (int t_segment = 0; t_segment < int(SourceNodes[t_order].size()); t_segment++){
@@ -449,10 +453,10 @@ LSDIndexRaster LSDStrahlerLinks::WriteTokunagaRaster(LSDFlowInfo& FlowInfo){
       int r_row, r_col;
 
       FlowInfo.retrieve_current_row_and_col(SourceNodes[t_order][t_segment], r_row, r_col);
-      data[r_row][r_col] = TokunagaValues[t_order][t_segment];
+      TokunagaOrderArray[r_row][r_col] = TokunagaValues[t_order][t_segment];
 
       FlowInfo.retrieve_current_row_and_col(ReceiverNodes[t_order][t_segment], r_row, r_col);
-      data[r_row][r_col] = TokunagaValues[t_order][t_segment];
+      TokunagaOrderArray[r_row][r_col] = TokunagaValues[t_order][t_segment];
 
       int next_node, next_row, next_col;
       int current_node = SourceNodes[t_order][t_segment];
@@ -461,17 +465,26 @@ LSDIndexRaster LSDStrahlerLinks::WriteTokunagaRaster(LSDFlowInfo& FlowInfo){
       while (current_node != ReceiverNodes[t_order][t_segment]) {
         FlowInfo.retrieve_receiver_information(current_node, next_node, next_row, next_col);
 
-        data[next_row][next_col] = TokunagaValues[t_order][t_segment];
+        TokunagaOrderArray[next_row][next_col] = TokunagaValues[t_order][t_segment];
         current_node = next_node;
 
       }
     }
   }
 
-  LSDIndexRaster out(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,data,GeoReferencingStrings);
-  return out;
 }
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Convenience method to return an LSDIndexRaster coded by Tokunaga values.
+//
+// SWDG 23/05/19
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDIndexRaster LSDStrahlerLinks::WriteTokunagaRaster(){
+
+  LSDIndexRaster out(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,TokunagaOrderArray,GeoReferencingStrings);
+  return out;
+
+}
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // Method to write Tokunaga indexes to a lat long csv file.
@@ -480,7 +493,7 @@ LSDIndexRaster LSDStrahlerLinks::WriteTokunagaRaster(LSDFlowInfo& FlowInfo){
 //
 // SWDG 23/05/19
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDStrahlerLinks::WriteTokunagaChannelsCSV(LSDFlowInfo& FlowInfo, LSDJunctionNetwork& JNetwork, string filename){
+void LSDStrahlerLinks::WriteTokunagaChannelsCSV(LSDJunctionNetwork& JNetwork, string filename){
 
   Array2D<int> data(NRows, NCols, NoDataValue);
 
@@ -494,31 +507,6 @@ void LSDStrahlerLinks::WriteTokunagaChannelsCSV(LSDFlowInfo& FlowInfo, LSDJuncti
 
   // this is for latitude and longitude
   LSDCoordinateConverterLLandUTM Converter;
-
-  for (int t_order = 0; t_order < int(SourceNodes.size()); t_order++){
-    for (int t_segment = 0; t_segment < int(SourceNodes[t_order].size()); t_segment++){
-
-      int r_row, r_col;
-
-      FlowInfo.retrieve_current_row_and_col(SourceNodes[t_order][t_segment], r_row, r_col);
-      data[r_row][r_col] = TokunagaValues[t_order][t_segment];
-
-      FlowInfo.retrieve_current_row_and_col(ReceiverNodes[t_order][t_segment], r_row, r_col);
-      data[r_row][r_col] = TokunagaValues[t_order][t_segment];
-
-      int next_node, next_row, next_col;
-      int current_node = SourceNodes[t_order][t_segment];
-
-      // After storing the locations of the start and end of each link, now we fill in the gaps in between
-      while (current_node != ReceiverNodes[t_order][t_segment]) {
-        FlowInfo.retrieve_receiver_information(current_node, next_node, next_row, next_col);
-
-        data[next_row][next_col] = TokunagaValues[t_order][t_segment];
-        current_node = next_node;
-
-      }
-    }
-  }
 
   //open a file to write
   ofstream WriteData;
@@ -536,7 +524,7 @@ void LSDStrahlerLinks::WriteTokunagaChannelsCSV(LSDFlowInfo& FlowInfo, LSDJuncti
       {
         JNetwork.get_lat_and_long_locations(i, j, latitude, longitude, Converter);
 
-        WriteData << latitude << "," << longitude << "," << data[i][j] << "," << StrahlerOrder[i][j] << endl;
+        WriteData << latitude << "," << longitude << "," << TokunagaOrderArray[i][j] << "," << StrahlerOrder[i][j] << endl;
       }
     }
   }
@@ -554,7 +542,6 @@ void LSDStrahlerLinks::WriteTokunagaChannelsCSV(LSDFlowInfo& FlowInfo, LSDJuncti
 // SWDG 23/05/19
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDStrahlerLinks::WriteTokunagaData(string data_directory, string label){
-
 
   string fname = data_directory + "TokunagaData_" + label + ".csv";
   cout << "fname is: " << fname << endl;

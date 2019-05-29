@@ -84,7 +84,7 @@ int main(int nNumberofArgs, char *argv[])
 
       stringstream ss2;
       ss2 << "/data/Geog-c2s2/toku/toku_orders_" << i;
-      Links.WriteTokunagaChannelsCSV(FlowInfo, SubChanNetwork, ss2.str());
+      Links.WriteTokunagaChannelsCSV(SubChanNetwork, ss2.str());
 
     }
 
