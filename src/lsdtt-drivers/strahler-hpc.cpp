@@ -77,23 +77,20 @@ int main(int nNumberofArgs, char *argv[])
       LSDStrahlerLinks Links(SubChanNetwork, FlowInfo);
       Links.CalculateTokunagaIndexes(SubChanNetwork, FlowInfo);
 
+      stringstream ss;
+      ss << "toku_subnet_" << i;
+      Links.WriteTokunagaData("/data/Geog-c2s2/toku/", ss.str());
+
+
       stringstream ss2;
-      ss2 << "toku_subnet_" << i;
-      Links.WriteTokunagaData("/data/Geog-c2s2/toku/", ss2.str());
-
-
-      stringstream ss3;
-      ss3 << "/data/Geog-c2s2/toku/toku_orders_" << i;
-      LSDIndexRaster source_data = Links.WriteTokunagaRaster(FlowInfo);
-      source_data.write_raster(ss3.str(), DEM_Format);
+      ss2 << "/data/Geog-c2s2/toku/toku_orders_" << i;
+      Links.WriteTokunagaChannelsCSV(FlowInfo, SubChanNetwork, ss2.str());
 
     }
 
-    LSDIndexRaster SOArray = ChanNetwork.StreamOrderArray_to_LSDIndexRaster();
-    SOArray.write_raster("/data/Geog-c2s2/toku/main_net", DEM_Format);
-
-    // Change ^^^ to StreamOrderArray_to_WGS84CSV
-    // Then create new method that does the same for tokunaga values
+    stringstream ss3;
+    ss3 << "/data/Geog-c2s2/toku/main_network_";
+    ChanNetwork.StreamOrderArray_to_WGS84CSV(ss3.str());
 
 }
 

@@ -472,6 +472,80 @@ LSDIndexRaster LSDStrahlerLinks::WriteTokunagaRaster(LSDFlowInfo& FlowInfo){
   return out;
 }
 
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Method to write Tokunaga indexes to a lat long csv file.
+//
+// Must run LSDStrahlerLinks.CalculateTokunagaIndexes() first.
+//
+// SWDG 23/05/19
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDStrahlerLinks::WriteTokunagaChannelsCSV(LSDFlowInfo& FlowInfo, LSDJunctionNetwork& JNetwork, string filename){
+
+  Array2D<int> data(NRows, NCols, NoDataValue);
+
+  Array2D<int> StrahlerOrder = JNetwork.get_StreamOrderArray();
+
+  // append csv to the filename
+  string FileName = filename + ".csv";
+
+  // the x and y locations
+  double latitude,longitude;
+
+  // this is for latitude and longitude
+  LSDCoordinateConverterLLandUTM Converter;
+
+  for (int t_order = 0; t_order < int(SourceNodes.size()); t_order++){
+    for (int t_segment = 0; t_segment < int(SourceNodes[t_order].size()); t_segment++){
+
+      int r_row, r_col;
+
+      FlowInfo.retrieve_current_row_and_col(SourceNodes[t_order][t_segment], r_row, r_col);
+      data[r_row][r_col] = TokunagaValues[t_order][t_segment];
+
+      FlowInfo.retrieve_current_row_and_col(ReceiverNodes[t_order][t_segment], r_row, r_col);
+      data[r_row][r_col] = TokunagaValues[t_order][t_segment];
+
+      int next_node, next_row, next_col;
+      int current_node = SourceNodes[t_order][t_segment];
+
+      // After storing the locations of the start and end of each link, now we fill in the gaps in between
+      while (current_node != ReceiverNodes[t_order][t_segment]) {
+        FlowInfo.retrieve_receiver_information(current_node, next_node, next_row, next_col);
+
+        data[next_row][next_col] = TokunagaValues[t_order][t_segment];
+        current_node = next_node;
+
+      }
+    }
+  }
+
+  //open a file to write
+  ofstream WriteData;
+  WriteData.open(FileName.c_str());
+
+  WriteData.precision(8);
+  WriteData << "latitude,longitude,TokunagaOrder,StrahlerOrder" << endl;
+
+  //loop over each cell and if there is a value, write it to the file
+  for(int i = 0; i < NRows; ++i)
+  {
+    for(int j = 0; j < NCols; ++j)
+    {
+      if (data[i][j] != NoDataValue)
+      {
+        JNetwork.get_lat_and_long_locations(i, j, latitude, longitude, Converter);
+
+        WriteData << latitude << "," << longitude << "," << data[i][j] << "," << StrahlerOrder[i][j] << endl;
+      }
+    }
+  }
+
+  WriteData.close();
+
+}
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // Write the TokunagaValues data to a csv file for analysis elsewhere.
 //

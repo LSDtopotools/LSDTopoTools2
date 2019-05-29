@@ -208,12 +208,22 @@ class LSDStrahlerLinks
     /// @date 23/05/19
     void CalculateTokunagaIndexes(LSDJunctionNetwork& JNetwork, LSDFlowInfo& FlowInfo);
 
-    /// @brief Method to  write Tokunaga indexes to a raster for visualisation.
+    /// @brief Method to write Tokunaga indexes to a raster for visualisation.
     ///
-    /// @detail Must run LSDStrahlerLinks.CalculateTokunagaIndexes() first
+    /// @detail Must run LSDStrahlerLinks.CalculateTokunagaIndexes() first.
+    /// @param FlowInfo LSDFlowInfo object
     /// @author SWDG
     /// @date 23/05/19
     LSDIndexRaster WriteTokunagaRaster(LSDFlowInfo& FlowInfo);
+
+    /// @brief Method to write Tokunaga indexes to a lat long csv file.
+    ///
+    /// @detail Must run LSDStrahlerLinks.CalculateTokunagaIndexes() first.
+    /// @param FlowInfo LSDFlowInfo object
+    /// @param filename String of the path + filename without the csv extension for the data to be written to.
+    /// @author SWDG
+    /// @date 29/05/19
+    void WriteTokunagaChannelsCSV(LSDFlowInfo& FlowInfo, LSDJunctionNetwork& JNetwork, string filename);
 
     /// @brief Write the TokunagaValues data to a csv file for analysis elsewhere.
     /// @param data_directory a string containing the data directory. Should be
