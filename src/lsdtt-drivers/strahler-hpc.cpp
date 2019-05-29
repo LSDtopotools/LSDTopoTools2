@@ -14,13 +14,25 @@
 int main(int nNumberofArgs, char *argv[])
 {
 
+  //Test for correct input arguments
+	if (nNumberofArgs!=4)
+	{
+		cout << "FATAL ERROR: wrong number of inputs.";
+		exit(EXIT_FAILURE);
+	}
+
+  //get input args
+  string Inpath = argv[1];
+  string Outpath = argv[2];
+  string DEMname = argv[3];
+
   string DEM_Format = "bil";
 
   //set boundary conditions
   vector<string> BoundaryConditions(4, "No Flux");
 
 	//load the DEM
-	LSDRaster DEM("/data/Geog-c2s2/toku/final", DEM_Format);
+	LSDRaster DEM(Inpath + DEMname, DEM_Format);
 
   //Fill
   float MinSlope = 0.0001;
@@ -56,18 +68,18 @@ int main(int nNumberofArgs, char *argv[])
       Links.CalculateTokunagaIndexes(SubChanNetwork, FlowInfo);
 
       stringstream ss;
-      ss << "toku_subnet_" << i;
-      Links.WriteTokunagaData("/data/Geog-c2s2/toku/", ss.str());
+      ss << DEMname << "_" << i;
+      Links.WriteTokunagaData(Outpath, ss.str());
 
 
       stringstream ss2;
-      ss2 << "/data/Geog-c2s2/toku/toku_orders_" << i;
+      ss2 << Outpath << "toku_network_" << DEMname << "_" << i;
       Links.WriteTokunagaChannelsCSV(SubChanNetwork, ss2.str());
 
     }
 
     stringstream ss3;
-    ss3 << "/data/Geog-c2s2/toku/main_network_";
+    ss3 << Outpath << "full_network_" << DEMname;
     ChanNetwork.StreamOrderArray_to_WGS84CSV(ss3.str());
 
 }
