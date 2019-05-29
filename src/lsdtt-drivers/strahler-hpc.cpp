@@ -84,4 +84,10 @@ int main(int nNumberofArgs, char *argv[])
 
 }
 
+else{
+
+  std::cout << "There are no suitable basins to process, the max order found is: " << max_order << '\n';
+
+}
+
 }
