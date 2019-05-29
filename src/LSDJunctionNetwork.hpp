@@ -332,7 +332,7 @@ class LSDJunctionNetwork
   /// @date 01/09/12
   LSDIndexRaster StreamOrderArray_to_LSDIndexRaster();
 
-  /// @brief Method to flatten an te stream order array and place the non NDV values in a csv file.
+  /// @brief Method to flatten a stream order array and place the non NDV values in a csv file.
   /// @detail Each value is placed on its own line, so that it can be read more quickly in python etc.
   ///   It includes the lat long coordinates in CSV, in WGS84 coordinate system EPSG:4326
   /// @param FileName_prefix The prefix of the file to write, if no path is included it will write to the current directory.
@@ -1832,7 +1832,7 @@ void write_river_profiles_to_csv_all_sources(float channel_length, int slope_win
 
 /// @brief Return a map of all nodes in the channel, useful to just chek if me node is a CNode or not
 /// @param FlowInfo
-/// @author B.G. 
+/// @author B.G.
 /// @date 12/11/2018
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
 map<int,bool> GetMapOfChannelNodes(LSDFlowInfo& flowinfo);
