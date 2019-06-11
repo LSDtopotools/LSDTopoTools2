@@ -385,7 +385,7 @@ void LSDStrahlerLinks::CalculateTokunagaIndexes(LSDJunctionNetwork& JNetwork,
       // Convert our i and j values to strings, concatenate them and then cast back to an int
       stringstream ss;
       ss << i << j;
-      TValues_tmp.push_back(stoi(ss.str()));
+      TValues_tmp.push_back(atoi(ss.str().c_str()));
     }
 
     TokunagaValues.push_back(TValues_tmp);

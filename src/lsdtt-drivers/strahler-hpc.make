@@ -1,5 +1,5 @@
 CC = g++
-CFLAGS= -c -Wall -O3 -std=c++11
+CFLAGS= -c -Wall -O3
 OFLAGS = -Wall -O3
 SOURCES = strahler-hpc.cpp \
     ../LSDIndexRaster.cpp \
