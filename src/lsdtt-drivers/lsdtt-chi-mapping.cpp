@@ -413,7 +413,7 @@ int main (int nNumberofArgs,char *argv[])
   else
   {
     BaselevelJunctions_file = RemoveControlCharactersFromEndOfString(BaselevelJunctions_file);
-    BaselevelJunctions_file = DATA_DIR+BaselevelJunctions_file;
+    //BaselevelJunctions_file = DATA_DIR+BaselevelJunctions_file; // MDH commented out 11/6/19 as path already added above
     cout << "You have selected a baselevel junctions file, it is: " << BaselevelJunctions_file << endl;
     cout << "Let me check if it exists..." << endl;
 
