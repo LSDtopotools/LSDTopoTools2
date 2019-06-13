@@ -4763,7 +4763,7 @@ void LSDJunctionNetwork::GetChannelNodesAndJunctions(LSDFlowInfo& flowinfo, vect
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
 map<int,bool> LSDJunctionNetwork::GetMapOfChannelNodes(LSDFlowInfo& flowinfo)
 {
-  
+
   map<int,bool> is_node_in_channel;
   int row = 0;  //ints to store the row and col of the current px
   int col = 0;
@@ -6020,6 +6020,54 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV(LSDFlowInfo& flowinfo, string 
     get_lat_and_long_locations(row, col, latitude, longitude, Converter);
 
     WriteData << latitude << "," << longitude << "," << JIvec[node] << "," << SOvec[node] << "," << NIvec[node] << endl;
+
+  }
+
+  WriteData.close();
+
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+// This prints a channel network to csv in WGS84
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+void LSDJunctionNetwork::PrintChannelNetworkToCSV_nolatlon(LSDFlowInfo& flowinfo, LSDRaster& elevation, string fname_prefix)
+{
+
+  // first get the vectors
+  vector<int> NIvec;
+  vector<int> SOvec;
+  vector<int> JIvec;
+  GetChannelNodesAndJunctions(flowinfo, NIvec, JIvec, SOvec);
+
+  // Deal with setting up the file
+  // append csv to the filename
+  string FileName = fname_prefix+".csv";
+
+  //open a file to write
+  ofstream WriteData;
+  WriteData.open(FileName.c_str());
+
+  WriteData.precision(8);
+  WriteData << "X,Y,Junction Index,Stream Order,NI,elevation" << endl;
+
+  // the x and y locations
+  double X,Y;
+
+
+
+  // now get the number of channel nodes
+  int this_NI;
+  int row,col;
+  int NNodes = int(NIvec.size());
+  float this_elev;
+  //cout << "The number of nodes is: " << NNodes << endl;
+  for(int node = 0; node<NNodes; node++)
+  {
+    this_NI = NIvec[node];
+    flowinfo.retrieve_current_row_and_col(this_NI,row,col);
+    this_elev = elevation.get_data_element(row,col);
+    flowinfo.get_x_and_y_locations(row,col,X,Y);
+    WriteData << X << "," << Y << "," << JIvec[node] << "," << SOvec[node] << "," << NIvec[node] << "," << this_elev << endl;
 
   }
 
@@ -8716,6 +8764,5 @@ void LSDJunctionNetwork::write_river_profiles_to_csv_all_sources(float channel_l
 
     chan_out.close();
 }
-
 
 #endif

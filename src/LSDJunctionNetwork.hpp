@@ -352,6 +352,11 @@ class LSDJunctionNetwork
   /// @date 14/11/16
   void PrintChannelNetworkToCSV(LSDFlowInfo& flowinfo, string fname_prefix);
 
+  /// @brief This prints a stream network to a csv in XY coordinates
+  /// @author BG
+  /// @date 28/01/2019
+  void PrintChannelNetworkToCSV_nolatlon(LSDFlowInfo& flowinfo, LSDRaster& elevation, string fname_prefix);
+
 
   /// @brief This sends the JunctionArray to a LSDIndexRaster.
   /// @return LSDIndexRaster of JunctionArray.
