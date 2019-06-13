@@ -63,8 +63,10 @@
 #include <vector>
 #include <map>
 #include <cmath>
+#include <iomanip>
 #include "LSDPorewaterParams.hpp"
 #include "LSDParameterParser.hpp"
+#include "LSDRaster.hpp" // addign that to get the slope raster
 #include "LSDStatsTools.hpp"
 #include "TNT/tnt.h"
 using namespace std;
@@ -81,10 +83,12 @@ void LSDPorewaterParams::create()
   D_0 = 0.00001;
   d = 2;
   alpha = 0.1;
-  Iz_over_K_steady = 0.2;
+  Iz_over_K_steady = 0.2;       // Iz is infiltration so this is the steady (long term) infiltration rate divided by the K 
   K_sat = 0.0000001;
   friction_angle = 0.66322511;
   cohesion = 500;
+
+  // This is graviy times water and soil density
   weight_of_soil = 19000;
   weight_of_water = 9800;
 
@@ -110,6 +114,9 @@ void LSDPorewaterParams::create()
 void LSDPorewaterParams::create(string paramfile_path, string paramfile_name)
 {
   LSDParameterParser LSDPP(paramfile_path, paramfile_name);
+
+  saving_prefix = LSDPP.get_write_fname();
+  string load_path = LSDPP.get_read_path();
   
   // maps for setting default parameters
   map<string,int> int_default_map;
@@ -133,9 +140,25 @@ void LSDPorewaterParams::create(string paramfile_path, string paramfile_name)
   int_default_map["n_depths"] = 31;
   
   bool_default_map["use_depth_vector"] = false;
+
+  bool_default_map["full_1D_output"] = false;
   
   string depth_vector_key = "depth_vector";
   string_default_map["depth_vector"] = "";
+  string_default_map["rainfall_csv"] = "";
+
+
+  // parameter for 2D columning
+  bool_default_map["spatial_analysis"] = false; // activate the slope analysis
+  bool_default_map["reload_alpha"] = false; // load a slope raster rather than calculating it
+  bool_default_map["resample_slope"] = false; // load a slope raster rather than calculating it
+  float_default_map["resample_slope_res"] = false; // load a slope raster rather than calculating it
+  string_default_map["topo_raster"] = ""; // name of the raster without the .bil extension
+  string_default_map["alpha_to_reload"] = ""; // name of the raster without the .bil extension
+  float_default_map["polyfit_window_radius"] = 6; // radius to calculate the slope
+  int_default_map["n_threads"] = 4; //  number of threads for multiprocessing
+  float_default_map["time_of_spatial_analysis"] = 100000; // Time in second (same than in the preprocessed input csv file) of the spatial analysis
+
   
   // Get the parameters
   LSDPP.parse_all_parameters(float_default_map, int_default_map, bool_default_map,string_default_map);
@@ -155,7 +178,13 @@ void LSDPorewaterParams::create(string paramfile_path, string paramfile_name)
   cohesion = this_float_map["cohesion"];
   weight_of_soil = this_float_map["weight_of_soil"];
   weight_of_water = this_float_map["weight_of_water"];
-  
+  rainfall_csv_name = this_string_map["rainfall_csv"];
+  rainfall_csv_path = paramfile_path; // I assume here this is the same path for your csv file. It should be anyway.
+  full_1D_output = this_bool_map["full_1D_output"];
+  output_2D = this_bool_map["spatial_analysis"];
+  n_threads = this_int_map["n_threads"];
+  time_of_spatial_analysis = this_float_map["time_of_spatial_analysis"];
+
   cout << "In the params, Iz_over_K_steady: " << Iz_over_K_steady << endl;
 
   // parameters for getting the depths
@@ -205,13 +234,73 @@ void LSDPorewaterParams::create(string paramfile_path, string paramfile_name)
   calculate_beta();
   calculate_D_hat();
   
-  cout << "In the params v2, Iz_over_K_steady: " << Iz_over_K_steady << endl;
+  if(this_bool_map["spatial_analysis"])
+  {
+    if(this_bool_map["reload_alpha"] == false)
+    {
+      cout << "I am now preprocessing your data  for spatial analysis of soil columns" << endl;
+      
+      LSDRaster this_topo(load_path + this_string_map["topo_raster"], "bil");
+
+      vector<int> relevant_variable_name_14 = {0,1,0,0,0,0,0,0}; // selection of raster to calculate with the polyfit fitting function, with a relevant variable name LOLz
+      vector<LSDRaster> tempRast;
+      cout << "Let me calculate the slope by fitting a polyfit raster to it." << endl;
+      tempRast = this_topo.calculate_polyfit_surface_metrics(this_float_map["polyfit_window_radius"], relevant_variable_name_14);
+      alpha_raster = tempRast[1]; // getting the right slpe and pushing it to the parameter
+      // Need to veonvert that into radian
+
+      cout << "Alright I got the slope, now I am converting it to radian (IMPORANT)" << endl;
+      float res_of_rast = alpha_raster.get_DataResolution();
+      size_t nrows = alpha_raster.get_NRows();
+      size_t ncols = alpha_raster.get_NCols();
+      for(size_t i=0; i<nrows; i++)
+      {
+        for(size_t j=0; j<ncols;j++)
+        {
+          alpha_raster.set_data_element(i,j, abs(atan(alpha_raster.get_data_element(i,j))));
+        }
+      }
+      cout << "Done, saving it ..." << endl;
+      alpha_raster.write_raster(load_path+saving_prefix + "slope_in_radian", "bil");
+      cout << "Saved." << endl;
+
+    }
+    else
+    {
+      // Reloading the slope from previous analysis. Needs to be in radians
+      cout << "Loading a slope raster for you. THIS IS IMPORTANT I HOPE YOU CHECKED IT WAS IN RADIANS OTHERWISE YOU WILL GET WRONG RESULTS. SORRY NOT SORRY" << endl;
+      LSDRaster this_alpha(load_path + this_string_map["alpha_raster"], "bil");
+      alpha_raster = this_alpha;
+    }
+
+    // Dealing with raster potential resampling
+    if(this_bool_map["resample_slope"])
+    {
+      cout << "I am resampling the slope raster, because I am calculating Factor of safety for any value!!!" << endl;
+      cout << "This is a quick resampling: calculate center pixel of old resolution and apply it to the whole pixel of the new one." << endl;
+      cout << "Alternative would be to use GDAL to resample with more complex methods such as nearest neighboors or cubic and directly load it without resampling" << endl;
+      LSDRaster relevant_variable_name_3 = alpha_raster.Resample(this_float_map["resample_slope_res"]);
+      alpha_raster = relevant_variable_name_3;
+      alpha_raster.write_raster(load_path+saving_prefix + "slope_in_radian_resampled", "bil");
+
+
+    }
+    else
+    {
+      cout << "You chose not to resample the slope raster. Just keep in mind that I will model all the pixels of the raster, it can take a loooot of time then" << endl;
+    }
+
+  }
+
+  // Commenting some cout
+  // cout << "In the params v2, Iz_over_K_steady: " << Iz_over_K_steady << endl;
   
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This calculates beta
-// Comes from Iverson's eq 27
+// Comes from Iverson's eq 27 (it is actually near the top of the first column)
+// on page 1902
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDPorewaterParams::calculate_beta()
 {
@@ -221,6 +310,7 @@ void LSDPorewaterParams::calculate_beta()
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This calculates D_hat
+// Comes from equation 26c
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDPorewaterParams::calculate_D_hat()
 {
@@ -231,6 +321,7 @@ void LSDPorewaterParams::calculate_D_hat()
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This uses the parameters to get a steady state pressure profile
+// See the first column in Iverson 2000 page 1902 for explanation
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 vector<float> LSDPorewaterParams::calculate_steady_psi()
 {
@@ -314,6 +405,296 @@ float LSDPorewaterParams::seconds_to_days(float seconds)
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This loads a csv file into a data map that contains a map into string vectors
+// You will need to convert and clean data later.
+// It is inteded to be flexible so you will end up with as many vectors 
+// as there were columns in the csv file and these vectors can be accessed by
+// referening the key, which is the column header.
+// All of the vectors contain strings so you will need to know what data is in
+// specific files and convert to those data types at a later stage.  
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+map<string, vector<string> > LSDPorewaterParams::load_csv_data_into_data_map(string filename)
+{
+  // make sure the filename works
+  ifstream ifs(filename.c_str());
+  if( ifs.fail() )
+  {
+    cout << "\nFATAL ERROR: Trying to load csv data file, but the file" << filename
+         << " doesn't exist;  LSDSpatialCSVReader::load_csv_data" << endl;
+    exit(EXIT_FAILURE);
+  }
+  else
+  {
+    cout << "I have opened the csv file." << endl;
+  }
+
+  // Initiate the data map
+  map<string, int > temp_vec_vec_key;
+  vector< vector<string> > temp_vec_vec;
+  map<string, vector<string> > temp_data_map;
+
+  // initiate the string to hold the file
+  string line_from_file;
+  vector<string> empty_string_vec;
+  vector<string> this_string_vec;
+  string temp_string;
+
+  // get the headers from the first line
+  getline(ifs, line_from_file);
+
+  // reset the string vec
+  this_string_vec = empty_string_vec;
+
+  // create a stringstream
+  stringstream ss(line_from_file);
+  ss.precision(9);
+
+  while( ss.good() )
+  {
+    string substr;
+    getline( ss, substr, ',' );
+
+    // remove the spaces
+    substr.erase(remove_if(substr.begin(), substr.end(), ::isspace), substr.end());
+
+    // remove control characters
+    substr.erase(remove_if(substr.begin(), substr.end(), ::iscntrl), substr.end());
+
+    // add the string to the string vec
+    this_string_vec.push_back( substr );
+  }
+  // now check the data map
+  int n_headers = int(this_string_vec.size());
+  vector<string> header_vector = this_string_vec;
+  for (int i = 0; i<n_headers; i++)
+  {
+    temp_data_map[header_vector[i]] = empty_string_vec;
+  }
+
+
+  // now loop through the rest of the lines, getting the data.
+  while( getline(ifs, line_from_file))
+  {
+    //cout << "Getting line, it is: " << line_from_file << endl;
+    // reset the string vec
+    this_string_vec = empty_string_vec;
+
+    // create a stringstream
+    stringstream ss(line_from_file);
+
+    while( ss.good() )
+    {
+      string substr;
+      getline( ss, substr, ',' );
+
+      // remove the spaces
+      substr.erase(remove_if(substr.begin(), substr.end(), ::isspace), substr.end());
+
+      // remove control characters
+      substr.erase(remove_if(substr.begin(), substr.end(), ::iscntrl), substr.end());
+
+      // add the string to the string vec
+      this_string_vec.push_back( substr );
+    }
+
+    //cout << "Yoyoma! size of the string vec: " <<  this_string_vec.size() << endl;
+    if ( int(this_string_vec.size()) <= 0)
+    {
+      cout << "Hey there, I am trying to load your csv data but you seem not to have" << endl;
+      cout << "enough columns in your file. I am ignoring a line" << endl;
+    }
+    else
+    {
+      int n_cols = int(this_string_vec.size());
+      //cout << "N cols is: " << n_cols << endl;
+      for (int i = 0; i<n_cols; i++)
+      {
+        temp_data_map[header_vector[i]].push_back(this_string_vec[i]);
+      }
+      //cout << "Done with this line." << endl;
+    }
+
+  }
+
+
+  return temp_data_map;
+  //cout << "Done reading your file." << endl;
+}
+//==============================================================================
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Converts a string vec to a float vec
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<float> LSDPorewaterParams::convert_string_vec_to_float(vector<string>& string_vec)
+{
+  float NoData = -9999;
+  vector<float> number_vec;
+  string this_string;
+  string NaN = "NaN";
+  string nan = "nan";
+  int n_nodes = int(string_vec.size());
+  
+  // Loop through data looking for NaNs, and if not record the number. 
+  for(int i = 0; i< n_nodes; i++)
+  {
+    if (string_vec[i].find(NaN) != string::npos  || string_vec[i].find(nan) != string::npos)
+    {
+      cout << "I found a NaN" << endl;
+      number_vec.push_back(NoData);
+    }
+    else
+    {
+      // Warning!!! I don't check if this is actually a number or not. To be added. 
+      number_vec.push_back(atof(string_vec[i].c_str()));
+    } 
+  }
+
+  return number_vec;
+
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Converts a string vec to an int vec
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<int> LSDPorewaterParams::convert_string_vec_to_int(vector<string>& string_vec)
+{
+  int NoData = -9999;
+  vector<int> number_vec;
+  string this_string;
+  string NaN = "NaN";
+  string nan = "nan";
+  int n_nodes = int(string_vec.size());
+  
+  // Loop through data looking for NaNs, and if not record the number. 
+  for(int i = 0; i< n_nodes; i++)
+  {
+    if (string_vec[i].find(NaN) != string::npos  || string_vec[i].find(nan) != string::npos)
+    {
+      cout << "I found a NaN" << endl;
+      number_vec.push_back(NoData);
+    }
+    else
+    {
+      // Warning!!! I don't check if this is actually a number or not. To be added. 
+      number_vec.push_back(atoi(string_vec[i].c_str()));
+    } 
+  }
+
+  return number_vec;
+
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This parses a rainfall file
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDPorewaterParams::parse_rainfall_file(string path, string filename, vector<double>& durations, vector<double>& intensities)
+{
+  string full_fname;
+  string PathName = FixPath(path);
+
+  full_fname = PathName+filename;
+  
+  map<string, vector<string> > csv_data_map = load_csv_data_into_data_map(full_fname);
+
+  // BORIS WORK FROM HERE
+
+  // Alright, let's get the data
+  size_t size_of_csv = csv_data_map["timestamp_utc"].size(); // size of time column and of all the csv
+  // First, I need to conver tthe data from the files
+  vector<double> raw_time_from_file(size_of_csv), raw_intensity_from_file(size_of_csv);
+
+  for(size_t i =0; i<size_of_csv; i++)
+  {
+    // Getting the duration data and converting it to double
+    string str_of_time = csv_data_map["timestamp_utc"][i];
+    stringstream ss;
+    ss << setprecision(12);
+    ss << str_of_time ;
+    double double_of_time = atof(ss.str().c_str()); 
+    // Getting the rainfall intensity now
+    string str_of_prec = csv_data_map["precip_MLP_mm"][i]; double double_of_prec = atof(str_of_prec.c_str()); // WARNING the MLP code site will probably change depending on the site
+    // Feeding my vectors
+    raw_intensity_from_file.push_back(double_of_prec); raw_time_from_file.push_back(double_of_time);
+    cout << setprecision(9);
+    cout << str_of_time << "||" << double_of_time << "||" << atof(ss.str().c_str()) << endl;
+
+  }
+
+  // I now have my timing, let's combine it:
+  combine_time_to_durations_with_intensities(raw_time_from_file,raw_intensity_from_file,durations,intensities);
+  // should be done
+
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This takes a vector of time and a vector of corresponding intensity and combine it into vector of duration and vector of cumulated intensity for that duration.
+// The out vectors have to be empty when feeded
+// B.G.
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDPorewaterParams::combine_time_to_durations_with_intensities( vector<double>& raw_time, vector<double>& raw_prec, vector<double>& durations, vector<double>& intensities)
+{
+  size_t size_of_vecs = raw_time.size();
+  double last_prec = raw_prec[0], cumulative_time = 0, cumulative_prec = 0;
+  for(size_t i=0;i<size_of_vecs;i++)
+  {
+    double this_prec = raw_prec[i], this_time = raw_time[i];
+    if(this_prec == last_prec)
+    {
+      if(i!=0)
+        cumulative_time = cumulative_time + (this_time - raw_time[i-1]);
+      cumulative_prec = cumulative_prec+this_prec;
+    }
+    else
+    {
+      durations.push_back(cumulative_time);
+      intensities.push_back(cumulative_prec/cumulative_time);
+      cumulative_prec =0;
+      cumulative_prec = cumulative_prec+this_prec;
+      cumulative_time = (this_time - raw_time[i-1]);
+
+    }
+    last_prec = this_prec;
+  }
+  // The last data
+  durations.push_back(cumulative_time);
+  intensities.push_back(last_prec);
+  // Done
+
+
+}
+
+void LSDPorewaterParams::get_duration_intensity_from_preprocessed_input(vector<float>& duration_s, vector<float>& this_intensity)
+{
+
+  // First I need to load the csv file
+  map<string, vector<string> > csv_data_map = load_csv_data_into_data_map(rainfall_csv_path + rainfall_csv_name);
+  // Simply reading and converting data from it (thanks to python preprocessing)
+  duration_s = convert_string_vec_to_float(csv_data_map["duration_s"]);
+  this_intensity = convert_string_vec_to_float(csv_data_map["intensity_mm_sec"]);
+
+
+  // Converting to the right units
+  // first taking care of dimensionnalizing the intensity 
+  for(size_t i=0; i<duration_s.size(); i++)
+  {
+    this_intensity[i] = (this_intensity[i]*0.001)/(K_sat);
+    if(this_intensity[i]>1) // Cannot be >1
+      this_intensity[i]=1;
+    else if(this_intensity[i]>1) // Cannot be >1
+      this_intensity[i]=0;
+
+  }
+  cout << "здесь" << endl;
+
+
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This parses a rainfall file
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDPorewaterParams::parse_rainfall_file(string path, string filename, vector<float>& intensities)
@@ -353,8 +734,8 @@ void LSDPorewaterParams::parse_rainfall_file(string path, string filename, vecto
   ifstream ifs(fname.c_str());
   if( ifs.fail() )
   {
-    cout << "\nFATAL ERROR: Trying to load csv cosmo data file, but the file" << filename
-         << "doesn't exist; LINE 245 LSDCosmoData" << endl;
+    cout << "\nFATAL ERROR: Trying to load csv rainfall file, but the file" << filename
+         << "doesn't exist; LINE 357 LSDPorewaterParams" << endl;
     exit(EXIT_FAILURE);
   }
   
@@ -395,7 +776,8 @@ void LSDPorewaterParams::parse_rainfall_file(string path, string filename, vecto
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// This parses a rainfall file
+// This parses a rainfall file, specifically a rainfall file derived from MIDAS data
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDPorewaterParams::parse_MIDAS_rainfall_file(string path, string filename,vector<int>& days, vector<float>& intensities )
 {
@@ -523,6 +905,8 @@ void LSDPorewaterParams::parse_MIDAS_rainfall_file(string path, string filename,
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This parses MIDAS intensity and day data to give multiday durations if
 // there are empty data slots or repeated rainfall amounts
+// The end goal is a vector with durations and intensities. 
+// Some of these can be 0 intensity!
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDPorewaterParams::parse_MIDAS_duration_intensities(vector<int>& days, vector<float>& intensities, vector<float>& durations)
 {

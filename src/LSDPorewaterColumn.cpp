@@ -65,6 +65,9 @@
 #include "LSDPorewaterParams.hpp"
 #include "LSDStatsTools.hpp"
 #include "TNT/tnt.h"
+#include <fstream>
+#include "LSDRaster.hpp"
+
 using namespace std;
 using namespace TNT;
 
@@ -103,6 +106,18 @@ void  LSDPorewaterColumn::create(LSDPorewaterParams LSDPP)
   Psi = LSDPP.calculate_steady_psi();
 }
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This create function takes a porewater parameter object and uses the
+// steady infiltration rate to set psi
+// contains information about the position on the raster
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void  LSDPorewaterColumn::create(LSDPorewaterParams LSDPP, int i, int j)
+{
+  row = i;
+  col = j;
+  node_index = 0;
+  Psi = LSDPP.calculate_steady_psi();
+}
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This prints the Psi values to screen
@@ -143,6 +158,9 @@ float LSDPorewaterColumn::CalculateResponseFunction(float t_star)
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This caluclates the Psi value based on iverson's equation 27
 // Has only the transient component of psi
+// The vector of Psi values gives the Psi value for each depth
+// the depths are determined by the LSDPorewaterParams object. That object has a vector
+// of depths. 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 vector<float> LSDPorewaterColumn::CalcualtePsiTransient(LSDPorewaterParams& LSDPP, float Iz_over_Kz, 
                            float t_star, float T_star)
@@ -220,10 +238,13 @@ vector<float> LSDPorewaterColumn::CalculatePsiDimensionalTimeTransient(LSDPorewa
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// This caluclates the Psi value based on iverson's equation 27
+// This calculates the Psi value based on iverson's equation 27
 // It parses a time series
 // The durations and time are in seconds. 
-// The intensities are in Iz_over_Kz
+// **IMPORTANT** The intensities are in Iz_over_Kz
+// This wraps the transient components
+// The end result of this calculation is that the pore pressure Psi (this combines
+//  steady and transient components) is stored in the data member Psi
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDPorewaterColumn::CalculatePsiFromTimeSeries(vector<float> durations, vector<float> intensities, 
                                 LSDPorewaterParams& LSDPP, float t)
@@ -310,7 +331,9 @@ void LSDPorewaterColumn::CalculatePsiFromTimeSeries(vector<float> durations, vec
       
       // get this steps Psi value
       this_transient_Psi = CalculatePsiDimensionalTimeTransient(LSDPP, eff_t, this_duration, this_intensity);
+
       
+
       // check values
       //cout << "Transient psi is:"<< endl;
       //for(int i = 0; i<int(cumulative_psi.size()); i++)
@@ -326,24 +349,37 @@ void LSDPorewaterColumn::CalculatePsiFromTimeSeries(vector<float> durations, vec
     }
   }
   
-  // see what the result is:
-  for(int i = 0; i<int(cumulative_psi.size()); i++)
-  {
-    cout << "Psi["<<i<<"]: " << cumulative_psi[i] << endl;
-  }
+  // I commented that - BG  
+  // // see what the result is:
+  // for(int i = 0; i<int(cumulative_psi.size()); i++)
+  // {
+  //   cout << "Psi["<<i<<"]: " << cumulative_psi[i] << endl;
+  // }
   
   Psi = cumulative_psi;
+  // Saving the transient psi at dimensional time
+  // cout << "WARUM FUNKTIONIERT DU NICHT - WILKOMMEN" << endl;
+  vec_of_Psi[t] = cumulative_psi;
+  // cout << "WARUM FUNKTIONIERT DU NICHT - WOLKSWAGEN" << endl;
+
   
 }
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // Factor of safety calculations
+// See iverson 2000 equation 28b
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This is the friction
 float LSDPorewaterColumn::F_f(LSDPorewaterParams& LSDPP)
 {
-  float alpha =  LSDPP.get_alpha();
+  // Getting the alpha depending on your analysis: 1 or 2D  
+  float alpha;
+  if(LSDPP.get_output_2D())
+    alpha = LSDPP.get_alpha_rowcol(row,col);
+  else
+    alpha =  LSDPP.get_alpha();
+
   float friction_angle = LSDPP.get_friction_angle();
   
   float tan_alpha = tan(alpha);
@@ -355,11 +391,18 @@ float LSDPorewaterColumn::F_f(LSDPorewaterParams& LSDPP)
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This is from the cohesion
+// See iverson 2000 equation 28d
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 vector<float> LSDPorewaterColumn::F_c(LSDPorewaterParams& LSDPP)
 {
   float cohesion = LSDPP.get_cohesion();
-  float alpha =  LSDPP.get_alpha();
+  // Getting the alpha depending on your analysis: 1 or 2D
+  float alpha;
+  if(LSDPP.get_output_2D())
+    alpha = LSDPP.get_alpha_rowcol(row,col);
+  else
+    alpha =  LSDPP.get_alpha();
+
   float weight_of_soil = LSDPP.get_weight_of_soil();
   vector<float> Depths = LSDPP.get_Depths();
   
@@ -381,12 +424,18 @@ vector<float> LSDPorewaterColumn::F_c(LSDPorewaterParams& LSDPP)
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// This is from the water
+// This is the factor of safety contribution from the water
+// See iverson 2000 equation 28c
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 vector<float> LSDPorewaterColumn::F_w(LSDPorewaterParams& LSDPP)
 {
   vector<float> Depths = LSDPP.get_Depths();
-  float alpha =  LSDPP.get_alpha();
+  // Getting the alpha depending on your analysis: 1 or 2D
+  float alpha;
+  if(LSDPP.get_output_2D())
+    alpha = LSDPP.get_alpha_rowcol(row,col);
+  else
+    alpha =  LSDPP.get_alpha();
   float friction_angle = LSDPP.get_friction_angle();
   float weight_of_soil = LSDPP.get_weight_of_soil();
   float weight_of_water = LSDPP.get_weight_of_water();
@@ -399,7 +448,7 @@ vector<float> LSDPorewaterColumn::F_w(LSDPorewaterParams& LSDPP)
   
   for(int i = 0; i< int(Depths.size()); i++)
   {
-    
+    // cout << "JY DINK JY IS COOLER AS EKKE? " <<  Psi[i] << endl;
     num1 = Psi[i]*weight_of_water;
     num2 = -num1*tan(friction_angle);
     
@@ -415,7 +464,8 @@ vector<float> LSDPorewaterColumn::F_w(LSDPorewaterParams& LSDPP)
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// This is the total factor of safety
+// This is the total factor of safety (combining different components of the FS)
+// calculation. See equations 28a-d in Iverson 2000
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 vector<float> LSDPorewaterColumn::FS(LSDPorewaterParams& LSDPP)
 {
@@ -425,13 +475,21 @@ vector<float> LSDPorewaterColumn::FS(LSDPorewaterParams& LSDPP)
   vector<float> F_c_vec = F_c(LSDPP);
   vector<float> F_w_vec = F_w(LSDPP);
 
-  // get the 
+  // get the Factor safety I guess
   vector<float> FS = F_c_vec;
   for(int i = 0; i< int(F_c_vec.size()); i++)
   {
     FS[i] = F_f_float+F_c_vec[i]+F_w_vec[i];
-    cout << "FS["<<i<<"]: " << FS[i] << endl;
+    // cout << "FS["<<i<<"]: " << FS[i] << endl;
   }
+  
+  // cout << "WARUM FUNKTIONIERT DU NICHT - NUMER VIER" << endl;
+
+  // saving the current state of factors
+  current_FS = FS;
+  current_F_f_float = F_f_float;
+  current_F_c_vec = F_c_vec;
+  current_F_w_vec = F_w_vec;
   
   return FS;
 
@@ -439,6 +497,7 @@ vector<float> LSDPorewaterColumn::FS(LSDPorewaterParams& LSDPP)
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This checks to see a failure depth
+// If the factor of safety does not go below 1 then it returns nodata, -9999
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 float LSDPorewaterColumn::DepthOfFailure(LSDPorewaterParams& LSDPP, float minimum_depth)
 {
@@ -468,7 +527,7 @@ float LSDPorewaterColumn::DepthOfFailure(LSDPorewaterParams& LSDPP, float minimu
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// This checks to see a failure depth
+// This checks to see the minimum factor of safety in the column. 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDPorewaterColumn::GetMinFS(LSDPorewaterParams& LSDPP, float minimum_depth, float& depth_of_minFS, float& minFS)
 {
@@ -480,6 +539,9 @@ void LSDPorewaterColumn::GetMinFS(LSDPorewaterParams& LSDPP, float minimum_depth
   
   // get the depth vector
   vector<float> Depths = LSDPP.get_Depths();
+
+  float min_depth = 99999, tempolitarute = 0.; 
+  bool failure_does_happen = false;
   
   int N_depths = int(Depths.size());
   for(int i = 0; i< N_depths; i++)
@@ -492,10 +554,26 @@ void LSDPorewaterColumn::GetMinFS(LSDPorewaterParams& LSDPP, float minimum_depth
         depth_of_minFS = Depths[i];
         min_FS  = FoS[i];
       }
+
+      // check where failure might happen
+      if(FoS[i]<=1)
+      {
+        failure_does_happen = true;
+        if(Depths[i] > tempolitarute)
+          tempolitarute = Depths[i];
+        if(Depths[i]< min_depth)
+          min_depth = Depths[i];
+      }
     }
+
   }
   
   minFS = min_FS;
+  potential_failure_times.push_back(current_tested_time_by_scanner);
+  potential_failure_min_depths.push_back(min_depth);
+  potential_failure_max_depths.push_back(tempolitarute);
+  potential_failure_bool.push_back(failure_does_happen);
+
   
   
 }
@@ -504,6 +582,9 @@ void LSDPorewaterColumn::GetMinFS(LSDPorewaterParams& LSDPP, float minimum_depth
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This scans a timeseries for a failure
+// The code takes two vectors with durations and intensities. It can then calculate 
+// the pore pressure at any time given these inputs. 
+// So you supply a time vector and loop through it to see when failure occurs. 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDPorewaterColumn::ScanTimeseriesForFailure(vector<float> durations, vector<float> intensities,
                                    LSDPorewaterParams& LSDPP, float minimum_depth, 
@@ -513,18 +594,181 @@ void LSDPorewaterColumn::ScanTimeseriesForFailure(vector<float> durations, vecto
   int n_times = int(times.size());
   float depth_of_minFS;
   float min_FS;
+  vector<float> vec_of_depth, vec_of_minFS;
+
+  // Map storing the FS for times
+  map<float, vector<float> > FSmap, F_c_map, F_w_map;
+  map<float,float> F_f_map;
+
+  vector<float> temp_float_vec;
+  vector<bool> temp_bool_vec;
+
+  potential_failure_times = temp_float_vec;
+  potential_failure_min_depths = temp_float_vec;
+  potential_failure_max_depths = temp_float_vec;
+  potential_failure_bool = temp_bool_vec;
+
+
   for(int i = 0; i< n_times; i++)
   {
+    current_tested_time_by_scanner = times[i];
     // get the pore pressure
+    // cout << "WARUM FUNKTIONIERT DU NICHT - NUMER EINS" << endl;
     CalculatePsiFromTimeSeries(durations, intensities, LSDPP, times[i]);
+    // cout << "WARUM FUNKTIONIERT DU NICHT - NUMER ZWEI" << endl;
     
     // get the min
     GetMinFS(LSDPP, minimum_depth, depth_of_minFS, min_FS);
-    
-    cout << "Time in weeks is: " << LSDPP.seconds_to_weeks(times[i]) << " d min FS: " 
-         << depth_of_minFS << " min FS: " << min_FS << endl;
+    // cout << "WARUM FUNKTIONIERT DU NICHT - NUMER DREI" << endl;
+
+    // Commenting this as it makes the terminal going crazy when multiprocessing
+    // if(i % 10 == 0)
+    //   cout << "Time in weeks is: " << LSDPP.seconds_to_weeks(times[i]) << " d min FS: "  << depth_of_minFS << " min FS: " << min_FS << "\r";
+
+    vec_of_depth.push_back(depth_of_minFS);
+    vec_of_minFS.push_back(min_FS);
+
+    FSmap[times[i]] = current_FS;
+    F_f_map[times[i]] = current_F_f_float;
+    F_c_map[times[i]] = current_F_c_vec;
+    F_w_map[times[i]] = current_F_w_vec;
 
   }
+
+  cout << endl;
+  cout << "Done with the scanning, let me know save your files" << endl;
+
+
+  ofstream myfile;
+  myfile.open(LSDPP.get_path_csv() +"test_scan.csv");
+  myfile << "time,min_depth,min_FS,final_Psi,duration,intensity" << endl;
+   
+  // saving temporary output
+  for(int i = 0; i< n_times; i++)
+  {
+    myfile << times[i] << "," << vec_of_depth[i] << "," << vec_of_minFS[i] << "," << Psi[i] << "," <<durations[i] << "," << intensities[i] << endl;
+  }
+
+  myfile.close();
+
+
+  // Saving the time series
+  vector<float> these_depth = LSDPP.get_Depths();
+  // First the Psi ones
+  myfile.open(LSDPP.get_path_csv() + LSDPP.get_saving_prefix() + "_time_series_depth_Psi.csv");
+  myfile << "depth";
+  for(int i = 0; i< n_times; i++)
+    myfile << "," << to_string(times[i]);
+  myfile << endl;
+  for(size_t i=0; i<these_depth.size(); i++)
+  {
+    myfile << these_depth[i];
+    for(size_t j=0; j< times.size();j++)
+    {
+      float this_time = times[j];
+      myfile << "," << vec_of_Psi[this_time][i];
+    }
+    myfile << endl;
+  }
+  myfile.close();
+
+  // Then the Factor of Safety ones
+  myfile.open(LSDPP.get_path_csv() + LSDPP.get_saving_prefix() + "_time_series_depth_FS.csv");
+  myfile << "depth";
+  for(int i = 0; i< n_times; i++)
+    myfile << "," << to_string(times[i]);
+  myfile << endl;
+  for(size_t i=0; i<these_depth.size(); i++)
+  {
+    myfile << these_depth[i];
+    for(size_t j=0; j< times.size();j++)
+    {
+      float this_time = times[j];
+      myfile << "," << FSmap[this_time][i];
+    }
+    myfile << endl;
+  }
+  myfile.close();
+
+  // Then the Factor of Safety ones
+  myfile.open(LSDPP.get_path_csv() + LSDPP.get_saving_prefix() + "_time_series_depth_F_c.csv");
+  myfile << "depth";
+  for(int i = 0; i< n_times; i++)
+    myfile << "," << to_string(times[i]);
+  myfile << endl;
+  for(size_t i=0; i<these_depth.size(); i++)
+  {
+    myfile << these_depth[i];
+    for(size_t j=0; j< times.size();j++)
+    {
+      float this_time = times[j];
+      myfile << "," << F_c_map[this_time][i];
+    }
+    myfile << endl;
+  }
+  myfile.close();
+
+  // Then the Factor of Safety ones
+  myfile.open(LSDPP.get_path_csv() + LSDPP.get_saving_prefix() + "_time_series_depth_F_w.csv");
+  myfile << "depth";
+  for(int i = 0; i< n_times; i++)
+    myfile << "," << to_string(times[i]);
+  myfile << endl;
+  for(size_t i=0; i<these_depth.size(); i++)
+  {
+    myfile << these_depth[i];
+    for(size_t j=0; j< times.size();j++)
+    {
+      float this_time = times[j];
+      myfile << "," << F_w_map[this_time][i];
+    }
+    myfile << endl;
+  }
+  myfile.close();
+
+  // Then the Factor of Safety ones
+  myfile.open(LSDPP.get_path_csv() + LSDPP.get_saving_prefix() + "_time_series_depth_F_f.csv");
+  myfile << "depth";
+  for(int i = 0; i< n_times; i++)
+    myfile << "," << to_string(times[i]);
+  myfile << endl;
+  myfile << "All_depth";
+  for(size_t j=0; j< times.size();j++)
+  {
+    float this_time = times[j];
+    myfile << "," << F_f_map[this_time];
+  }
+  myfile << endl;
+  myfile.close();
+
+  // Finally (or not if I had other stuff) the potfailfile
+  myfile.open(LSDPP.get_path_csv() + LSDPP.get_saving_prefix() + "_potfailfile.csv");
+  myfile << "time,min_depth,max_depth,failure";
+  myfile << endl;
+
+  bool is_failing = true;
+  for(size_t i=0; i<potential_failure_times.size();i++)
+  {
+    if(potential_failure_bool[i] == true)
+    {
+      myfile << potential_failure_times[i] << "," << potential_failure_min_depths[i] << "," << potential_failure_max_depths[i] << "," << potential_failure_bool[i] << endl;
+    }
+    else if (is_failing == true && potential_failure_bool[i] == false)
+    {
+      // insert a breask in here
+      myfile << "-9999,-9999,-9999,-9999" << endl;
+      is_failing = false;
+    }
+    is_failing = potential_failure_bool[i];
+  }
+  
+  myfile.close(); 
+
+
+
+
 }
+
+// map<string,float> calculate
 
 #endif

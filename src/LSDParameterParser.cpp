@@ -901,6 +901,7 @@ string LSDParameterParser::check_for_path_and_add_read_path_if_required(string t
     if (this_string.find(sl_dot) != std::string::npos)
     {
       cout << "This filename includes a path. I am not going to modify it." << endl;
+      new_string = this_string;
     } 
     else
     {

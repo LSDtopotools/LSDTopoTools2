@@ -195,6 +195,9 @@ class LSDRaster
   /// @return Raster values as a 2D Array.
   Array2D<float> get_RasterData() const { return RasterData.copy(); }
 
+  Array2D<float>* get_RasterDataPtr() { return &RasterData; }
+
+
   /// @brief Get the raw raster data, double format
   /// @author DAV
   Array2D<double> get_RasterData_dbl() const { return RasterData_dbl.copy(); }
@@ -221,6 +224,13 @@ class LSDRaster
   /// @author SMM
   /// @date 19/05/16
   void set_data_element(int row, int column, float value)  { RasterData[row][column] = value; }
+
+  /// @brief Sets the raster global data.
+  /// @param 2Darray new array of data. Needs to be same dimensions than the other one.
+  /// @author BG
+  /// @date 16/04/19
+  void set_data_array(Array2D<float> ndata)  { RasterData = ndata.copy(); }
+
 
   /// Assignment operator.
   LSDRaster& operator=(const LSDRaster& LSDR);
@@ -1906,6 +1916,14 @@ class LSDRaster
   /// @author SWDG
   /// @date 16/10/13
   LSDRaster D_inf_units();
+
+  //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  ///@brief Wrapper Function to create a D-infinity flow accumulation and drainage area raster
+  ///@return vector of LSDRaster (0 is acc, 1 is DA)
+  ///@author BG 
+  ///@date 09/01/2018
+  //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  vector<LSDRaster> D_inf_flowacc_DA();
 
   ///@brief Wrapper Function to convert a D-infinity flow raster into spatial units.
   /// @return LSDRaster of D-inf flow areas in spatial units.

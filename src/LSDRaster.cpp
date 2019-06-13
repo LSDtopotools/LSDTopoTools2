@@ -7217,6 +7217,29 @@ LSDRaster LSDRaster::D_inf_units(){
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//Wrapper Function to create a D-infinity flow accumulation and drainage area raster
+//BG - 09/01/2018
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+vector<LSDRaster> LSDRaster::D_inf_flowacc_DA()
+{
+  vector<LSDRaster> output(2);
+
+  Array2D<float> Dinf_flow = D_inf_FlowDir();
+  LSDRaster Dinf_area = D_inf_FlowArea(Dinf_flow);
+
+  float cell_area = DataResolution*DataResolution;
+  Array2D<float> pixel_area(NRows, NCols, cell_area);
+
+  Array2D<float> Dinf_area_units = Dinf_area.get_RasterData() * pixel_area;
+  LSDRaster Dinf_area_units_raster = Dinf_area.LSDRasterTemplate(Dinf_area_units);
+
+  output[0] = Dinf_area;
+  output[1] = Dinf_area_units_raster;
+
+  return output;
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //
 // Function to multiply D_inf flow accumulation data to drainage area by multiplying through
 // by the data resolution. (This could be a duplicate function but I don't have time to check!).
@@ -11107,6 +11130,7 @@ LSDIndexRaster LSDRaster::PolylineShapefileToRaster(string FileName){
 // OutputResolution is the resolution in spatial units to be resampled to.
 // Returns an LSDRaster resampled to the OutputResolution.
 // SWDG 17/3/14
+// BG Edited on the 18th of February 2019 around 3PM: I am attempting to sort the georefering which happens to dislike the resampling
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 LSDRaster LSDRaster::Resample(float OutputResolution){
 
@@ -11138,6 +11162,10 @@ LSDRaster LSDRaster::Resample(float OutputResolution){
 
   LSDRaster OutputRaster(NewNRows,NewNCols,XMinimum,YMinimum,OutputResolution,
                       NoDataValue,Resampled,GeoReferencingStrings);
+
+  // this should do the trick bg
+  OutputRaster.Update_GeoReferencingStrings();
+
   return OutputRaster;
 
 }

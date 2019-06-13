@@ -63,6 +63,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include "LSDRaster.hpp"
 #include "TNT/tnt.h"
 using namespace std;
 using namespace TNT;
@@ -76,8 +77,9 @@ class LSDPorewaterParams
     /// @date 11/11/2015
     LSDPorewaterParams()     { create(); }
 
-    /// @brief Create a SoilHydroRaster by copying an LSDRaster
-    /// @param ThisRaster The LSDRaster to be copied
+    /// @brief Create a LSDPorewaterParams object using parameter files
+    /// @param paramfile_path path to the parameter file
+    /// @param paramfile_name The name of the parameter file without the path
     /// @author SMM
     /// @date 11/11/2015
     LSDPorewaterParams(string paramfile_path, string paramfile_name)
@@ -88,7 +90,7 @@ class LSDPorewaterParams
     vector<float> get_Depths() const { return Depths; }
 
     /// @return slope in radians
-    float get_alpha() const { return alpha; }
+    float get_alpha() const { return alpha;}
 
     /// @return diffusivity
     float get_D_0() const { return D_0; }
@@ -180,6 +182,28 @@ class LSDPorewaterParams
     /// @date 25/11/2016
     float seconds_to_days(float seconds);
 
+    /// @brief A general function to load csv data 
+    /// @param filename The name of the csv file INCLUDING path and extension
+    /// @return a data map with headers as keys and vectors of strings as values. 
+    /// @author SMM
+    /// @date 15/01/2019
+    map<string, vector<string> > load_csv_data_into_data_map(string filename);
+
+    /// @brief A function for converting string vecs into float vecs. 
+    ///  Changes NaN or nan values to -9999 
+    /// @param string_vec a vector of strings
+    /// @return a vector of floats. 
+    /// @author SMM
+    /// @date 15/01/2019
+    vector<float> convert_string_vec_to_float(vector<string>& string_vec);
+
+    /// @brief A function for converting string vecs into int vecs. 
+    ///  Changes NaN or nan values to -9999 
+    /// @param string_vec a vector of strings
+    /// @return a vector of floats. 
+    /// @author SMM
+    /// @date 15/01/2019
+    vector<int> convert_string_vec_to_int(vector<string>& string_vec);  
 
 
     /// @brief This calculates a steady state pressure profile
@@ -196,6 +220,30 @@ class LSDPorewaterParams
     /// @author SMM
     /// @date 17/11/2016
     void parse_rainfall_file(string path, string filename, vector<float>& intensities);
+
+    /// @brief This function parses a rainfall file. It is more flexible in that it loads
+    ///  a csv file and extracts both intensities and durations
+    /// @param path the path to the rainfall file
+    /// @param filename the name of the file including extension (but this needs to be
+    ///  a csv file)
+    /// @param durations a float vector holding durations
+    /// @param intensities a float vector holding rainfall intensities. 
+    /// @author SMM
+    /// @date 15/01/2019
+    void parse_rainfall_file(string path, string filename, vector<double>& intensities, vector<double>& durations);
+
+
+    /// @brief Extract duration-intensity from a csv file preprocessed. it ingest data in s and mm/yrs and convert it to the right units (m) and dimentionlessize the time.
+    /// @param durations a float vector holding durations
+    /// @param intensities a float vector holding rainfall intensities. 
+    /// @author BG
+    /// @date 01/02/2019
+    void get_duration_intensity_from_preprocessed_input(vector<float>& duration_s, vector<float>& intensity_mm);
+
+
+    ///@brief I will comment after lunch
+    ///@author BG
+    void combine_time_to_durations_with_intensities( vector<double>& raw_time, vector<double>& raw_intensity, vector<double>& durations, vector<double>& intensities);
 
     /// @brief This function parses a rainfall file derived from MIDAS. 
     /// @param path the path to the rainfall file
@@ -223,6 +271,32 @@ class LSDPorewaterParams
     void print_parameters_to_screen();
 
 
+    /// @brief Return the rainfall csv name
+    string get_rainfall_csv_name(){return rainfall_csv_name;};
+
+    string get_path_csv(){return rainfall_csv_path;};
+
+    /// returns the write prefix
+    string get_saving_prefix(){return saving_prefix;};
+
+    /// @brief return the slope raster
+    LSDRaster get_alpha_raster(){return alpha_raster;}
+
+    /// @brief returns spatially variable alpha. Row col on alpha raster.
+    float get_alpha_rowcol(int row, int col) {return alpha_raster.get_data_element(row,col);}
+
+    /// @brief Is full 1D analysis on?
+    bool get_full_1D_output() {return full_1D_output;}
+    /// @brief Is 2D analysis on?
+    bool get_output_2D() {return output_2D;};
+
+    /// @brief Get the number of threads to use for the spatial analysis
+    int get_n_threads() {return n_threads;};
+    /// @brief get the discrete time (in seconds, same as preprocessed input) of the spatial analysis
+    float get_time_of_spatial_analysis() {return time_of_spatial_analysis;};
+
+
+
   protected:
     /// This holds the depths in metres
     vector<float> Depths;
@@ -242,23 +316,49 @@ class LSDPorewaterParams
     /// The depth to saturated water table at steady infiltration in metres
     float d;
     
-    /// A parameter that describes the stead state pressure profile
+    /// A parameter that describes the steady state pressure profile
+    /// It is equal to cos^2 alpha - (Iz_over_K_steady) and alpha is the slope angle
+    /// see Iverson 2000 page 1902
     float beta;
     
-    /// The infiltration rate at steady state
+    /// The infiltration rate at steady state. Dimensionless since I_z is in m/s and K is in m/s
     float Iz_over_K_steady;
     
-    /// The friction andgle
+    /// The friction andgle (in radians)
     float friction_angle;
     
-    /// The cohesion
+    /// The cohesion in Pa
     float cohesion;
     
-    /// The weigth of water (density time gravity)
+    /// The weight of water (density times gravity; use SI units (kg/(s*m^2))
     float weight_of_water;
     
-    /// The weight of soil (density times gravity)
+    /// The weight of soil (density times gravity; use SI units (kg/(s*m^2))
     float weight_of_soil;
+
+    /// Name of the csv file hosting the rainfall data from param
+    string rainfall_csv_name;
+
+    /// path to the csv file
+    string rainfall_csv_path;
+
+    /// Saving prefix
+    string saving_prefix;
+
+    /// alpha raster
+    LSDRaster alpha_raster;
+
+    /// Few bools
+    bool full_1D_output;
+    bool output_2D;
+
+    /// OMP param
+    int n_threads;
+
+    /// Time at which the spatial analysis need to be processed
+    float time_of_spatial_analysis;
+
+
   
   private:
   

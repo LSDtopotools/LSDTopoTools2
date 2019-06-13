@@ -74,19 +74,22 @@ class LSDPorewaterColumn
     /// @date 17/11/2016
     LSDPorewaterColumn()     { create(); }
 
-    /// @brief Create a 
-    /// @param ThisRaster The LSDRaster to be copied
+    /// @brief Creates a porewater column with a fixed pore pressure
+    /// @param initial_Psi A vector with pressure values 
     /// @author SMM
     /// @date 17/11/2016
     LSDPorewaterColumn( vector<float> initial_Psi )
       { create(initial_Psi); }
 
-    /// @brief Create a SoilHydroRaster by copying an LSDRaster
-    /// @param ThisRaster The LSDRaster to be copied
+    /// @brief Creates a porewater column with a fixed pore pressure with some porewater parameters
+    /// @param LSDPP A porewater parameter object
     /// @author SMM
     /// @date 17/11/2016
     LSDPorewaterColumn( LSDPorewaterParams LSDPP )
       { create(LSDPP); }
+
+    LSDPorewaterColumn(LSDPorewaterParams LSDPP, int i, int j)
+    {create(LSDPP, i, j);}
       
     /// @brief this prints the pressure to screen
     /// @author SMM
@@ -106,14 +109,17 @@ class LSDPorewaterColumn
     /// @param Iz_over_Kz the infilatration rate of this response
     /// @param t_star the dimensionless time
     /// @param T_star the dimensionless storm duration
-    /// @return the transient component of Psi for this storm
+    /// @return the transient component of Psi for this storm. 
+    ///   The vector of Psi values gives the Psi value for each depth
+    /// the depths are determined by the LSDPorewaterParams object. That object has a vector
+    /// of depths. 
     /// @author SMM
     /// @date 17/11/2016
     vector<float> CalcualtePsiTransient(LSDPorewaterParams& LSDPP, float Iz_over_Kz, 
                            float t_star, float T_star);
 
     /// @brief This calculates the transient component of Psi for a given
-    ///  rainfall pulse using dimensional tie
+    ///  rainfall pulse using dimensional time
     /// @param  LSDPP an LSDPorewaterParams object
     /// @param Iz_over_Kz the infilatration rate of this response
     /// @param t the time in seconds
@@ -129,6 +135,9 @@ class LSDPorewaterColumn
     /// @param intensities storm intensities, in dimensionless Iz_over_Kz
     /// @param LSDPP is an PorewaterParams object
     /// @param t is the dimensional time
+    /// @return There is no return, but the end result of this calculation is that the data member Psi
+    ///  will contain the pressure at dimensional time t. The Psi values are in a vector representing the 
+    ///  depths. These depths are stored in LSDPP, the LSDPorewaterParams object. 
     /// @author SMM
     /// @date 17/11/2016
     void CalculatePsiFromTimeSeries(vector<float> durations, vector<float> intensities, 
@@ -137,33 +146,37 @@ class LSDPorewaterColumn
 
     /// @brief Calcualtes the friction factor component of the factor of safety
     /// @param LSDPP is an PorewaterParams object
-    /// @return F_f 
+    /// @return F_f. The depths of each of the factor of safeties can be obtained from 
+    ///  the LSDPP object
     /// @author SMM
     /// @date 25/11/2016
     float F_f(LSDPorewaterParams& LSDPP);
 
-    /// @brief Calcualtes the friction factor from cohesion component of the factor of safety
+    /// @brief Calculates the friction factor from cohesion component of the factor of safety
     /// @param LSDPP is an PorewaterParams object
-    /// @return F_c (a vector of floats)
+    /// @return F_c (a vector of floats). The depths of each of the factor of safeties can be obtained from 
+    ///  the LSDPP object
     /// @author SMM
     /// @date 25/11/2016
     vector<float> F_c(LSDPorewaterParams& LSDPP);
 
-    /// @brief Calcualtes the friction factor from pore pressure component of the factor of safety
+    /// @brief Calcualtes the friction factor from the pore pressure component of the factor of safety
     /// @param LSDPP is an PorewaterParams object
-    /// @return F_w (a vector of floats)
+    /// @return F_w (a vector of floats). The depths of each of the factor of safeties can be obtained from 
+    ///  the LSDPP object
     /// @author SMM
     /// @date 25/11/2016
     vector<float> F_w(LSDPorewaterParams& LSDPP);
 
     /// @brief Calcualtes the factor of safety
     /// @param LSDPP is an PorewaterParams object
-    /// @return FS (a vector of floats)
+    /// @return FS (a vector of floats). The depths of each of the factor of safeties can be obtained from 
+    ///  the LSDPP object
     /// @author SMM
     /// @date 26/11/2016
     vector<float> FS(LSDPorewaterParams& LSDPP);
     
-    /// @brief This calcualtes the depth of failer of the column. 
+    /// @brief This calculates the depth of failure of the column. 
     /// @param LSDPP is a PorewaterParams object
     /// @param minimum_depth the minimum depth at which falure can occur
     /// @return depth_of_failure This is -9999 if there is no failure
@@ -171,7 +184,7 @@ class LSDPorewaterColumn
     /// @date 02/12/2016
     float DepthOfFailure(LSDPorewaterParams& LSDPP, float minimum_depth);
 
-    /// @brief This finds the minimum facotr of safety in a column
+    /// @brief This finds the minimum factor of safety in a column
     /// @param LSDPP is a PorewaterParams object
     /// @param minimum_depth the minimum depth at which falure can occur
     /// @param depth_of_minFS The depth where the minimum FS occurs
@@ -209,17 +222,40 @@ class LSDPorewaterColumn
   protected:
     /// This holds the pressure heads
     vector<float> Psi;
-    
+    /// This holds the transient pressure head for each time 
+    map<float, vector<float> > vec_of_Psi;
     /// This has the information about where the column is
     int row;
     int col;
     int node_index;
+
+
+    /// Current tested time while scanning. Useful for specific functions when assessing transience
+    float current_tested_time_by_scanner;
+
+    /// When scanning for failure, saves the current factor of safety. Each value correspond to am associated depth
+    vector<float> current_FS;
+    float current_F_f_float;
+    vector<float> current_F_c_vec;
+    vector<float> current_F_w_vec;
+
+    /// Time where failure can occur (FS<=1)
+    vector<float> potential_failure_times;
+    /// min depth where failure can occur (FS<=1)
+    vector<float> potential_failure_min_depths;
+    /// max depth where failure can occur (FS<=1)
+    vector<float> potential_failure_max_depths;
+    /// Time where failure can occur (FS<=1)
+    vector<bool> potential_failure_bool;
+    
   
   private:
   
     void create();
     void create(vector<float> InitialPsi);
     void create(LSDPorewaterParams LSDPP);
+    void create(LSDPorewaterParams LSDPP, int i, int j);
+    
   
 };
 
