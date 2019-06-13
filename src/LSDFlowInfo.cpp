@@ -2706,7 +2706,9 @@ LSDRaster LSDFlowInfo::upslope_variable_accumulator(LSDRaster& accum_raster)
     {
       cout << "Warning!!, LSDFlowInfo::upslope_area_accumulator\n"
      << "Accumulation raster does not match dimensions of original raster" << endl;
-      return accum_raster;
+      exit(EXIT_FAILURE);
+      // return accum_raster;
+
     }
   else
     {
@@ -2738,6 +2740,114 @@ LSDRaster LSDFlowInfo::upslope_variable_accumulator(LSDRaster& accum_raster)
             DataResolution, NoDataValue, accumulated_data_array,GeoReferencingStrings);
       return accumulated_flow;
     }
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+//  Accumulate some variable (such a precipitation) from an accumulation raster
+//
+//  v2, I am trying to optimise it and remove the dependencies of having the exact same dimensions!
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+LSDRaster LSDFlowInfo::upslope_variable_accumulator_v2(LSDRaster& accum_raster, LSDRaster& filled_raster)
+{
+  int raster_NRows, raster_NCols;
+  float raster_XMin, raster_YMin, raster_DataRes;
+
+  // first check to make sure the raster dimensions match that of the
+  // raster upon which LSDFlowInfo is based
+  raster_NRows =  accum_raster.get_NRows();
+  raster_NCols =  accum_raster.get_NCols();
+  raster_XMin  =  accum_raster.get_XMinimum();
+  raster_YMin  =  accum_raster.get_YMinimum();
+  raster_DataRes  =  accum_raster.get_DataResolution();
+
+  if (raster_NRows != NRows || raster_NCols != NCols ||
+      raster_XMin != XMinimum || raster_YMin != YMinimum ||
+      raster_DataRes != DataResolution)
+  {
+    cout << "Warning!!, LSDFlowInfo::upslope_area_accumulator\n"
+      << "Accumulation raster does not match dimensions of original raster\n"
+      << "I am resampling your raster to the same dimensions" << endl;
+
+    // Using a simple xy query approach
+    LSDRaster new_accum_raster = filled_raster;
+    for(size_t i=0; i< NRows; i++)
+    {
+      for(size_t j=0; j < NCols; j++)
+      {
+        float tx,ty,new_val;
+        new_accum_raster.get_x_and_y_locations(i,j,tx,ty);
+        new_val = accum_raster.get_value_of_point(tx,ty);
+        new_accum_raster.set_data_element(i,j,new_val);
+      }
+    }
+
+    accum_raster = new_accum_raster;
+  // Resampling done!
+
+  }
+
+  // getting my clean vectors
+
+  map<string, vector< vector<int> > > these_vec = get_map_of_vectors();
+
+  // create the data array
+  float goulg = 0;
+  Array2D<float> accumulated_data_array(NRows,NCols,goulg);
+  // Array2D<float> checker(NRows,NCols,goulg);
+  for(size_t i=0;i<NRows;i++)
+  {
+    for(size_t j=0;j<NCols;j++)
+    {
+      accumulated_data_array[i][j] = 0;
+    }
+  }
+
+  size_t n_vec = these_vec["inverted_stack_order"].size();
+  // #pragma omp parallel for
+  int tot_n = 0;
+  int tot_n_check = 0;
+  for(int i=0; i<int(n_vec); i++)
+  {
+    vector<int> vec_of_node = these_vec["inverted_stack_order"][i];
+    size_t dat_vec_size = vec_of_node.size();
+    tot_n += int(dat_vec_size);
+    for(size_t j=0; j<dat_vec_size; j++)
+    {
+      int this_node = vec_of_node[j];
+      int row,col;
+      tot_n_check++;
+
+      // retrieve_current_row_and_col(this_node,row,col);
+      row =  these_vec["inverted_rows"][i][j];
+      col = these_vec["inverted_cols"][i][j];
+      // cout << "row: " << row << " || " << " Col: " << col << endl;
+      // First getting the precipitation added to that part
+      float increment_val = accum_raster.get_data_element(row,col);
+      accumulated_data_array[row][col] += increment_val;
+      // checker[row][col] = 1;
+      // if my receiving node is not the same, I transmit that accumulation to the next node
+      int recnode; retrieve_receiver_information(this_node,recnode);
+      if(recnode != this_node)
+      {
+        int rrow,rcol;
+        retrieve_current_row_and_col(recnode,rrow,rcol);
+        accumulated_data_array[rrow][rcol] += accumulated_data_array[row][col];
+
+      }
+    }
+
+  }
+  // // Done
+
+  // create the raster
+  LSDRaster accumulated_flow(NRows, NCols, XMinimum, YMinimum,
+        DataResolution, NoDataValue, accumulated_data_array,GeoReferencingStrings);
+  return accumulated_flow;
+    
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
@@ -8536,149 +8646,167 @@ vector< vector<int> > LSDFlowInfo::get_vectors_of_flow(LSDRaster& topo)
 
 
   return out_vector;  
-
-  // Old attempts
-
-  // Vector to return
-  // vector< vector<int> > out_vector;
-  // // Temp vector for each 
-  // vector<int> this_vector;
-  // cout<< "Preprocessing ordering nodes first"<< endl;
-  // priority_queue< node_to_process_PQPN, vector<node_to_process_PQPN>, greater<node_to_process_PQPN> > processing_PQ;
-  // map<int,bool> is_processed;
-
-  // for(size_t i=0; i<NRows;i++)
-  // {
-  //   for(size_t j=0; j<NCols;j++)
-  //   {
-  //     if(NodeIndex[i][j] != NoDataValue)
-  //     {
-  //       int this_node = NodeIndex[i][j];
-  //       is_processed[this_node] = false;
-  //       node_to_process_PQPN NTP;
-  //       NTP.index = this_node;
-  //       NTP.elevation = topo.get_data_element(i,j);
-  //       processing_PQ.push(NTP);
-  //     }
-  //   }
-  // }
-
-  // while(processing_PQ.size() > 0)
-  // {
-  //   // getting the top PQ
-  //   node_to_process_PQPN this_pop;
-  //   if(processing_PQ.size() % 1000 == 0)
-  //   cout<< processing_PQ.size() << "\r";
-
-  //   do
-  //   {
-  //     // cout<< "A" << endl;
-  //     this_pop = processing_PQ.top();
-  //     processing_PQ.pop();
-  //   }
-  //   while(is_processed[this_pop.index]) ; 
-
-  //   int this_node = this_pop.index;
-  //   this_vector.push_back(this_node);
-  //   is_processed[this_node] = true;
-  //   bool keep_on = true;
-  //   do
-  //   {
-  //     // cout<< "B" << endl;
-
-  //     int this_RecNode;
-  //     retrieve_receiver_information(this_node,this_RecNode);
-  //     if(this_RecNode != this_node)
-  //     {
-  //       this_vector.push_back(this_RecNode);
-  //       this_node = this_RecNode;
-  //       is_processed[this_node] = true;
-  //     }
-  //     else
-  //     {
-  //       out_vector.push_back(this_vector);
-  //       this_vector.clear();
-  //       keep_on = false;
-  //     }
-  //   }
-  //   while(keep_on);
-
-  // }
-
-  // cout<< "Getting vectors of flows...";
-
-  // vector<int> RSVector = SVector;
-  // vector<int> RSVectorindex = SVectorIndex;
-  // reverse(RSVector.begin(),RSVector.end());
-  // reverse(RSVectorindex.begin(),RSVectorindex.end());
-  // int hjhjhj = 0;
-  // int this_node = 0;
-  // int row,col,lrow,lcol;
-  // float this_elev =0, last_elev = -9999;
-  // for(size_t i=0;i<SVector.size();i++)
-  // {
-  //   this_node = SVector[i];
-  //   retrieve_current_row_and_col(this_node,row,col);
-  //   this_elev = topo.get_data_element(row,col);
-  //   int this_idx_vec = SVectorIndex[i];
-  //   int NDonors_here = NDonorsVector[this_idx_vec];
-  //   cout << hjhjhj << " || " << topo.get_data_element(row,col) << " || " << NDonors_here << endl;
-
-  //   if(this_elev > last_elev or abs(lrow-row)>1 or abs(lcol-col)>1 )
-  //   {
-  //     // Top level
-  //     // this_vector.push_back(SVector[i]);
-  //     out_vector.push_back(this_vector);
-  //     this_vector.clear();
-  //     this_vector.push_back(SVector[i]);
-
-  //     hjhjhj++;
-
-  //     if(i%10000==0){cout<< ".";}
-  //   }
-  //   else
-  //   {
-  //     this_vector.push_back(SVector[i]);
-  //   }
-  //   last_elev = this_elev;
-  //   lrow = row;
-  //   lcol = col;
-
-  // }
-
-
-
-
-
-  // vector<int> RSVector = SVector;
-  // reverse(RSVector.begin(),RSVector.end());
-
-  
-  // for(size_t i =0; i<RSVector.size(); i++)
-  // {
-  //   int this_node = RSVector[i];
-  //   // int row,col;
-  //   // retrieve_current_row_and_col(this_node,row,col);
-  //   int NDonors_here = NDonorsVector[this_node];
-  //   if(NDonors_here == 0)
-  //   {
-  //     // Top level
-  //     this_vector.push_back(RSVector[i]);
-  //     // reverse(this_vector.begin(),this_vector.end());
-
-  //     out_vector.push_back(this_vector);
-  //     this_vector.clear();
-  //     if(i%10000==0){cout<< ".";}
-  //   }
-  //   else
-  //   {
-  //     this_vector.push_back(RSVector[i]);
-  //   }
-  // }
-  // cout << "done!" << endl;
-  // return out_vector;
-
 }
+
+
+// Alright, for the following operation, I will need to create a structure:
+// I want to sort my base-level nodes per ascending order to make sure I multithread the largest basins first
+struct base_level_node_sorter
+{
+  int Node_ID;
+  int n_donors_to_that_node;
+};
+//Overload the less than and greater than operators to consider Zeta data only
+//N.B. Fill only needs greater than but less than useful for mdflow routing
+//(I've coded this but not yet added to LSDRaster, it's only faster than presorting
+//when applied to pretty large datasets).
+bool operator>( const base_level_node_sorter& lhs, const base_level_node_sorter& rhs )
+{
+  return lhs.n_donors_to_that_node > rhs.n_donors_to_that_node;
+}
+bool operator<( const base_level_node_sorter& lhs, const base_level_node_sorter& rhs )
+{
+  return lhs.n_donors_to_that_node < rhs.n_donors_to_that_node;
+}
+
+  // This function attemps to return a user friendly vectors of different element calculated in the FlowInfo object
+  // If you question the relevance of that function, try to get the stack vector of node from Braun and Willett
+  // just reading the comments of that file.
+  // the returned map has the several string keys:
+  // "stack order" -> the stack order sense Braun and willett, per node index
+  // ...
+  // B.G. 14/04/2019
+  map<string, vector< vector<int> > > LSDFlowInfo::get_map_of_vectors()
+  {
+    
+    // I first, I want the base levels again
+    priority_queue< base_level_node_sorter, vector<base_level_node_sorter>, less<base_level_node_sorter> > PriorityQueue;
+
+    vector<int> base_levels;
+    int check_my_vectors = 0;
+    for(size_t i=0; i<ReceiverVector.size(); i++)
+    {
+      check_my_vectors++;
+      // checking if this is a baselevel AND has some receivers
+      if(int(i) == ReceiverVector[i] && retrieve_ndonors_to_node(i) > 1)
+      {
+        base_level_node_sorter BLNS;BLNS.Node_ID = int(i);BLNS.n_donors_to_that_node = retrieve_ndonors_to_node(i);
+        PriorityQueue.push( BLNS);
+      }
+    }
+
+    while(PriorityQueue.size()>0)
+    {
+      base_levels.push_back(PriorityQueue.top().Node_ID);
+      PriorityQueue.pop();
+    }
+
+    // cout << "Gougne: " << base_levels.size() << " || vs: " << check_my_vectors << endl;
+
+    vector<vector<int> > nodes_per_basins(base_levels.size()), inverted_nodes_per_basins(base_levels.size()), n_row(base_levels.size()), n_col(base_levels.size()), i_row(base_levels.size()), i_col(base_levels.size());
+    for(size_t i=0;i<base_levels.size();i++)
+    {
+      // First get the stack_order of that base_level
+      vector<int> this_vec = get_upslope_nodes(base_levels[i]);
+
+      if(this_vec.size() > 1)
+      {
+        this_vec.insert(this_vec.begin(),base_levels[i]); // Do not forget dat first node!!!
+        nodes_per_basins.push_back(this_vec);
+        vector<int> rev_vec;
+        for(int j= int(this_vec.size()-1); j>=0; j--)
+        {
+          int new_val = this_vec[j];
+          rev_vec.push_back(new_val);
+        }
+   
+        // reverse(rev_vec.begin(),rev_vec.end());
+        inverted_nodes_per_basins.push_back(rev_vec);
+        // Now getting the row and col
+        vector<int> this_n_row, this_n_col, this_i_row, this_i_col;
+        for(size_t j = 0; j< this_vec.size(); j++)
+        {
+          int this_node = this_vec[j];
+          int i_node = rev_vec[j];
+
+          int row,col;
+          retrieve_current_row_and_col(this_node,row,col);
+          this_n_row.push_back(row);
+          this_n_col.push_back(col);
+
+          retrieve_current_row_and_col(i_node,row,col);
+          this_i_row.push_back(row);
+          this_i_col.push_back(col);
+        }
+
+        n_row.push_back(this_n_row);
+        n_col.push_back(this_n_col);
+        i_row.push_back(this_i_row);
+        i_col.push_back(this_i_col);
+      }
+
+    }
+
+
+    // formatting the output
+    map<string, vector< vector<int> > > output;
+
+    // adding a tracer
+    vector<vector<int> > tracer;
+    int cpt = 0;
+    for(size_t i = 0; i<size_t(nodes_per_basins.size()); i++ )
+    {
+      vector<int> goris2;
+      for(size_t j=0; j<nodes_per_basins[i].size();j++)
+        {
+          goris2.push_back(cpt);
+          cpt ++;
+        }
+        tracer.push_back(goris2);
+    }
+
+    output["stack_order"] = nodes_per_basins;
+    output["inverted_stack_order"] = inverted_nodes_per_basins;
+    output["rows"] = n_row;
+    output["cols"] = n_col;
+    output["inverted_rows"] = i_row;
+    output["inverted_cols"] = i_col;
+    output["tracer"] = tracer;
+
+    // DEBUGGING, KEEP FOR A BIT------------------------------------------------------------------------------------------------------------
+    // float goulg = 0;
+    // Array2D<float> checker(NRows,NCols,goulg);
+    // for(size_t i=0; i<i_row.size(); i++)
+    // {
+    //   for(size_t j=0; j<i_row[i].size() ; j++)
+    //   {
+    //     int row,col;
+    //     row = i_row[i][j];
+    //     col = i_col[i][j];
+    //     checker[row][col] = 1;
+    //   }
+    // }
+
+    // // Done
+    // int cpt2 = 0;
+    // for(size_t i=0;i<NRows;i++)
+    // {
+    //   for(size_t j=0;j<NCols;j++)
+    //   {
+    //     if(checker[i][j] == 0)
+    //       cpt2++;
+    //   }
+    // }
+
+    // cout << "DEBUG::ORERING::There are " << cpt2 << " 0s out of " << NRows*NCols  <<  endl;
+    // DEBUGGING, KEEP FOR A BIT------------------------------------------------------------------------------------------------------------
+
+
+    return output;
+
+  }
+
+  // map<string, vector<int> > burn_raster_to_
 
 
 #endif

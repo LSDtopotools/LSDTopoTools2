@@ -605,6 +605,16 @@ class LSDFlowInfo
   ///@date 09/06/2014
   LSDRaster upslope_variable_accumulator(LSDRaster& accum_raster);
 
+  ///@brief This function accumulates some variable from an LSDRaster
+  ///The most probably use is to accumulate precipitation in order
+  ///to get a discharge raster
+  ///@param A raster that contains the variable to be accumulated (e.g., precipitation)
+  ///@param A raster containing the elevation data
+  ///@return A raster containing the accumulated variable
+  ///@author BG, SMM
+  ///@date 17/04/2019
+  LSDRaster upslope_variable_accumulator_v2(LSDRaster& accum_raster, LSDRaster& filled_raster);
+
   ///@brief This function tests whether one node is upstream of another node
   ///@param current_node
   ///@param test_node
@@ -1274,6 +1284,8 @@ void get_nodeindices_from_csv(string csv_filename, vector<int>& NIs, vector<floa
   vector<int> get_RowIndex() {return RowIndex;}  
   /// Accessor for the DonorStackVector()
   vector<int> get_ColIndex() {return ColIndex;}  
+
+  map<string, vector< vector<int> > > get_map_of_vectors();
 
   protected:
 
