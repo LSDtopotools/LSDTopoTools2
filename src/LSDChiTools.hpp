@@ -83,8 +83,10 @@
 #include "LSDIndexChannel.hpp"
 #include "LSDStatsTools.hpp"
 #include "LSDShapeTools.hpp"
+#include "LSDChiNetwork.hpp"
 using namespace std;
 using namespace TNT;
+#include "omp.h"
 
 
 /// @brief This object packages a number of tools for chi analysis
@@ -1023,6 +1025,21 @@ class LSDChiTools
                            int target_nodes, int n_iterations, int skip,
                            int minimum_segment_length, float sigma);
 
+#ifdef _OPENMP
+        void chi_map_automator(LSDFlowInfo& FlowInfo,
+                                            vector<int> source_nodes,
+                                            vector<int> outlet_nodes,
+                                            vector<int> baselevel_node_of_each_basin,
+                                            LSDRaster& Elevation, LSDRaster& FlowDistance,
+                                            LSDRaster& DrainageArea, LSDRaster& chi_coordinate,
+                                            int target_nodes,
+                                            int n_iterations, int skip,
+                                            int minimum_segment_length, float sigma, int nthreads);
+
+        void internal_function_multi_ksn(vector<LSDChiNetwork*>& me_vec_of_chi_network, float tA_0 , float  tm_over_n , int tn_iterations, int tskip , int ttarget_nodes , int tminimum_segment_length , float tsigma);
+
+#endif
+
     /// @brief This function maps out the chi steepness and other channel
     ///  metrics in chi space from all the sources supplied in the
     ///  source_nodes vector. The source and outlet nodes vector is
@@ -1472,12 +1489,23 @@ class LSDChiTools
     ///@date 21/11/2018
     map<string, vector<float> > get_float_vecdata_for_m_chi(LSDFlowInfo &Flowinfo);
 
+    ///@brief return a map of all the interger data linked with the knickoint analysis
+    ///@authors: B.G. 
+    ///@date 13/12/2018
+    map<string, vector<int> > get_integer_vecdata_for_knickpoint_analysis(LSDFlowInfo &Flowinfo);
+
+    ///@brief return map of all the floating point data linked with the knickpoint analysis
+    map<string, vector<float> > get_float_vecdata_for_knickpoint_analysis(LSDFlowInfo &Flowinfo);
+
+
+
 
     ///@brief Return the node sequence
     ///@author B.G.
     ///@date 21/11/2018
     vector<int> get_vectors_of_node();
 
+    vector<int> get_ordered_baselevel(){return ordered_baselevel_nodes;}
 
 
 

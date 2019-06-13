@@ -85,6 +85,8 @@ class LSDChiNetwork
     /// @param channel_network_fname Filename.
     LSDChiNetwork(string channel_network_fname)
                  { create( channel_network_fname ); }
+
+    LSDChiNetwork(){create();} // empty constructor
     
     LSDChiNetwork(LSDFlowInfo& FlowInfo, int SourceNode, int OutletNode, LSDRaster& Elevation,
                            LSDRaster& FlowDistance, LSDRaster& DrainageArea)
@@ -942,6 +944,7 @@ class LSDChiNetwork
     vector< vector<int> > break_nodes_vecvec;
 
   private:
+    void create();
     void create(string channel_network_fname);
     void create(LSDFlowInfo& FlowInfo, int SourceNode, int OutletNode, LSDRaster& Elevation,
                            LSDRaster& FlowDistance, LSDRaster& DrainageArea);

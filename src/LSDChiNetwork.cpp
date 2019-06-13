@@ -87,6 +87,11 @@ using namespace TNT;
 #define LSDChiNetwork_CPP
 
 
+void LSDChiNetwork::create()
+{
+  // Nothing, empty constructor
+}
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // first create routine
@@ -3900,15 +3905,15 @@ void LSDChiNetwork::monte_carlo_sample_river_network_for_best_fit_after_breaks(f
   vector<int> node_reference;
   int n_segments;
 
-  cout << "LSDChiNetwork::sample after breaks, iteration: ";
+  // cout << "LSDChiNetwork::sample after breaks, iteration: ";
 
   // loop through the iterations
   for (int it = 1; it <= n_iterations; it++)
   {
-    if (it%10 == 0)
-    {
-      cout << " " << it;
-    }
+    // if (it%10 == 0)
+    // {
+    //   cout << " " << it;
+    // }
 
     //cout << "LSDChiNetwork::monte_carlo_sample_river_network_for_best_fit_after_breaks, iteration: " << it << endl;
 
@@ -4024,7 +4029,7 @@ void LSDChiNetwork::monte_carlo_sample_river_network_for_best_fit_after_breaks(f
 
     }    // end channel loop
   }      // end iteration loop
-  cout << endl;
+  // cout << endl;
 
   // reset the data holding the fitted network properties
   vector< vector<float> > empty_vecvec;
