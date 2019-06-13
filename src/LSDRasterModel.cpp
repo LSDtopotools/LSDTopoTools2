@@ -424,9 +424,9 @@ void LSDRasterModel::initialize_model(string param_file)
     else if (lower == "d")      K_soil     = atof(value.c_str());
     else if (lower == "s_c")    S_c     = atof(value.c_str());
     else if (lower == "rigidity")    rigidity  = atof(value.c_str());
-    else if (lower == "nrows"){    if (not loaded_from_file)   NRows     = atoi(value.c_str());}
-    else if (lower == "ncols"){    if (not loaded_from_file)   NCols     = atoi(value.c_str());}
-    else if (lower == "resolution"){  if (not loaded_from_file)   DataResolution   = atof(value.c_str()); }
+    else if (lower == "nrows"){    if (loaded_from_file == false)   NRows     = atoi(value.c_str());}
+    else if (lower == "ncols"){    if (loaded_from_file == false)   NCols     = atoi(value.c_str());}
+    else if (lower == "resolution"){  if (loaded_from_file == false)   DataResolution   = atof(value.c_str()); }
     else if (lower == "print interval")  print_interval  = atoi(value.c_str());
     else if (lower == "k mode")    K_mode    = atoi(value.c_str());
     else if (lower == "d mode")    D_mode     = atoi(value.c_str());
@@ -477,7 +477,7 @@ void LSDRasterModel::initialize_model(string param_file)
     report_name = name;
   else
     report_name = param_file;
-  if (not loaded_from_file)
+  if (loaded_from_file == false)
   {
     RasterData = Array2D<float>(NRows, NCols, 0.0);
     // Generate random noise
@@ -1376,7 +1376,7 @@ void LSDRasterModel::check_steady_state( void )
   // mean this is only reached if it gets to steady state. It then checks if
   // this is the initial steady, state, and if not switches the initial_steady_state
   // flag to true
-  if (not initial_steady_state)
+  if (initial_steady_state == false)
   {
     initial_steady_state = true;
     time_delay = current_time;
@@ -1389,7 +1389,7 @@ void LSDRasterModel::check_steady_state( void )
     {
       endTime += time_delay;
     }
-    if (not quiet)
+    if (quiet == false)
     {
       cout << "\t\t\t> Initial steady state reached at " << current_time;
     }
@@ -1414,7 +1414,7 @@ void LSDRasterModel::check_recording( void )
   {
     return;
   }
-  else if (not initial_steady_state)
+  else if (initial_steady_state == false)
   {
     // If we haven't reached steady state yet, don't record any data
     recording = false;
@@ -1479,7 +1479,7 @@ bool LSDRasterModel::check_end_condition( void )
     case 1:    // time specified is after reaching steady state
     {
       // end is only true if the time exceeds or is equal to the end time
-      if (not initial_steady_state || current_time <= endTime+timeStep)
+      if (initial_steady_state == false || current_time <= endTime+timeStep)
         return false;
       else
         return true;
@@ -1487,7 +1487,7 @@ bool LSDRasterModel::check_end_condition( void )
     }
     case 2:    // Number specified is a number of cycles of periodicity
     {
-      if (not initial_steady_state || num_cycles <= endTime)
+      if (initial_steady_state ==  false || num_cycles <= endTime)
         return false;
       else
         return true;
@@ -1506,7 +1506,7 @@ bool LSDRasterModel::check_end_condition( void )
       //  if (not quiet)
       //    cout << "\n" << endTime << " " << time_delay << " " << periodicity << " " <<endTime_adjusted << " hi " << endl;
       endTime = endTime_adjusted;
-      if (not initial_steady_state || current_time < endTime_adjusted+timeStep)
+      if (initial_steady_state == false || current_time < endTime_adjusted+timeStep)
       {
         return false;
       }
@@ -1545,7 +1545,7 @@ bool LSDRasterModel::check_end_condition( void )
 void LSDRasterModel::check_periodicity_switch( void )
 {
   // don't do anything if not periodic
-  if ((K_mode == 0 && D_mode == 0) || (not initial_steady_state && not cycle_steady_check))
+  if ((K_mode == 0 && D_mode == 0) || (initial_steady_state == false && cycle_steady_check == false))
     return;
   else if (period_mode == 2 || period_mode == 4)
   {
@@ -1589,19 +1589,19 @@ bool LSDRasterModel::check_if_hung( void )
   return false;
   switch (endTime_mode){
     case 1:
-      if (not initial_steady_state && current_time > endTime*100)
+      if (initial_steady_state == false && current_time > endTime*100)
         return true;
       else
         return false;
       break;
     case 2:
-      if (not initial_steady_state && num_cycles > endTime * 100)
+      if (initial_steady_state == false && num_cycles > endTime * 100)
         return true;
       else
         return false;
       break;
     case 3:
-      if (not initial_steady_state && current_time > endTime*100)
+      if (initial_steady_state == false && current_time > endTime*100)
         return true;
       else
         return false;
@@ -1736,8 +1736,8 @@ void LSDRasterModel::interpret_boundary(short &dimension, bool &periodic, int &s
   if (boundary_conditions[1-dimension][0] == 'p' || boundary_conditions[3-dimension][0] == 'p')
   {
     periodic = true;
-    if (not (boundary_conditions[1-dimension][0] && boundary_conditions[3-dimension][0] == 'p'))
-      if (not quiet) cout << "Warning! Entered one boundary as periodic, but not t'other! Assuming both are periodic." << endl;
+    if ( (boundary_conditions[1-dimension][0] && boundary_conditions[3-dimension][0] == 'p') == false)
+      if ( quiet == false) cout << "Warning! Entered one boundary as periodic, but not t'other! Assuming both are periodic." << endl;
   }
   if (dimension == 0)
     size = (NRows-2)*NCols;
@@ -1901,7 +1901,7 @@ float LSDRasterModel::get_total_erosion_rate_over_timestep()
         if(RasterData[row][col]!=NoDataValue)
         {
           // make sure this is not a base level node
-          if(not is_base_level(row,col))
+          if(is_base_level(row,col) == false)
           {
             erate_total+= get_erosion_at_cell(row, col);
             N_erate++;
@@ -2254,7 +2254,7 @@ float LSDRasterModel::get_average_upflit_rate_last_timestep()
       if(RasterData[row][col] != NoDataValue)
       {
         // check to see if it is a base level cell
-        if(not is_base_level(row,col))
+        if(is_base_level(row,col) == false)
         {
           tot_urate += get_uplift_rate_at_cell(row, col);
           N_U++;
@@ -2897,7 +2897,7 @@ LSDRasterModel LSDRasterModel::run_model_implicit_hillslope_and_fluvial(string p
              inv_dx_S_c_squared, inv_dy_S_c_squared, dx_front_term, dy_front_term,
                vec_k_value_i_j, vec_k_value_ip1_j, vec_k_value_im1_j, vec_k_value_i_jp1, vec_k_value_i_jm1);
 
-  if (not quiet) cout << "LINE " << __LINE__ << ": assembler matrix initialized" << endl;
+  if (quiet == false) cout << "LINE " << __LINE__ << ": assembler matrix initialized" << endl;
 
   // do a time loop
   // now do the time loop
@@ -2905,7 +2905,7 @@ LSDRasterModel LSDRasterModel::run_model_implicit_hillslope_and_fluvial(string p
   {
     t_ime+= dt;
 
-    if (not quiet) cout << flush << "time is: " << t_ime << "\r";
+    if (quiet == false) cout << flush << "time is: " << t_ime << "\r";
 
 //     // buffer the landscape
 //     ZetaBuff = Zeta.create_buffered_surf(South_boundary_elevation,North_boundary_elevation);
@@ -3063,7 +3063,7 @@ void LSDRasterModel::run_components( void )
       print_rasters( frame );
       ++frame;
     }
-    if (not quiet) cout << "\rTime: " << current_time << " years" << flush;
+    if (quiet == false) cout << "\rTime: " << current_time << " years" << flush;
     ++print;
 
     // check to see if steady state has been achieved
@@ -3071,7 +3071,7 @@ void LSDRasterModel::run_components( void )
     check_steady_state();
     //cout << "Line 2224, checked, iss: " << initial_steady_state << endl;
 
-  } while (not check_end_condition());
+  } while (check_end_condition() == false);
 
   if ( print_interval == 0 || (print_interval > 0 && ((print-1) % print_interval) != 0))
   {
@@ -3190,13 +3190,13 @@ void LSDRasterModel::run_components_combined( void )
       print_rasters_and_csv( frame );
       ++frame;
     }
-    if (not quiet) cout << "\rTime: " << current_time << " years" << flush;
+    if (quiet == false) cout << "\rTime: " << current_time << " years" << flush;
     ++print;
 
     // check to see if steady state has been achieved
     check_steady_state();
 
-  } while (not check_end_condition());
+  } while (check_end_condition() == false);
 
   if ( print_interval == 0 || (print_interval > 0 && ((print-1) % print_interval) != 0))
   {
@@ -3304,9 +3304,9 @@ void LSDRasterModel::run_components_combined( LSDRaster& URaster, LSDRaster& KRa
       print_rasters_and_csv( frame );
       ++frame;
     }
-    if (not quiet) cout << "\rTime: " << current_time << " years" << flush;
+    if (quiet == false) cout << "\rTime: " << current_time << " years" << flush;
 
-  } while (not check_end_condition());
+  } while (check_end_condition() == false);
 
   // reset the current frame
   current_frame = frame;
@@ -3451,7 +3451,7 @@ void LSDRasterModel::run_components_combined_cell_tracker( vector<LSDParticleCol
 
       ++frame;
     }
-    if (not quiet) cout << "\rTime: " << current_time << " years" << flush;
+    if ( quiet == false) cout << "\rTime: " << current_time << " years" << flush;
     ++print;
 
     //cout << "Line 2693, data[10][10]: " << RasterData[10][10] << endl;
@@ -3459,7 +3459,7 @@ void LSDRasterModel::run_components_combined_cell_tracker( vector<LSDParticleCol
     // check to see if steady state has been achieved
     //check_steady_state();
 
-  }  while (not check_end_condition());
+  }  while ( check_end_condition() == false);
 
   eroded_cells = e_cells;
 }
@@ -3572,7 +3572,7 @@ void LSDRasterModel::run_model( void )
 
     recording = false;                 // SMM: not clear why this is set to false
 
-    if (not initialized && not quiet)
+    if ( initialized == false &&  quiet == false)
     {
       cout << "Model has not been initialized with a parameter file." << endl;
       cout << "All values used are defaults" << endl;
@@ -3601,12 +3601,12 @@ void LSDRasterModel::run_model_from_steady_state( void )
   RasterData = steady_state_data;
   reset_model();
 
-  if (not initialized && not quiet)
+  if ( initialized == false &&  quiet == false)
   {
     cout << "Model has not been initialized with a parameter file." << endl;
     cout << "All values used are defaults" << endl;
   }
-  if (not initial_steady_state)
+  if ( initial_steady_state == false)
   {
     cout << "Model has not been set to steady state yet" << endl;
     cout << "Run LSDRasterModel::reach_steady_state( float tolerance ) first" << endl;
@@ -3623,7 +3623,7 @@ void LSDRasterModel::run_model_from_steady_state( void )
 
   // If the last output wasn't written, write it
 
-  if (not quiet) cout << "\nModel finished!\n" << endl;
+  if ( quiet == false) cout << "\nModel finished!\n" << endl;
   final_report();
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -3661,7 +3661,7 @@ void LSDRasterModel::reach_steady_state( void )
   bool reporting_swap = reporting;
   string name_swap = name;
 
-  if (not initialized && not quiet)
+  if ( initialized == false &&  quiet == false)
   {
     cout << "Model has not been initialized with a parameter file." << endl;
     cout << "All values used are defaults" << endl;
@@ -3691,7 +3691,7 @@ void LSDRasterModel::reach_steady_state( void )
   print_interval = 0;
   reporting = false;
 
-  if (not quiet)
+  if ( quiet == false)
   {
     cout << "Producing steady state profile" << endl;
   }
@@ -3705,7 +3705,7 @@ void LSDRasterModel::reach_steady_state( void )
   // run components
   run_components();
 
-  if (not quiet)
+  if ( quiet == false)
   {
     cout << "Finished producing cyclic steady" << endl;
   }
@@ -3722,10 +3722,10 @@ void LSDRasterModel::reach_steady_state( void )
   initial_steady_state = false;
   current_time = 0;
 
-  if (not quiet) cout << "Did cyclic steady, now running at constant forcing for a while." << endl;
+  if ( quiet == false) cout << "Did cyclic steady, now running at constant forcing for a while." << endl;
   cout << "Timestep is: " << timeStep << endl;
   run_components();
-  if (not quiet) cout << "Forced from constant steady state, exiting steady state routine." << endl;
+  if ( quiet == false) cout << "Forced from constant steady state, exiting steady state routine." << endl;
 
   endTime = endTime_swap;
   periodicity = period_swap;
@@ -3775,7 +3775,7 @@ void LSDRasterModel::soil_diffusion_fv( void )
   }
 
 
-  if (not defined)
+  if (defined == false)
   {
   mtl_initiate_assembler_matrix(problem_dimension, inv_dx_S_c_squared, inv_dy_S_c_squared,
                   dx_front_term, dy_front_term, vec_k_value_i_j, vec_k_value_ip1_j,
@@ -3828,7 +3828,7 @@ mtl::compressed2D<float> LSDRasterModel::generate_fd_matrix( int dimension, int 
     }
     else if (dimension == 0)
     {
-      if (not periodic)
+      if ( periodic == false)
         --num_neighbours;
       else
         ins[i][i+width-1] << -r;
@@ -3841,7 +3841,7 @@ mtl::compressed2D<float> LSDRasterModel::generate_fd_matrix( int dimension, int 
     }
     else if (dimension == 0)
     {
-      if (not periodic)
+      if ( periodic == false)
         --num_neighbours;
       else
         ins[i][i-width+1] << -r;
@@ -3854,7 +3854,7 @@ mtl::compressed2D<float> LSDRasterModel::generate_fd_matrix( int dimension, int 
     }
     else if (dimension == 1)
     {
-      if (not periodic)
+      if ( periodic == false)
         --num_neighbours;
       else
         ins[i][i+(width*(NCols-1))] << -r;
@@ -3867,7 +3867,7 @@ mtl::compressed2D<float> LSDRasterModel::generate_fd_matrix( int dimension, int 
     }
     else if (dimension == 1)
     {
-      if (not periodic)
+      if (periodic == false)
         --num_neighbours;
       else
         ins[i][i-(width*(NCols-1))] << -r;
@@ -3878,13 +3878,13 @@ mtl::compressed2D<float> LSDRasterModel::generate_fd_matrix( int dimension, int 
     if (row > 0 && col > 0)
       ins[i][i-width-1] << -r_;
     else if (dimension == 0 && row > 0)
-      if (not periodic)
+      if (periodic == false)
         --num_neighbours_;
       else{
         ins[i][i-1] << -r_;}
     else if (dimension == 1 && col > 0)
     {
-      if (not periodic)
+      if (periodic == false)
         --num_neighbours_;
       else
         ins[i][i+(width*(NCols-1))-1] << -r;
@@ -3896,14 +3896,14 @@ mtl::compressed2D<float> LSDRasterModel::generate_fd_matrix( int dimension, int 
       ins[i][i-width+1] << -r_;
     else if (dimension == 0 && row > 0)
     {
-      if (not periodic)
+      if (periodic == false)
         --num_neighbours_;
       else
         ins[i][i-(2*width)+1] << -r_;
     }
     else if (dimension == 1 && col < width-1)
     {
-      if (not periodic)
+      if (periodic == false)
         --num_neighbours_;
       else
         ins[i][i+(width*(NCols-1))+1] << -r_;
@@ -3914,7 +3914,7 @@ mtl::compressed2D<float> LSDRasterModel::generate_fd_matrix( int dimension, int 
       ins[i][i+width-1] << -r_;
     else if (dimension == 0 && row < height-1)
     {
-      if (not periodic)
+      if (periodic == false)
         --num_neighbours_;
       else
         ins[i][i+(2*width)-1] << -r_;
@@ -3922,7 +3922,7 @@ mtl::compressed2D<float> LSDRasterModel::generate_fd_matrix( int dimension, int 
 
     else if (dimension == 1 && col > 0)
     {
-      if (not periodic)
+      if (periodic == false)
         --num_neighbours_;
       else
         ins[i][col-1] << -r_;
@@ -3935,7 +3935,7 @@ mtl::compressed2D<float> LSDRasterModel::generate_fd_matrix( int dimension, int 
     }
     else if (dimension == 0 && row < height-1)
     {
-      if (not periodic)
+      if (periodic == false)
         --num_neighbours_;
       else
         ins[i][i+1] << -r_;
@@ -3943,7 +3943,7 @@ mtl::compressed2D<float> LSDRasterModel::generate_fd_matrix( int dimension, int 
 
     else if (dimension == 1 && col < width-1)
     {
-      if (not periodic)
+      if (periodic == false)
         --num_neighbours_;
       else
         ins[i][col+1] << -r_;
@@ -4045,7 +4045,7 @@ void LSDRasterModel::soil_diffusion_fd_linear( void )
   // Unpack data
   mtl::dense_vector <float> data_vector = build_fd_vector(dimension, size);
 
-  if (not quiet && name == "debug" && size < 100)
+  if ( quiet == false && name == "debug" && size < 100)
   {
     cout << "Data: " << endl;
     for (int i=0; i<NRows; ++i)
@@ -4080,7 +4080,7 @@ void LSDRasterModel::soil_diffusion_fd_linear( void )
 
 
   repack_vector(output, dimension);
-  if (not quiet && name == "debug" && size <100)
+  if (quiet == false && name == "debug" && size <100)
   {
     cout << "Output: " << endl;
     for (int i=0; i<size; ++i)
@@ -4266,7 +4266,7 @@ void LSDRasterModel::soil_diffusion_fv_nonlinear( void )
   // b
   mtl::dense_vector <float> data_vector = build_fv_vector(dimension, size);
 
-  if (not quiet && name == "debug" && NRows <= 10 && NCols <= 10)
+  if (quiet == false && name == "debug" && NRows <= 10 && NCols <= 10)
   {
   cout << "Data: " << endl;
   for (int i=0; i<NRows; ++i)
@@ -4328,7 +4328,7 @@ void LSDRasterModel::soil_diffusion_fv_nonlinear( void )
           max_diff = RasterData[i][j] - last_iteration[i][j];
       }
     }
-  if (not quiet && name == "debug" && size <100)
+  if (quiet == false && name == "debug" && size <100)
   {
     cout << "Output: " << endl;
     for (int i=0; i<size; ++i)
@@ -4534,7 +4534,105 @@ float LSDRasterModel::fluvial_calculate_K_for_steady_state_relief(float U, float
   return(K);
 }
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// Calculates a new elevation raster based on instantaneous tilting of the model
+// by a defined tilt angle.
+// Need to specify: angle = tilt angle
+//                  tilt_boundary = which boundary is the model tilted from. N, S, E, or W
+// FJC 11/03/19
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDRasterModel::instantaneous_tilt(float angle, string tilt_boundary)
+{
+  Array2D<float> elev = RasterData.copy();
+  Array2D<float> new_elev(NRows, NCols, NoDataValue);
 
+  // loop through each possible tilt direction and get the new array of elevations
+  // after tilting
+  if (tilt_boundary == "N")  // north is tilt boundary - max elevation at the S
+  {
+    for (int i = 0; i < NRows; i++)
+    {
+      for (int j = 0; j < NCols; j++)
+      {
+        // first row stays at same elevation
+        if (i == 0) { new_elev[i][j] = elev[i][j]; }
+        // other rows, calculate based on angle
+        else
+        {
+          float this_elev = elev[i][j];
+          float length = (i + 1) * DataResolution;
+          new_elev[i][j] = (length * tan(angle)) + this_elev;
+          cout << "old elev: " << this_elev << " new elev: " << (length * tan(angle)) + this_elev << endl;
+        }
+      }
+    }
+  }
+  else if (tilt_boundary == "S")  // south is tilt boundary - max elevation at the N
+  {
+    for (int i = 0; i < NRows; i++)
+    {
+      for (int j = 0; j < NCols; j++)
+      {
+        // last row stays at same elevation
+        if (i == NRows-1) { new_elev[i][j] = elev[i][j]; }
+        // other rows, calculate based on angle
+        else
+        {
+          float this_elev = elev[i][j];
+          float length = (NRows - i) * DataResolution;
+          new_elev[i][j] = (length * tan(angle)) + this_elev;
+          cout << "old elev: " << this_elev << " new elev: " << (length * tan(angle)) + this_elev << endl;
+        }
+      }
+    }
+  }
+  else if (tilt_boundary == "E")  // east is tilt boundary - max elevation at the W
+  {
+    for (int i = 0; i < NRows; i++)
+    {
+      for (int j = 0; j < NCols; j++)
+      {
+        // last col stays at same elevation
+        if (j == NCols-1) { new_elev[i][j] = elev[i][j]; }
+        // other cols, calculate based on angle
+        else
+        {
+          float this_elev = elev[i][j];
+          float length = (NCols - i) * DataResolution;
+          new_elev[i][j] = (length * tan(angle)) + this_elev;
+          cout << "old elev: " << this_elev << " new elev: " << (length * tan(angle)) + this_elev << endl;
+        }
+      }
+    }
+  }
+  else if (tilt_boundary == "W")  // west is tilt boundary - max elevation at the E
+  {
+    for (int i = 0; i < NRows; i++)
+    {
+      for (int j = 0; j < NCols; j++)
+      {
+        // first col stays at same elevation
+        if (j == 0) { new_elev[i][j] = elev[i][j]; }
+        // other cols, calculate based on angle
+        else
+        {
+          float this_elev = elev[i][j];
+          float length = (j + 1) * DataResolution;
+          new_elev[i][j] = (length * tan(angle)) + this_elev;
+          cout << "old elev: " << this_elev << " new elev: " << (length * tan(angle)) + this_elev << endl;
+        }
+      }
+    }
+  }
+  else
+  {
+    cout << "Warning - you haven't set your boundary to N, W, E, or S. Returning the original raster" << endl;
+    new_elev = elev;
+  }
+
+  // set the model to the array of new elevations
+  RasterData = new_elev;
+}
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // This is the component of the model that is solved using the
@@ -4561,7 +4659,7 @@ void LSDRasterModel::fluvial_incision( void )
 
 
   // this is only for bug checking
-  if (not quiet && name == "debug" && NRows <= 10 && NCols <= 10)
+  if (quiet == false && name == "debug" && NRows <= 10 && NCols <= 10)
   {
     cout << "Drainage area: " << endl;
     for (int i=0; i<NRows*NCols; ++i)
@@ -4585,7 +4683,7 @@ void LSDRasterModel::fluvial_incision( void )
     drainageArea = flow.retrieve_contributing_pixels_of_node(node) *  DR2;
 
     // some code for debugging
-    if (not quiet && name == "debug" && NRows <= 10 && NCols <= 10)
+    if (quiet == false && name == "debug" && NRows <= 10 && NCols <= 10)
     {
       cout << row << ", " << col << ", " << receiver_row << ", " << receiver_col << endl;
       cout << flow.retrieve_flow_length_code_of_node(node) << endl;
@@ -4719,7 +4817,7 @@ void LSDRasterModel::fluvial_incision_with_uplift( void )
 
 
   // this is only for bug checking
-  if (not quiet && name == "debug" && NRows <= 10 && NCols <= 10)
+  if (quiet == false && name == "debug" && NRows <= 10 && NCols <= 10)
   {
     cout << "Drainage area: " << endl;
     for (int i=0; i<NRows*NCols; ++i)
@@ -4743,7 +4841,7 @@ void LSDRasterModel::fluvial_incision_with_uplift( void )
     drainageArea = flow.retrieve_contributing_pixels_of_node(node) *  DR2;
 
     // some code for debugging
-    if (not quiet && name == "debug" && NRows <= 10 && NCols <= 10)
+    if (quiet == false && name == "debug" && NRows <= 10 && NCols <= 10)
     {
       cout << row << ", " << col << ", " << receiver_row << ", " << receiver_col << endl;
       cout << flow.retrieve_flow_length_code_of_node(node) << endl;
@@ -4903,7 +5001,7 @@ void LSDRasterModel::fluvial_incision_with_uplift_and_variable_K( LSDRaster& K_r
 
 
   // this is only for bug checking
-  if (not quiet && name == "debug" && NRows <= 10 && NCols <= 10)
+  if (quiet == false && name == "debug" && NRows <= 10 && NCols <= 10)
   {
     cout << "Drainage area: " << endl;
     for (int i=0; i<NRows*NCols; ++i)
@@ -4927,7 +5025,7 @@ void LSDRasterModel::fluvial_incision_with_uplift_and_variable_K( LSDRaster& K_r
     drainageArea = flow.retrieve_contributing_pixels_of_node(node) *  DR2;
 
     // some code for debugging
-    if (not quiet && name == "debug" && NRows <= 10 && NCols <= 10)
+    if (quiet == false && name == "debug" && NRows <= 10 && NCols <= 10)
     {
       cout << row << ", " << col << ", " << receiver_row << ", " << receiver_col << endl;
       cout << flow.retrieve_flow_length_code_of_node(node) << endl;
@@ -5076,7 +5174,7 @@ void LSDRasterModel::fluvial_incision_with_variable_uplift_and_variable_K( LSDRa
 
 
   // this is only for bug checking
-  if (not quiet && name == "debug" && NRows <= 10 && NCols <= 10)
+  if (quiet == false && name == "debug" && NRows <= 10 && NCols <= 10)
   {
     cout << "Drainage area: " << endl;
     for (int i=0; i<NRows*NCols; ++i)
@@ -5100,7 +5198,7 @@ void LSDRasterModel::fluvial_incision_with_variable_uplift_and_variable_K( LSDRa
     drainageArea = flow.retrieve_contributing_pixels_of_node(node) *  DR2;
 
     // some code for debugging
-    if (not quiet && name == "debug" && NRows <= 10 && NCols <= 10)
+    if (quiet == false && name == "debug" && NRows <= 10 && NCols <= 10)
     {
       cout << row << ", " << col << ", " << receiver_row << ", " << receiver_col << endl;
       cout << flow.retrieve_flow_length_code_of_node(node) << endl;
@@ -5245,7 +5343,7 @@ void LSDRasterModel::fluvial_incision_with_variable_uplift_and_variable_K_adapti
   float DR2 = DataResolution*DataResolution;
 
   // this is only for bug checking
-  if (not quiet && name == "debug" && NRows <= 10 && NCols <= 10)
+  if (quiet == false && name == "debug" && NRows <= 10 && NCols <= 10)
   {
     cout << "Drainage area: " << endl;
     for (int i=0; i<NRows*NCols; ++i)
@@ -5621,7 +5719,7 @@ void LSDRasterModel::wash_out( void )
 {
   // don't do anything if there is no hillslope or fluvial erosion,
   // or if the threshold drainage is less than zero
-  if (threshold_drainage < 0 || not hillslope || not fluvial)
+  if (threshold_drainage < 0 || hillslope == false || fluvial == false)
     return;
 
   // get the old elevations
@@ -5712,7 +5810,7 @@ void LSDRasterModel::flexural_isostasy( float alpha )
     root_depth = calculate_root();
     difference = root_depth - old_root;
 
-    if (not quiet && name == "debug" && NRows <= 10 && NCols<= 10)
+    if ( quiet == false && name == "debug" && NRows <= 10 && NCols<= 10)
     {
       cout << "Topography: " << endl;
     for (int i=0; i<NRows; ++i)
@@ -5779,7 +5877,7 @@ void LSDRasterModel::flexural_isostasy_alt( void )
   root_depth = calculate_root();
   difference = root_depth - old_root;
 
-  if (not quiet && name == "debug" && NRows <= 10 && NCols<= 10)
+  if (quiet == false && name == "debug" && NRows <= 10 && NCols<= 10)
   {
     cout << "Topography: " << endl;
   for (int i=0; i<NRows; ++i)
@@ -6017,7 +6115,7 @@ void LSDRasterModel::write_report( void )
   // check to see if enough time has elapsed to write the report
   if (reporting && current_time > report_delay)
   {
-    if (not outfile.is_open())
+    if ( outfile.is_open() == false)
     {
       // Headers
       outfile.open((report_name + "_report").c_str());
@@ -6039,7 +6137,7 @@ void LSDRasterModel::write_report( void )
       //outfile << "Drainage-500m2\t";
       outfile << endl;
     }
-    if (not recording)
+    if ( recording == false)
       check_recording();
     if (print_erosion_cycle)
       erosion_cycle_field = Array2D<float>(NRows, NCols, 0.0);
@@ -6064,7 +6162,7 @@ void LSDRasterModel::write_report( void )
       {
         erosion_cycle_field[i][j] += e;
       }
-      if (not is_base_level(i,j))
+      if ( is_base_level(i,j) == false)
       {
         erosion += e;
         ++n;
@@ -6124,7 +6222,7 @@ void LSDRasterModel::cycle_report( float elev, float relief0, float relief10)
   // There's got to be a better way to design this method, I don't like it
   static ofstream outfile;
   static int phase_pos = 1;
-  if ( not outfile.is_open() && reporting && current_time > report_delay)
+  if ( outfile.is_open() == false && reporting && current_time > report_delay)
   {
     outfile.open((report_name + "_cycle_report").c_str());
     outfile << name << endl;
@@ -6292,7 +6390,7 @@ void LSDRasterModel::print_average_erosion_and_apparent_erosion( int frame,
 
   static ofstream er_outfile;
   // Print the cosmo metadata
-  if (not er_outfile.is_open())
+  if (er_outfile.is_open() == false)
   {
     string metadata_fname =  name+".er_frame_metadata";
     cout << "Name of raster metadata file is: " <<  metadata_fname << endl;
@@ -6402,7 +6500,7 @@ void LSDRasterModel::print_column_erosion_and_apparent_erosion( int frame,
   // This if statement opens the file if it doesn't exist
   static ofstream er_outfile;
   // Print the cosmo metadata
-  if (not er_outfile.is_open())
+  if (er_outfile.is_open() == false)
   {
     string CRNdata_fname =  name+".CRN_frame_metadata";
     cout << "Name of CRN file is: " <<  CRNdata_fname << endl;
@@ -6480,7 +6578,7 @@ void LSDRasterModel::print_rasters( int frame )
   //cout << "input to sine wave: " << (current_time - time_delay - switch_delay) * 2 * PI / periodicity << endl;
   //cout << "Sin wave:" << sin( (current_time - time_delay - switch_delay) * 2 * PI / periodicity )  << endl;
   static ofstream outfile;
-  if (not outfile.is_open())
+  if ( outfile.is_open() == false)
   {
     string metadata_fname =  name+"._frame_metadata";
     cout << "Name of raster metadata file is: " <<  metadata_fname << endl;
@@ -6499,7 +6597,7 @@ void LSDRasterModel::print_rasters( int frame )
   outfile << get_K() << "\t";
   outfile << get_D() << "\t";
   outfile << erosion << "\t";
-  outfile << get_max_uplift() << "\t";
+  outfile << get_max_uplift(); // << "\t"; i think this make the output buggy, at least for me it sxrew up the csv file! - BG
   outfile << endl;
 
   map<string,string> GRS = get_GeoReferencingStrings();
@@ -6560,7 +6658,7 @@ void LSDRasterModel::print_rasters_and_csv( int frame )
 
   cout << endl;
   static ofstream outfile;
-  if (not outfile.is_open())
+  if (outfile.is_open() == false)
   {
     string metadata_fname =  name+"_model_info.csv";
     cout << "Name of raster metadata file is: " <<  metadata_fname << endl;
@@ -6578,9 +6676,9 @@ void LSDRasterModel::print_rasters_and_csv( int frame )
   outfile << get_K() << ",";
   outfile << get_D() << ",";
   outfile << erosion << ",";
-  outfile << get_max_uplift() << ",";
+  outfile << get_max_uplift() ; // The last comma was generating bug here
   outfile << endl;
-
+  cout << "UPDATE_WARNING::I removed an extra comma from csv file here. It was creating a bug with pandas when reading csv (the python package, not the bamboo junkies). Let me know if it impacts your new outputs" << endl;
   map<string,string> GRS = get_GeoReferencingStrings();
 
   //cout << "Printing, print elevation is " << print_elevation
@@ -6589,7 +6687,10 @@ void LSDRasterModel::print_rasters_and_csv( int frame )
   stringstream ss;
   if (print_elevation)
   {
-    ss << name << frame;
+    if(frame >0 )
+      ss << name << frame;
+    else
+      ss << name << "_init";
     this->write_raster(ss.str(), outfile_format);
   }
   if (print_hillshade)
@@ -6722,7 +6823,7 @@ void LSDRasterModel::slope_area_data( string name )
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDRasterModel::slope_area_data( string fname, int slope_flag, int area_flag  )
 {
-  if (not quiet)
+  if ( quiet == false )
   {
     cout << "Printing slope-area data, filename is " << fname << endl;
   }
@@ -6742,7 +6843,7 @@ void LSDRasterModel::slope_area_data( string fname, int slope_flag, int area_fla
   Array2D<float> slope_array(NRows, NCols, 0.0);
   LSDRaster slope;
 
-  if (not quiet)
+  if (quiet == false)
   {
     cout << " LSDRasterModel::slope_area_data, slope_flag is: " << slope_flag
          << " and area_flag is: " << area_flag << endl;
@@ -6906,7 +7007,7 @@ void LSDRasterModel::slope_area_data( string fname, int slope_flag, int area_fla
     }
   }
 
-  if (not quiet)
+  if (quiet == false)
   {
     cout << "mean error % between predicted and measured slope is: " << err_tot/n_sa_nodes << endl;
   }
@@ -6983,7 +7084,7 @@ float LSDRasterModel::get_K( void )
 
   static bool copied = false;
 
-  if (K_mode == 3 && not copied)
+  if (K_mode == 3 && copied == false)
   {
     stringstream ss;
     ss << ".K_file_" << name << ".aux";
@@ -7043,7 +7144,7 @@ float LSDRasterModel::get_D( void )
   //cout << "initial steady state: " << initial_steady_state << endl;
   static bool copied = false;
 
-  if (D_mode == 3 && not copied)
+  if (D_mode == 3 && copied == false)
   {
     stringstream ss;
     ss << ".D_file_" << name << ".aux";
@@ -7147,7 +7248,7 @@ float LSDRasterModel::stream_K_fluv( void )
   static float upr_t = -99;
   static float lwr_t = 0;
   static ifstream strm;
-  if (not strm.is_open())
+  if (strm.is_open() == false)
   {
     stringstream ss;
     ss << ".K_file_" << name << ".aux";
@@ -7196,7 +7297,7 @@ float LSDRasterModel::stream_K_soil( void )
   static float upr_t = -99;
   static float lwr_t = 0;
   static ifstream strm;
-  if (not strm.is_open())
+  if (strm.is_open() == false)
   {
     stringstream ss;
     ss << ".D_file_" << name << ".aux";

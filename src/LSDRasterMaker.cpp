@@ -786,4 +786,101 @@ void LSDRasterMaker::increase_west_half_raster_values(int increase_amt)
   }
 }
 
+//----------------------------------------------------------------------------//
+// Tilted uplift field
+// for progressive block tilting over time
+//----------------------------------------------------------------------------//
+void LSDRasterMaker::tilted_block(float angle, string tilt_boundary)
+{
+  Array2D<float> old_values = RasterData.copy();
+  Array2D<float> new_values(NRows, NCols, NoDataValue);
+
+  // loop through each possible tilt direction and get the new array of values
+  // after tilting
+  if (tilt_boundary == "N")  // north is tilt boundary - max at the S
+  {
+    for (int i = 0; i < NRows; i++)
+    {
+      for (int j = 0; j < NCols; j++)
+      {
+        // first row stays at same elevation
+        if (i == 0) { new_values[i][j] = old_values[i][j]; }
+        // other rows, calculate based on angle
+        else
+        {
+          float this_value = old_values[i][j];
+          float length = (i + 1) * DataResolution;
+          new_values[i][j] = (length * tan(angle)) + this_value;
+          //cout << "old elev: " << this_value << " new elev: " << (length * tan(angle)) + this_value << endl;
+        }
+      }
+    }
+  }
+  else if (tilt_boundary == "S")  // south is tilt boundary - max elevation at the N
+  {
+    for (int i = 0; i < NRows; i++)
+    {
+      for (int j = 0; j < NCols; j++)
+      {
+        // last row stays at same elevation
+        if (i == NRows-1) { new_values[i][j] = old_values[i][j]; }
+        // other rows, calculate based on angle
+        else
+        {
+          float this_value = old_values[i][j];
+          float length = (NRows - i) * DataResolution;
+          new_values[i][j] = (length * tan(angle)) + this_value;
+          //cout << "old elev: " << this_value << " new elev: " << (length * tan(angle)) + this_value << endl;
+        }
+      }
+    }
+  }
+  else if (tilt_boundary == "E")  // east is tilt boundary - max elevation at the W
+  {
+    for (int i = 0; i < NRows; i++)
+    {
+      for (int j = 0; j < NCols; j++)
+      {
+        // last col stays at same elevation
+        if (j == NCols-1) { new_values[i][j] = old_values[i][j]; }
+        // other cols, calculate based on angle
+        else
+        {
+          float this_value = old_values[i][j];
+          float length = (NCols - i) * DataResolution;
+          new_values[i][j] = (length * tan(angle)) + this_value;
+        //  cout << "old value: " << this_value << " new elev: " << (length * tan(angle)) + this_value << endl;
+        }
+      }
+    }
+  }
+  else if (tilt_boundary == "W")  // west is tilt boundary - max elevation at the E
+  {
+    for (int i = 0; i < NRows; i++)
+    {
+      for (int j = 0; j < NCols; j++)
+      {
+        // first col stays at same elevation
+        if (j == 0) { new_values[i][j] = old_values[i][j]; }
+        // other cols, calculate based on angle
+        else
+        {
+          float this_value = old_values[i][j];
+          float length = (j + 1) * DataResolution;
+          new_values[i][j] = (length * tan(angle)) + this_value;
+          //cout << "old elev: " << this_value << " new elev: " << (length * tan(angle)) + this_value << endl;
+        }
+      }
+    }
+  }
+  else
+  {
+    cout << "Warning - you haven't set your boundary to N, W, E, or S. Returning the original raster" << endl;
+    new_values = old_values;
+  }
+
+  // set the model to the array of new elevations
+  RasterData = new_values;
+}
+
 #endif

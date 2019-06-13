@@ -59,6 +59,7 @@ using namespace std;
 #include <string>
 #include <cstring>
 #include <vector>
+#include <utility>
 #include <fstream>
 #include <cmath>
 
@@ -170,6 +171,9 @@ PointData get_point_data_from_coordinates(vector<double>& X_coordinates, vector<
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 long getFileSize(FILE *file);
 
+
+
+
 /// @brief Ellipsoid class for converting coordinates between UTM and lat long
 class LSDEllipsoid
 {
@@ -182,7 +186,9 @@ class LSDEllipsoid
   /// @param id a reference into the ellipsoid
   /// @param name the name of the ellipsoid
   /// @param radius the radius of the equator in km
-  /// @param fr not sure what this is
+  /// @param fr This is the inverse flattening see https://en.wikipedia.org/wiki/Earth_ellipsoid
+  ///   see also https://en.wikipedia.org/wiki/Geodetic_datum
+  ///   the eccentricity is defined by flattening. 
   LSDEllipsoid(int id, char* name, double radius, double fr)
       { Name=name;  EquatorialRadius=radius;  eccSquared=2/fr-1/(fr*fr);}
 
@@ -192,9 +198,83 @@ class LSDEllipsoid
   /// equatorial radius in km
   double EquatorialRadius;
 
-  /// square of the equatorial radius
+  /// square of the eccentricity
   double eccSquared;
 };
+
+/// @brief Ellipsoid class for converting coordinates between UTM and lat long
+class LSDReferenceEllipsoid
+{
+  public:
+
+    /// @brief the default constructor
+    LSDReferenceEllipsoid()    { create();} 
+
+    /// @brief assigment constructor for the ellipsiod class
+    /// @param id a reference into the ellipsoid
+    /// @param name the name of the ellipsoid
+    /// @param radius the radius of the equator in km
+    /// @param fr This is the inverse flattening see https://en.wikipedia.org/wiki/Earth_ellipsoid
+    ///   see also https://en.wikipedia.org/wiki/Geodetic_datum
+    ///   the eccentricity is defined by flattening. 
+    LSDReferenceEllipsoid(string ellipsoid_name)
+        { create(ellipsoid_name);}
+
+    /// @brief This is intended to check if the ellipsoid is correct but it just returns true 
+    ///  since checking is done during object creation
+    /// @author SMM
+    /// @date 21/01/2019
+    bool check_ellipsoid();
+
+    //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    // Getter functions
+    string get_Name() { return Name; }
+    double get_EquatorialRadius() { return EquatorialRadius; }
+    double get_f() { return f; }
+    double get_f_inverse() { return f_inverse; }
+    double get_eccSquared() { return eccSquared; }
+    double get_ecc() { return ecc; }
+
+
+    /// @brief This prints the parameters of the ellipsoid to screen. 
+    /// @author SMM
+    /// @date 17/07/2019
+    void print_ellipsoid_parameters_to_screen();
+
+    /// @brief Sets the ellipsoid parameters
+    /// @author SMM
+    /// @date 17/07/2019
+    void set_ellipsoid_parameters(string Ellipsoid_Name);
+
+
+  protected:
+    /// name of the ellipsoid
+    string Name;
+
+    /// equatorial radius in km
+    double EquatorialRadius;
+
+    /// Flattening
+    double f;
+
+    /// Inverse flattening
+    double f_inverse;
+
+    /// square of the eccentricity
+    double eccSquared;
+
+    /// the eccentricity
+    double ecc;
+
+
+  private:
+    /// The create function. This one assumes WGS84.
+    void create();
+
+    /// Create function that uses a name to set the parameters
+    void create (string Ellipsoid_Name);
+};
+
 
 /// @brief Datum class for converting coordinates between UTM and lat long
 class LSDDatum
@@ -213,6 +293,132 @@ class LSDDatum
   double dX;
   double dY;
   double dZ;
+};
+
+/// A class for storing projection information
+/// We implement a minamalistic interface: it is not meant as a replacement for GDAL
+/// Projections and transformations of rasters should happen in GDAL
+/// These tools are simply from getting points from projected coordinates
+/// to lat-long in EPSG:4326 (WGS84)
+/// Initially the only option was UTM but we have expanded to 
+/// a hacky version of the british national grid
+/// and reasonable implementations of lambert conical conformal and 
+/// albers equal area.
+/// The latter projections require a bunch of parameters that are stored in a map
+class LSDProjectionInfo
+{
+  public:
+    /// @brief Default constructor function. Assumes a default projection with parameters
+    ///  taken from Snyder 1987 page 296
+    /// @author SMM
+    /// @date 19/01/2019
+    LSDProjectionInfo()  { create(); }
+
+    /// @brief The constructor that takes and EPSG code
+    /// @detail The number of available EPSG codes are very limited
+    /// @param EPSG_code: The EPSG code of the desired projection.
+    ///  For the code to work someone needs to hard code the parameters in the cpp file!!! 
+    /// @author SMM
+    /// @date 19/01/2019
+    LSDProjectionInfo( int EPSG_code)  { create(EPSG_code);}
+
+    /// @brief This create function just assigns all the variables
+    /// @detail This is used with the OGCWKT reader object to quickly
+    ///  create a map of Projections within it
+    /// @param tEPSG_code The epsg code
+    /// @param tEPSG_type The type of projection. Various options are avilable
+    /// @param tIntProjParameter a map of integer project parameters. 
+    /// @param tProjParameter a map of double project parameters. 
+    /// @param tRefEllipsoid The reference ellipsoid. 
+    /// @author SMM
+    /// @date 29/01/2019
+    LSDProjectionInfo(int tEPSG_code, string tEPSG_type, 
+                      map<string,int> tIntProjParameters, 
+                      map<string,double> tProjParameters, 
+                      LSDReferenceEllipsoid tRefEllipsoid)
+       { create(tEPSG_code, tEPSG_type, 
+                tIntProjParameters,tProjParameters, 
+                tRefEllipsoid); }
+
+    /// @brief This is intended to check if the projection is correct but it just returns true 
+    ///  since checking is done during object creation
+    /// @author SMM
+    /// @date 21/01/2019
+    bool check_projection();  
+
+    /// @detail Prints the projection parameters to screen
+    /// @author SMM
+    /// @date 19/01/2019
+    void print_projection_parameters();
+
+    /// @detail Sets the projection. 
+    /// @param EPSG_code: The EPSG code of the desired projection.
+    ///  For the code to work someone needs to hard code the parameters in the cpp file!!! 
+    /// @author SMM
+    /// @date 19/01/2019    
+    void set_projection(int EPSG_code);
+
+    /// Get the EPSG code
+    int get_EPSG() { return EPSG; }
+
+    /// Get the parameters for the projection
+    map<string,double> get_ProjParameters() { return ProjParameters;}
+
+    /// Get the integer parameters for the projection
+    map<string,int> get_IntProjParameters() { return IntProjParameters;}
+
+    /// Get the EPSG type
+    string get_EPSG_type() { return EPSG_type; }
+
+    /// Get the referene ellipsoid
+    LSDReferenceEllipsoid get_ReferenceEllipsoid() { return ReferenceEllipsoid; }
+
+  protected:
+
+    /// The EPSG code
+    int EPSG; 
+
+    /// This is the type of projection
+    /// IMPORTANT it needs to be derived from the Well KNown Text (WKT) inputs for coordinate systems
+    /// For example:
+    ///  Transverse_Mercator (e.g., see http://spatialreference.org/ref/epsg/32624/ogcwkt/) (The British National Grid is included here)
+    ///  Lambert_Conformal_Conic_2SP  (e.g., see http://spatialreference.org/ref/esri/north-america-lambert-conformal-conic/ogcwkt/)
+    ///  Albers_Conic_Equal_Area (e.g., see http://spatialreference.org/ref/esri/102001/ogcwkt/)
+    string EPSG_type;
+
+    /// Values for the parameters of the projection
+    map<string,double> ProjParameters;
+
+    /// These are integer values
+    map<string,int> IntProjParameters;
+
+    LSDReferenceEllipsoid ReferenceEllipsoid;
+ 
+    
+  
+  private:
+    /// @brief Default create function. Assumes a default projection with parameters
+    ///  taken from Snyder 1987 page 296
+    /// @author SMM
+    /// @date 19/01/2019
+    void create();
+
+    /// @brief The constructor that takes and EPSG code
+    /// @detail The number of available EPSG codes are very limited
+    /// @param EPSG_code: The EPSG code of the desired projection.
+    ///  For the code to work someone needs to hard code the parameters in the cpp file!!! 
+    /// @author SMM
+    /// @date 19/01/2019
+    void create(int EPSG_code);
+
+    /// @brief The constructor that builds a projection with all the necessary information. 
+    /// @author SMM
+    /// @date 28/01/2019
+    void create(int tEPSG_code, string tEPSG_type, 
+                      map<string,int> tIntProjParameters, 
+                      map<string,double> tProjParameters, 
+                      LSDReferenceEllipsoid tRefEllipsoid);
+
 };
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -392,5 +598,263 @@ class LSDCoordinateConverterLLandUTM
     void create();
 
 };
+
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This will hold an object for reading a coordinate system from a OGC WKT file
+// Will need to do this later. Thinking about it makes my head hurt. 
+class LSDOGCWKTCRSReader
+{
+  public:
+    /// @brief the default constructor. Does nothing
+    LSDOGCWKTCRSReader()  {create();}
+
+    /// @brief This creates the object based on a filename that includes the path
+    /// @detail This only works if the OGC WKT entries have no line returns in them. That
+    ///   is, each projection only occupies one line. 
+    /// @param filename the name of the OGC WKT text
+    /// @author SMM
+    /// @date 29/01/2019
+    LSDOGCWKTCRSReader(string filename)  {create(filename);}
+
+    /// @brief This creates the object based on a filename and a path
+    /// @detail This only works if the OGC WKT entries have no line returns in them. That
+    ///   is, each projection only occupies one line. 
+    /// @param path The full path to the OGC WKT file
+    /// @param filename the name of the OGC WKT text without path
+    /// @author SMM
+    /// @date 29/01/2019
+    LSDOGCWKTCRSReader(string path,string filename)  {create(path,filename);}
+
+    /// @brief This reads a file with OGC WKT entries on lines
+    /// @param The filename with full path
+    /// @author SMM
+    /// @date 28/01/2019
+    void read_OGCWKT_file(string filename);
+
+    /// @brief This creates the data entries for UTM zones
+    /// @author SMM
+    /// @date 29/01/2019
+    void populate_UTM_data();
+
+    /// @brief This is a wrapper function that parses all the relevant information from an OGC WKT file
+    /// @detail See https://www.opengeospatial.org/standards/wkt-crs
+    /// @param line A string that contains a single OGC WKT entry. Read from a file
+    /// @author SMM
+    /// @date 29/01/2019
+    void parse_OGCWKT_line(string line);
+
+    /// @brief This parses the projection from an OGC WKT entry. We only allow certain options. See source code for those options. 
+    /// @detail See https://www.opengeospatial.org/standards/wkt-crs
+    /// @param line A string that contains a single OGC WKT entry. Read from a file
+    /// @author SMM
+    /// @date 29/01/2019
+    string parse_projection(string line);
+
+    /// @brief This parses a reference ellipse from an OGC WKT entry. We only allow certain options. See source code for those options. 
+    /// @param line A string that contains a single OGC WKT entry. Read from a file
+    /// @author SMM
+    /// @date 29/01/2019    
+    string parse_ellipsoid(string line);
+
+    /// @brief This parses the EPSG code from an OGC WKT entry. 
+    /// @param line A string that contains a single OGC WKT entry. Read from a file
+    /// @author SMM
+    /// @date 29/01/2019 
+    int parse_EPSG(string line);
+
+    /// @brief This parses parameters from a conic coordinate system. 
+    /// @detail See Snyder 1987. The parameters are phi_0, lambda_0, phi_1 and phi_2. 
+    ///  These prepresent the location of the origin (lat,long for phi and lambda)
+    ///   and then the two standard parallels (these are in latitude)
+    /// @param line A string that contains a single OGC WKT entry. Read from a file
+    /// @author SMM
+    /// @date 29/01/2019    
+    map<string,double> parse_conic_parameters(string line);
+
+    /// @brief This parses a specific keyword, defined by the user
+    /// @param line A string that contains a single OGC WKT entry. Read from a file
+    /// @param keyword The keyword you wnat to extract from the string
+    /// @author SMM
+    /// @date 29/01/2019  
+    string parse_keyword(string line, string keyword);
+
+    /// @brief this gets the projection from a specific EPSG code
+    ///  WARNING no checking is the code is valid!!!!
+    LSDProjectionInfo get_projection(int EPSG_code)  { return projections_map[EPSG_code];}
+
+
+
+  protected:
+
+    /// A map holding projections, with the EPSG code as the key
+    /// see http://spatialreference.org/ for information about various EPSG codes 
+    map<int, LSDProjectionInfo> projections_map;
+
+
+  private:
+    void create();
+
+    void create(string filename);
+
+    void create(string path, string filename);
+
+
+};
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// A class for converting datums and coordinates
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+class LSDCoordinateConverter
+{
+  public:
+    /// @brief default constructor. Assumes both a projection and ellipsoid
+    /// @detail Assumed ellisoid is WGS84. Assumed projection is TBD
+    /// @author SMM
+    /// @date 20/01/2019
+    LSDCoordinateConverter()     { create(); }
+
+    /// @brief Constructor that takes a projection and assumes and ellipsoid
+    /// @param ProjInfo the LSDProjectionInfo projection object
+    /// @author SMM
+    /// @date 20/01/2019
+    LSDCoordinateConverter(int EPSG_code)     
+                 { create(EPSG_code); }
+
+    /// @brief Constructor that takes a projection and assumes and ellipsoid
+    /// @param ProjInfo the LSDProjectionInfo projection object
+    /// @param RefEllipse The LSDReferenceEllipsoid object
+    /// @author SMM
+    /// @date 20/01/2019
+    LSDCoordinateConverter(int EPSG_code, string Ellipse_name)     
+                        { create(EPSG_code, Ellipse_name); }
+
+
+
+    /// @brief This wraps computation of the Easting and Northing from lat-long
+    /// @detail The function reads the projection to determine what type of conversion to call
+    /// @param Lat_Long the latitude and logitude in decimal degrees as a pair (Lat_Long.first is the latitude)
+    /// @return A pair containing easting and northing (easting is the first element in the pair)
+    /// @author SMM
+    /// @date 21/01/2019
+    pair<double,double> Convert_LL_to_EN(pair<double,double> Lat_Long);
+    
+    /// @brief This wraps computation of the Easting and Northing from lat-long
+    /// @detail The function reads the projection to determine what type of conversion to call
+    /// @param A pair containing easting and northing (easting is the first element in the pair)
+    /// @return Lat_Long the latitude and logitude in decimal degrees as a pair (Lat_Long.first is the latitude)
+    /// @author SMM
+    /// @date 22/01/2019
+    pair<double,double> Convert_EN_to_LL(pair<double,double> Easting_Northing);
+
+
+    /// @brief converts LatLongHt in datum dIn, to LatLongHt in datum dTo;
+    /// @detail 2002dec: by Eugene Reimer, from PeterDana equations.
+    ///   Lat and Long params are in degrees;
+    /// North latitudes and East longitudes are positive;  Height is in meters;
+    /// ==This approach to Datum-conversion is a waste of time;
+    /// to get acceptable accuracy a large table is needed -- see NADCON, NTv2...
+    void DatumConvert(int dIn, double LatIn, double LongIn, double HtIn,
+                  int dTo,  double& LatTo, double& LongTo, double& HtTo);
+
+    /// @brief A forward conversion from lat long to lambert conical conformal system
+    /// @detail See page 108 in Snyder 1987
+    /// @param Lat_Long a pair containing the latitude and longitude
+    /// @return a pair containing the false easting and false northing in local coordinates
+    /// @author SMM 
+    /// @date 21/01/2019
+    pair<double,double> LCC_forward(pair<double,double> Lat_Long);
+
+    /// @brief An inverse conversion from easting and northing to lat-long
+    /// @detail See page 108 in Snyder 1987
+    /// @param a pair containing the false easting and false northing in local coordinates
+    /// @return Lat_Long a pair containing the latitude and longitude
+    /// @author SMM 
+    /// @date 21/01/2019
+    pair<double,double> LCC_inverse(pair<double,double> Easting_Northing);
+
+    /// @brief A forward conversion from lat long to albers equal area conic system
+    /// @detail See page 101 in Snyder 1987
+    /// @param Lat_Long a pair containing the latitude and longitude
+    /// @return a pair containing the false easting and false northing in local coordinates
+    /// @author SMM 
+    /// @date 22/01/2019
+    pair<double,double> AEAC_forward(pair<double,double> Lat_Long);
+
+    /// @brief An inverse conversion from easting and northing to lat-long
+    /// @detail See page 101 in Snyder 1987
+    /// @param a pair containing the false easting and false northing in local coordinates
+    /// @return Lat_Long a pair containing the latitude and longitude
+    /// @author SMM 
+    /// @date 22/01/2019
+    pair<double,double> AEAC_inverse(pair<double,double> Easting_Northing);
+
+    /// @brief A forward conversion from lat long to universal transverse mercator system
+    /// @param Lat_Long a pair containing the latitude and longitude
+    /// @return a pair containing the false easting and false northing in local coordinates
+    /// @author SMM 
+    /// @date 21/01/2019
+    pair<double,double> UTM_forward(pair<double,double> Lat_Long);
+
+    /// @brief An inverse conversion from universal transverse mercator system to lat long
+    /// @param a pair containing the false easting and false northing in local coordinates
+    /// @return Lat_Long a pair containing the latitude and longitude
+    /// @author SMM 
+    /// @date 23/01/2019
+    pair<double,double> UTM_inverse(pair<double,double> Easting_Northing);
+
+    /// @brief A forward conversion from lat long to british national grid system
+    /// @param Lat_Long a pair containing the latitude and longitude
+    /// @return a pair containing the false easting and false northing in local coordinates
+    /// @author SMM 
+    /// @date 21/01/2019
+    pair<double,double> BNG_forward(pair<double,double> Lat_Long);
+
+               
+
+  protected:
+
+    /// The reference ellipsoid
+    LSDReferenceEllipsoid RefEllipsoid;
+
+    /// The parameters 
+    LSDProjectionInfo ProjParams;
+
+    /// Some parameters for setting degree conversions
+    double RADIANS_PER_DEGREE;
+    double DEGREES_PER_RADIAN;
+
+
+
+  private:
+
+    /// @brief This create function sets up the data membeers that hold the
+    ///  ellipsoid and datum data
+    /// @author SMM
+    /// @date 20/01/2019    
+    void create();
+
+    /// @brief Create function that takes a projection and assumes and ellipsoid
+    /// @param ProjInfo the LSDProjectionInfo projection object
+    /// @param RefEllipse The LSDReferenceEllipsoid object
+    /// @author SMM
+    /// @date 20/01/2019
+    void create(int EPSG_code);
+
+    /// @brief Create function that takes a projection and assumes and ellipsoid
+    /// @param ProjInfo the LSDProjectionInfo projection object
+    /// @param RefEllipse The LSDReferenceEllipsoid object
+    /// @author SMM
+    /// @date 20/01/2019
+    void create(int EPSG_code, string Ellipse_name);
+
+};
+
 
 #endif

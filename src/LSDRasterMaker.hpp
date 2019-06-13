@@ -101,11 +101,11 @@ class LSDRasterMaker: public LSDRaster
     /// @author SMM
     /// @date 03/09/2017
     vector<float> minimum_and_maximum_value();
- 
+
     /// @brief This sets all non nodata pixels to a constant value
     /// @param new_value does what it says on the tin.
     /// @author SMM
-    /// @date 18/11/2018    
+    /// @date 18/11/2018
     void set_to_constant_value(float new_value);
 
     /// @brief This linearly scales the raster to new minimum and maximum values
@@ -199,6 +199,14 @@ class LSDRasterMaker: public LSDRaster
   void increase_south_half_raster_values(int increase_amt);
   void increase_south_quarter_raster_values(int increase_amt);
   void increase_west_half_raster_values(int increase_amt);
+
+  /// @brief This function creates a raster of tilted values (e.g. for making a
+  /// tilted uplift field)
+  /// @param angle tilt angle
+  /// @param tilt_boundary the boundary which will stay fixed (can be N, S, E, or W)
+  /// @author FJC
+  /// @date 17/07/18
+  void tilted_block(float angle, string tilt_boundary);
 
   protected:
 

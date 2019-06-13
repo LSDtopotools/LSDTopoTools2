@@ -686,6 +686,15 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @date 29/08/2017
   float fluvial_calculate_K_for_steady_state_relief(float U, float desired_relief);
 
+  /// @brief This method instantaneously tilts the landscape by a certain angle.
+  /// @param angle the tilt angle in degrees
+  /// @param tilt_boundary. Tilt can be from the N, E, S, or W boundary. Must be"N", "E",
+  /// "S", or "W".
+  /// @return Doesn't return anlything but updates the raster elevations
+  /// @author FJC
+  /// @date 11/03/19
+  void instantaneous_tilt(float angle, string tilt_boundary);
+
 
   /// @brief Fastscape, implicit finite difference solver for stream power equations
   /// O(n)
@@ -1150,6 +1159,12 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @author SMM
   /// @date 09/08/2017
   void set_print_erosion( bool do_I_print_erosion )      { print_erosion = do_I_print_erosion; }
+
+  /// @brief Sets the End time mode
+  /// @param short 0,1,2,3,4
+  /// @author BG
+  /// @date 22/01/2019
+  void set_endTime_mode(short edm){endTime_mode = edm;}
 
 
 
