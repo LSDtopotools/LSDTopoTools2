@@ -82,11 +82,11 @@ int main (int nNumberofArgs,char *argv[])
   cout << "|| This program was developed by Fiona J. Clubb        ||" << endl;
   cout << "||  and Simon M. Mudd                                  ||" << endl;
   cout << "||  at the University of Edinburgh                     ||" << endl;
-  cout << "|| If you use this code on a tropical beach please     ||" << endl;
-  cout << "||  post a picture on instagram,                       ||" << endl;
-  cout << "||  since here in the UK our research funding is       ||" << endl;
-  cout << "||  tied to vaguely defined impact and we are not sure ||" << endl;
-  cout << "||  but perhaps social media counts.                   ||" << endl;
+  cout << "=========================================================" << endl;   
+  cout << "|| If you use these routines please cite:              ||" << endl;   
+  cout << "|| https://www.doi.org/10.1002/2013WR015167            ||" << endl;
+  cout << "|| If you use the wiener routine please cite:          ||" << endl;   
+  cout << "|| https://www.doi.org/10.5194/esurf-4-627-2016        ||" << endl;  
   cout << "=========================================================" << endl;
   cout << "|| Documentation can be found at:                      ||" << endl;
   cout << "|| https://lsdtopotools.github.io/LSDTT_documentation/ ||" << endl;
@@ -141,7 +141,7 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["print_stream_order_raster"] = false;
   bool_default_map["print_sources_to_raster"] = false;
   bool_default_map["print_fill_raster"] = false;
-  bool_default_map["write hillshade"] = false;
+  bool_default_map["write_hillshade"] = false;
   bool_default_map["print_wiener_filtered_raster"] = false;
   bool_default_map["print_curvature_raster"] = false;
 
@@ -169,7 +169,7 @@ int main (int nNumberofArgs,char *argv[])
   map<string,string> this_string_map = LSDPP.get_string_parameters();
 
   // Now print the parameters for bug checking
-  LSDPP.print_parameters();
+  //LSDPP.print_parameters();
 
   // location of the files
   string DATA_DIR =  LSDPP.get_read_path();
@@ -243,7 +243,7 @@ int main (int nNumberofArgs,char *argv[])
   }
 
   // check to see if you need hillshade
-  if (this_bool_map["write hillshade"])
+  if (this_bool_map["write_hillshade"])
   {
     float hs_azimuth = 315;
     float hs_altitude = 45;

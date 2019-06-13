@@ -77,7 +77,14 @@ int main (int nNumberofArgs,char *argv[])
   cout << "|| This program was developed by Simon M. Mudd         ||" << endl;
   cout << "|| Fiona J. Clubb and Boris Gailleton                  ||" << endl;
   cout << "||  at the University of Edinburgh                     ||" << endl;  
-  cout << "|| and Martin D Hurst at the University of Glasgow.    ||" << endl;    
+  cout << "|| and Martin D Hurst at the University of Glasgow.    ||" << endl;
+  cout << "=========================================================" << endl;   
+  cout << "|| If you use the k_sn routines please cite:           ||" << endl;   
+  cout << "|| https://www.doi.org/10.1002/2013JF002981            ||" << endl;
+  cout << "|| If you use the concavity routines please cite:      ||" << endl;   
+  cout << "|| https://www.doi.org/10.5194/esurf-6-505-2018        ||" << endl;
+  cout << "|| If you use the knickpoint routines please cite:     ||" << endl;   
+  cout << "|| https://www.doi.org/10.5194/esurf-7-211-2019        ||" << endl;    
   cout << "=========================================================" << endl;
   cout << "|| Documentation can be found at:                      ||" << endl;
   cout << "|| https://lsdtopotools.github.io/LSDTT_documentation/ ||" << endl;
@@ -298,8 +305,8 @@ int main (int nNumberofArgs,char *argv[])
 
 
   // Now print the parameters for bug checking
-  cout << "PRINT THE PARAMETERS..." << endl;
-  LSDPP.print_parameters();
+  //cout << "PRINT THE PARAMETERS..." << endl;
+  //LSDPP.print_parameters();
 
   // location of the files
   string DATA_DIR =  LSDPP.get_read_path();
@@ -413,7 +420,7 @@ int main (int nNumberofArgs,char *argv[])
   else
   {
     BaselevelJunctions_file = RemoveControlCharactersFromEndOfString(BaselevelJunctions_file);
-    //BaselevelJunctions_file = DATA_DIR+BaselevelJunctions_file; // MDH commented out 11/6/19 as path already added above
+    BaselevelJunctions_file = DATA_DIR+BaselevelJunctions_file;
     cout << "You have selected a baselevel junctions file, it is: " << BaselevelJunctions_file << endl;
     cout << "Let me check if it exists..." << endl;
 
@@ -2109,7 +2116,7 @@ int main (int nNumberofArgs,char *argv[])
     if ( this_bool_map["convert_csv_to_geojson"])
     {
       cout << "Now let me print your chi network to a geojson" << endl;
-      string gjson_name = OUT_DIR+OUT_ID+"_MChiSegmented.geojson";
+      string gjson_name = OUT_DIR+OUT_ID+"_KP_MChiSegmented.geojson";
       LSDSpatialCSVReader thiscsv(csv_full_fname);
       thiscsv.print_data_to_geojson(gjson_name);
     }

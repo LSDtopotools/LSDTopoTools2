@@ -11,7 +11,7 @@
 // https://lsdtopotools.github.io/LSDTopoTools_ChiMudd2014/
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
-// Copyright (C) 2017 Simon M. Mudd 2017
+// Copyright (C) 2019 Simon M. Mudd 2019
 //
 // Developer can be contacted by simon.m.mudd _at_ ed.ac.uk
 //
@@ -71,6 +71,11 @@ int main (int nNumberofArgs,char *argv[])
   cout << "|| simple landscape metrics.                           ||" << endl;
   cout << "|| This program was developed by Simon M. Mudd         ||" << endl;
   cout << "||  at the University of Edinburgh                     ||" << endl;
+  cout << "=========================================================" << endl;   
+  cout << "|| If you use these routines please cite:              ||" << endl;   
+  cout << "|| https://www.doi.org/10.5281/zenodo.2560223          ||" << endl;
+  cout << "|| If you use the roughness routine please cite:       ||" << endl;   
+  cout << "|| https://www.doi.org/10.5194/esurf-3-483-2015        ||" << endl;  
   cout << "=========================================================" << endl;
   cout << "|| Documentation can be found at:                      ||" << endl;
   cout << "|| https://lsdtopotools.github.io/LSDTT_documentation/ ||" << endl;
@@ -125,6 +130,9 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["print_tangential_curvature"]= false;
   bool_default_map["print_point_classification"]= false;
   bool_default_map["print_directional_gradients"] = false;
+
+  // Window size estimation
+  bool_default_map["calculate_window_size"] = false;
   
   // Roughness calculations
   float_default_map["REI_critical_slope"] = 1.0;
@@ -442,6 +450,75 @@ int main (int nNumberofArgs,char *argv[])
   else
   {
     cout << "I won't be doing any polyfitting so you have saved yourself some time!" << endl;
+  }
+
+  if (this_bool_map["calculate_window_size"])
+  {
+    cout << "I am going to run the calculations so you can determine the window size." << endl;
+    cout << "This is extremely computationally expensive. I suggest finding a good book." << endl;
+
+    vector<int> raster_selection(9, 0);  // This controls which surface fitting metrics to compute
+    raster_selection[3] = 1;    // Turns on the curvature
+
+    //array of window sizes to test 
+    //this is a little arbritrary but reflects the sizes used by Roering et al. 2010
+    int WindowSizes[] = {1, 2, 3, 4, 5, 7, 8, 10,15,20,25,50,70,90,100};
+
+    // floats to hold the stats about the fitted surface
+    float Curv_mean;
+    float Curv_stddev;
+    float Curv_median;
+    float Curv_UpperQuartile;
+    float Curv_LowerQuartile;
+    float Curv_MaxValue;
+    float Curv_iqr;
+    vector<float> Curv_vec;
+
+    string this_window_fitting_name = OUT_DIR+OUT_ID+"_WindowSize.csv";
+    ofstream WriteData;
+    WriteData.open(this_window_fitting_name.c_str());
+
+    //write headers
+    WriteData << "Length_scale,Curv_mean,Curv_stddev,Curv_iqr" << endl;
+    
+    for (int w = 0; w < 15; ++w){
+      
+      cout << "Processing surface " << w+1 << " of " << "15" << endl;
+                                              
+      vector<LSDRaster> Surfaces = topography_raster.calculate_polyfit_surface_metrics(WindowSizes[w], raster_selection);
+      LSDRaster curvature = Surfaces[3];   
+    
+      //reset values for next run
+      Curv_mean = 0;
+      Curv_stddev = 0;
+      Curv_median = 0;
+      Curv_UpperQuartile = 0;
+      Curv_LowerQuartile = 0;
+      Curv_MaxValue = 0;
+      Curv_iqr = 0;
+      Curv_vec.clear();  
+    
+      //go through the landscape and get every curvature value into a 1D vector    
+      for (int i = 0; i < int(curvature.get_NRows()); ++i){
+        for (int j = 0; j < int(curvature.get_NCols()); ++j){
+          if (curvature.get_data_element(i,j) != curvature.get_NoDataValue()){
+            Curv_vec.push_back(curvature.get_data_element(i,j));
+          }
+        }
+      }  
+    
+      //calculate the std dev and iqr (this comes from LSDStatsTools)
+      get_distribution_stats(Curv_vec, Curv_mean, Curv_median, Curv_UpperQuartile, Curv_LowerQuartile, Curv_MaxValue);
+      Curv_stddev = get_standard_deviation(Curv_vec, Curv_mean);
+      Curv_iqr = Curv_UpperQuartile - Curv_LowerQuartile;
+
+      //write the values to the output file  
+      WriteData << WindowSizes[w] << "," << Curv_mean << "," << Curv_stddev << "," << Curv_iqr << endl; 
+      
+      }
+                                            
+    WriteData.close();
+
   }
   
   //============================================================================

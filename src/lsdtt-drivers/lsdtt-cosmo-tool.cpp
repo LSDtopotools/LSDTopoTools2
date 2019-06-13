@@ -81,6 +81,9 @@ int main (int nNumberofArgs,char *argv[])
   cout << "|| cosmogenic nuclide concentrations.                  ||" << endl;
   cout << "|| This program was developed by Simon M. Mudd         ||" << endl;
   cout << "||  at the University of Edinburgh                     ||" << endl;
+  cout << "=========================================================" << endl;   
+  cout << "|| If you use these routines please cite:              ||" << endl;   
+  cout << "|| https://doi.org/10.5194/esurf-4-655-2016            ||" << endl;
   cout << "=========================================================" << endl;
   cout << "|| Documentation can be found at:                      ||" << endl;
   cout << "|| https://lsdtopotools.github.io/LSDTT_documentation/ ||" << endl;
@@ -178,8 +181,8 @@ int main (int nNumberofArgs,char *argv[])
   map<string,string> this_string_map = LSDPP.get_string_parameters();
 
   // Now print the parameters for bug checking
-  cout << "PRINT THE PARAMETERS..." << endl;
-  LSDPP.print_parameters();
+  //cout << "PRINT THE PARAMETERS..." << endl;
+  //LSDPP.print_parameters();
 
   // location of the files
   string DATA_DIR =  LSDPP.get_read_path();

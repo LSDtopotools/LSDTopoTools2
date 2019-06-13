@@ -52,7 +52,7 @@ set(EXE_SOURCES
   lsdtt-drivers/lsdtt-channel-extraction.cpp
   lsdtt-drivers/lsdtt-chi-mapping.cpp
   lsdtt-drivers/lsdtt-cosmo-tool.cpp
-  lsdtt-drivers/lsdtt-river-clusters.cpp
+  lsdtt-drivers/lsdtt-hillslope-channel-coupling.cpp
 )
 
 set(EXE_FILES)
