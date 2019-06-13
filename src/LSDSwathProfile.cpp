@@ -1318,6 +1318,8 @@ Array2D<float> LSDSwath::get_DistanceToBaseline_ConnectedComponents(LSDIndexRast
 // 1 = mean value along swath
 // 2 = min value along swath
 // 3 = max value along swath
+// 4 = first quartile (added by BG - > 15/11/2018)
+// 5 = third quartile  (added by BG - > 15/11/2018)
 // FJC
 // 15/02/17
 //
@@ -1330,6 +1332,8 @@ vector <vector <float> > LSDSwath::get_RasterValues_along_swath(LSDRaster& Raste
   vector<float> MeanRasterValues;
   vector<float> MinRasterValues;
   vector<float> MaxRasterValues;
+  vector<float> FQRasterValues;
+  vector<float> TQRasterValues;
 
   float Resolution = RasterTemplate.get_DataResolution();
 	Array2D<float> RasterValues_temp = RasterTemplate.get_RasterData();
@@ -1386,10 +1390,15 @@ vector <vector <float> > LSDSwath::get_RasterValues_along_swath(LSDRaster& Raste
       float mean_value = get_mean_ignore_ndv(raster_values, NoDataValue);
       float min_value = Get_Minimum(raster_values, NoDataValue);
       float max_value = Get_Maximum(raster_values, NoDataValue);
+      float FQ = get_percentile(raster_values, 25);
+      float TQ = get_percentile(raster_values, 75);
+
       DistAlongBaseline.push_back(DistanceAlongBaseline[i]);
       MeanRasterValues.push_back(mean_value);
       MinRasterValues.push_back(min_value);
       MaxRasterValues.push_back(max_value);
+      FQRasterValues.push_back(FQ);
+      TQRasterValues.push_back(TQ);
       //cout << "Distance: " << DistanceAlongBaseline[i] << " n_raster values: " << raster_values.size() << endl;
     }
     else
@@ -1398,6 +1407,8 @@ vector <vector <float> > LSDSwath::get_RasterValues_along_swath(LSDRaster& Raste
       MeanRasterValues.push_back(NoDataValue);
       MinRasterValues.push_back(NoDataValue);
       MaxRasterValues.push_back(NoDataValue);
+      FQRasterValues.push_back(NoDataValue);
+      TQRasterValues.push_back(NoDataValue);
     }
   }
 
@@ -1406,6 +1417,8 @@ vector <vector <float> > LSDSwath::get_RasterValues_along_swath(LSDRaster& Raste
   MasterVector.push_back(MeanRasterValues);
   MasterVector.push_back(MinRasterValues);
   MasterVector.push_back(MaxRasterValues);
+  MasterVector.push_back(FQRasterValues);
+  MasterVector.push_back(TQRasterValues);
 
   return MasterVector;
 }
