@@ -535,7 +535,8 @@ void LSDStrahlerLinks::WriteTokunagaChannelsCSV(LSDJunctionNetwork& JNetwork, st
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // Write the TokunagaValues data to a csv file for analysis elsewhere.
 //
-// Must run LSDStrahlerLinks.CalculateTokunagaIndexes() first.
+// Must run LSDStrahlerLinks.CalculateTokunagaIndexes() and
+// LSDStrahlerLinks.calculate_lengths() first.
 //
 // SWDG 23/05/19
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -547,12 +548,12 @@ void LSDStrahlerLinks::WriteTokunagaData(string data_directory, string label){
   ofstream toku_out;
   toku_out.open(fname.c_str());
 
-  toku_out << "strahler_order,tokunaga_index" << endl;
+  toku_out << "strahler_order,tokunaga_index,length" << endl;
 
   for (int order = 0; order < int(TokunagaValues.size()); order++){
     for (int link = 0; link < int(TokunagaValues[order].size()); link++){
 
-      toku_out << order + 1 << "," << TokunagaValues[order][link] << endl;
+      toku_out << order + 1 << "," << TokunagaValues[order][link] << "," <<  LengthData[order][link] << endl;
 
     }
   }

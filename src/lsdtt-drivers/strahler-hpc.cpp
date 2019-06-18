@@ -66,6 +66,7 @@ int main(int nNumberofArgs, char *argv[])
 
       LSDStrahlerLinks Links(SubChanNetwork, FlowInfo);
       Links.CalculateTokunagaIndexes(SubChanNetwork, FlowInfo);
+      Links.calculate_lengths(Flowinfo);
 
       stringstream ss;
       ss << DEMname << "_" << i;

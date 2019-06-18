@@ -231,6 +231,9 @@ class LSDStrahlerLinks
     void WriteTokunagaChannelsCSV(LSDJunctionNetwork& JNetwork, string filename);
 
     /// @brief Write the TokunagaValues data to a csv file for analysis elsewhere.
+    ///
+    /// @detail Must run LSDStrahlerLinks.CalculateTokunagaIndexes() and
+    /// LSDStrahlerLinks.calculate_lengths() first.
     /// @param data_directory a string containing the data directory. Should be
     ///  terminated with a slash
     /// @param label a string that is used to identify the file
