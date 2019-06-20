@@ -1804,9 +1804,10 @@ vector<int> get_channel_pixels_along_line(vector<int> line_rows, vector<int> lin
 /// @param DistanceFromOutlet
 /// @param Elevation elev raster
 /// @param csv_filename the output csv file name
+/// @param window_size the total window size (in channel nodes) for calculating the channel slopes over.
 /// @author FJC
 /// @date 06/04/18
-void write_river_profiles_to_csv(vector<int>& BasinJunctions, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& Elevation, string csv_filename);
+void write_river_profiles_to_csv(vector<int>& BasinJunctions, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& Elevation, string csv_filename, int window_size);
 
 /// @brief function to take a vector of basin outlet junctions and write data about all tribs to csv
 /// @param BasinJunctions vector of basin junctions
@@ -1837,7 +1838,7 @@ void write_river_profiles_to_csv_all_sources(float channel_length, int slope_win
 
 /// @brief Return a map of all nodes in the channel, useful to just chek if me node is a CNode or not
 /// @param FlowInfo
-/// @author B.G. 
+/// @author B.G.
 /// @date 12/11/2018
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
 map<int,bool> GetMapOfChannelNodes(LSDFlowInfo& flowinfo);

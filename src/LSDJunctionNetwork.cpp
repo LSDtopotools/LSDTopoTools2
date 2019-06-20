@@ -8537,7 +8537,7 @@ vector<int> LSDJunctionNetwork::get_channel_pixels_along_line(vector<int> line_r
 // the longest channel in each to a csv.
 // FJC 06/05/18
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDJunctionNetwork::write_river_profiles_to_csv(vector<int>& BasinJunctions, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& Elevation, string csv_filename)
+void LSDJunctionNetwork::write_river_profiles_to_csv(vector<int>& BasinJunctions, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& Elevation, string csv_filename, int window_size)
 {
   int this_node, row, col, stream_order;
   double latitude, longitude;
@@ -8549,7 +8549,7 @@ void LSDJunctionNetwork::write_river_profiles_to_csv(vector<int>& BasinJunctions
   string this_fname = csv_filename+".csv";
   chan_out.open(this_fname.c_str());
 
-  chan_out << "basin_id,id,node,distance_from_outlet,elevation,drainage_area,stream_order,latitude,longitude" << endl;
+  chan_out << "basin_id,id,node,distance_from_outlet,elevation,drainage_area,stream_order,slope,latitude,longitude" << endl;
 
   // for each basin, get the profile
   for (int i = 0; i < int(BasinJunctions.size()); i++)
@@ -8559,6 +8559,14 @@ void LSDJunctionNetwork::write_river_profiles_to_csv(vector<int>& BasinJunctions
     vector<int> NodeSequence = ThisChannel.get_NodeSequence();
     int UpstreamNode = NodeSequence.front();
     int DownstreamNode = NodeSequence.back();
+
+    // make an LSDChannel object. this is the same as the index channel but has elevation data, etc.
+    float downslope_chi=1;
+    float m_over_n=0.5;
+    LSDChannel ThisChan(UpstreamNode, DownstreamNode, downslope_chi, m_over_n, downslope_chi, FlowInfo, Elevation);
+    // get channel slopes from LSDChannel
+    vector<float> channel_slopes = ThisChan.calculate_channel_slopes(window_size, DistanceFromOutlet);
+
     for (int n = 0; n < int(NodeSequence.size()); n++)
     {
       this_node = NodeSequence[n];
@@ -8574,7 +8582,8 @@ void LSDJunctionNetwork::write_river_profiles_to_csv(vector<int>& BasinJunctions
                << dist_from_outlet << ","
                << Elevation.get_data_element(row,col) << ","
                << drainage_area << ","
-               << stream_order << ",";
+               << stream_order << ","
+               << channel_slopes[n] << ",";
       chan_out.precision(9);
       chan_out << latitude << "," << longitude << endl;
     }

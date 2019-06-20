@@ -159,7 +159,7 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["convert_csv_to_geojson"] = false;  // This converts all cv files to geojson (for easier loading in a GIS)
 
   // These are the HFR printing flags
-  bool_default_map["run_HRF_analysis"] = false;
+  bool_default_map["run_HFR_analysis"] = false;
   bool_default_map["write_hilltops"] = false;
   bool_default_map["write_hilltop_curvature"] = false;
   bool_default_map["write_hillslope_length"] = false;
@@ -249,7 +249,7 @@ int main (int nNumberofArgs,char *argv[])
   }
 
   // Set the printing functions to true is you are running the HFR analysis
-  if (this_bool_map["run_HRF_analysis"])
+  if (this_bool_map["run_HFR_analysis"])
   {
     this_bool_map["write_hilltops"] = true;
     this_bool_map["write_hilltop_curvature"] = true;
