@@ -54,6 +54,10 @@ int main(int nNumberofArgs, char *argv[])
   LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
   std::cout << "Built junction network" << '\n';
 
+  stringstream ss3;
+  ss3 << Outpath << "full_network_" << DEMname;
+  ChanNetwork.StreamOrderArray_to_WGS84CSV(ss3.str());
+
   double Lat = atof(argv[4]);
   double Long = atof(argv[5]);
   LSDCoordinateConverterLLandUTM converter;
@@ -88,8 +92,6 @@ int main(int nNumberofArgs, char *argv[])
   ss2 << Outpath << "toku_network_" << DEMname << "_" << 1;
   Links.WriteTokunagaChannelsCSV(SubChanNetwork, ss2.str());
 
-  stringstream ss3;
-  ss3 << Outpath << "full_network_" << DEMname;
-  ChanNetwork.StreamOrderArray_to_WGS84CSV(ss3.str());
+
 
 }

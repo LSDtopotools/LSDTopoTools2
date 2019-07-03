@@ -7148,9 +7148,7 @@ int LSDJunctionNetwork::get_nodeindex_of_nearest_channel_for_specified_coordinat
       // check to if the kernal returned a channel node
       if(largest_SO_in_kernal != NoDataValue)
       {
-        cout << largest_SO_row << " " << largest_SO_col << " " << endl;
         NearestChannel = FlowInfo.NodeIndex[largest_SO_row][largest_SO_col];
-        std::cout << "success" << '\n';
       }
       else    // get the next node
       {
