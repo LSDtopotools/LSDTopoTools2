@@ -1848,6 +1848,22 @@ void LSDCoordinateConverterLLandUTM::DatumConvert(int dIn, double LatIn,
 
 
 
+
+////==============================================================================
+////=========================================================
+////=========================================================
+////=========================================================
+////=========================================================
+//// YYY    YYY   YYY    YYY     OOOO
+////  YYY  YYY     YYY  YYY     OOOOOO
+////   YYYYYY       YYYYYY    OOO    OOO
+////    YYYY         YYYY     OOO    OOO
+////    YYYY         YYYY     OOO    OOO
+////    YYYY         YYYY     OOO    OOO
+////    YYYY         YYYY       OOOOOO
+////    YYYY         YYYY        OOOO
+//// BELOW HERE IS ALL THE NEW GEOREFERNCING STUFF
+//// Developed by SMM in 2019
 //==============================================================================
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // New Reference Ellipsoid object
@@ -1867,7 +1883,7 @@ void LSDReferenceEllipsoid::create(string Name)
 }
 
 
-// THis sets the ellipsoid parameters from a list of common ellipsoids
+// This sets the ellipsoid parameters from a list of common ellipsoids
 // TODO (SMM 19/01/2019) Add a martian coordinate system
 void LSDReferenceEllipsoid::set_ellipsoid_parameters(string Name)
 {
@@ -2012,7 +2028,7 @@ void LSDProjectionInfo::set_projection(int EPSG_code)
 
   // Conical projections include the origin latitude and longitude (phi_0, lambda_0)
   // and the standard parallels (phi_1 and phi_2)
-  // These parameters apply to both lambert convormal conical and albers equal area projections
+  // These parameters apply to both lambert conformal conical and albers equal area projections
   // See Snyder 1987 page 101 and page 106
   // THESE ARE REPORTED IN DEGREES!!!!!! 
   map<string,double> Conical;
@@ -2049,7 +2065,7 @@ void LSDProjectionInfo::set_projection(int EPSG_code)
   EPSG_int_list[32634] = UTM_int;
   EPSG_type_map[32634] = "Transverse_Mercator";
 
-  // now zone 18 (for the examle)
+  // now zone 18 (for the example)
   UTM_int["zone"] =18;
   UTM_int["is_north"] = 1;
   EPSG_list[32618] = UTM;

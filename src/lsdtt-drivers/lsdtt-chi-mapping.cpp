@@ -220,6 +220,7 @@ int main (int nNumberofArgs,char *argv[])
   // this switch turns on all the appropriate runs for estimating
   // the best fit m/n
   bool_default_map["estimate_best_fit_movern"] = false;
+  bool_default_map["estimate_best_fit_movern_no_bootstrap"] = false;
 
   // S-A analysis parameters
   float_default_map["SA_vertical_interval"] = 20;
@@ -355,15 +356,61 @@ int main (int nNumberofArgs,char *argv[])
   // If you want, turn on all the appropriate switches for estimating the best
   // fit m/n
   //----------------------------------------------------------------------------//
+  if (this_bool_map["estimate_best_fit_movern_no_bootstrap"])
+  {
+    this_bool_map["estimate_best_fit_movern"] = false;  
+
+    cout << endl << endl << "=======================================" << endl;
+    cout << "You have set the concavity analysis in motion!"  << endl;
+    cout << "You are not using the bootstrap method. "<< endl;
+    cout << "This means you will only use the disorder metric to get a robust estimate of concavity." <<endl;
+    cout << "Slope-area analysis will also be run, but we do not trust this at all" << endl;
+    cout << "See Mudd et al., 2018 https://www.earth-surf-dynam.net/6/505/2018/" << endl;
+    cout << "We do trust the disorder metric, but if you want a fuller picture of concavity" << endl;
+    cout << "you may wish to turn on the bootstrap method." << endl;
+    cout << "estimate_best_fit_movern: true" << endl;
+    cout << "estimate_best_fit_movern_no_bootstrap: false" << endl;
+    cout << "Be warned: the bootstrap analysis takes a VERY LONG time." << endl;
+    cout << "=======================================" << endl << endl << endl;
+    
+    // we need to make sure we select basins the correct way
+    if(this_bool_map["get_basins_from_outlets"] == false)
+    {
+      this_bool_map["find_complete_basins_in_window"] = true;
+    }
+    else
+    {
+      this_bool_map["test_drainage_boundaries"] = true;
+    }
+    this_bool_map["print_basin_raster"] = true;
+    this_bool_map["write_hillshade"] = true;
+    this_bool_map["print_chi_data_maps"] = true;
+    this_bool_map["force_all_basins"] = false; // Otherwise you'll have a bad time
+
+    // run the chi methods of estimating best fit m/n
+    this_bool_map["calculate_MLE_collinearity"] = false;
+    this_bool_map["calculate_MLE_collinearity_with_points_MC"] = false;
+    this_bool_map["print_profiles_fxn_movern_csv"] = true;
+    
+    this_bool_map["movern_disorder_test"] = true; 
+    this_bool_map["disorder_use_uncert"] = true; 
+
+    // run the SA methods of estimating best fit m/n
+    this_bool_map["print_slope_area_data"] = true;
+    this_bool_map["segment_slope_area_data"] = true;    
+  }
+
   if (this_bool_map["estimate_best_fit_movern"])
   {
     cout << endl << endl << "=======================================" << endl;
     cout << "You have set the full concavity analysis in motion!"  << endl;
-    cout << "This can take a while. If you just want a basic, efficient calculation," << endl;
-    cout << "use the disorder metric. " << endl;
-    cout << "Set: " << endl;
-    cout << "movern_disorder_test: true" << endl; 
-    cout << "disorder_use_uncert = true" << endl;
+    cout << "This includes the disorder metric and the bootstrap metric." <<endl;
+    cout << "The bootstrap metric takes a VERY LONG time to run. " << endl;
+    cout << "If you haven't got all week, we suggest running the disorder metric only." << endl;
+    cout << "estimate_best_fit_movern_no_bootstrap: true" << endl;
+    cout << "Slope-area analysis will also be run, but we do not trust this at all" << endl;
+    cout << "See Mudd et al., 2018 https://www.earth-surf-dynam.net/6/505/2018/" << endl;
+    cout << "We do trust the disorder metric, but if you want a fuller picture of concavity" << endl;
     cout << "=======================================" << endl << endl << endl;
     
     // we need to make sure we select basins the correct way

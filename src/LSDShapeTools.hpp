@@ -175,6 +175,7 @@ long getFileSize(FILE *file);
 
 
 /// @brief Ellipsoid class for converting coordinates between UTM and lat long
+/// @detail This is the old version
 class LSDEllipsoid
 {
   public:
@@ -203,6 +204,8 @@ class LSDEllipsoid
 };
 
 /// @brief Ellipsoid class for converting coordinates between UTM and lat long
+/// @author SMM
+/// @date 21/01/2019
 class LSDReferenceEllipsoid
 {
   public:
@@ -295,7 +298,7 @@ class LSDDatum
   double dZ;
 };
 
-/// A class for storing projection information
+/// @brief A class for storing projection information
 /// We implement a minamalistic interface: it is not meant as a replacement for GDAL
 /// Projections and transformations of rasters should happen in GDAL
 /// These tools are simply from getting points from projected coordinates
@@ -305,6 +308,8 @@ class LSDDatum
 /// and reasonable implementations of lambert conical conformal and 
 /// albers equal area.
 /// The latter projections require a bunch of parameters that are stored in a map
+/// @author SMM
+/// @date 19/01/2019
 class LSDProjectionInfo
 {
   public:
@@ -424,6 +429,7 @@ class LSDProjectionInfo
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // A class for converting datums and coordinates
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+/// @brief This is the old version that can only hold UTM to WGS84
 class LSDCoordinateConverterLLandUTM
 {
   public:
@@ -711,6 +717,13 @@ class LSDOGCWKTCRSReader
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // A class for converting datums and coordinates
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+/// @brief This is a coordinate converter class that is relatively flexible
+/// You can add different ellipsoids and coordinate systems
+/// @detail You will need to hard code EPSG codes but since all the maths are now
+///  in these functions it will be fairly easy to add new lambert and albers 
+///  projections.
+/// @author SMM
+/// @date 20/01/2019
 class LSDCoordinateConverter
 {
   public:
