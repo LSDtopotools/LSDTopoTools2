@@ -4763,7 +4763,7 @@ void LSDJunctionNetwork::GetChannelNodesAndJunctions(LSDFlowInfo& flowinfo, vect
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
 map<int,bool> LSDJunctionNetwork::GetMapOfChannelNodes(LSDFlowInfo& flowinfo)
 {
-  
+
   map<int,bool> is_node_in_channel;
   int row = 0;  //ints to store the row and col of the current px
   int col = 0;
@@ -7117,7 +7117,7 @@ int LSDJunctionNetwork::get_nodeindex_of_nearest_channel_for_specified_coordinat
 
       // get the current row and column
       FlowInfo.retrieve_current_row_and_col(CurrentNode,CurrentRow,CurrentCol);
-
+      cout << CurrentNode << " " << CurrentRow << " " << CurrentCol << " " << endl;
       // now search the kernal
       largest_SO_in_kernal = NoDataValue;
       largest_SO_row = NoDataValue;

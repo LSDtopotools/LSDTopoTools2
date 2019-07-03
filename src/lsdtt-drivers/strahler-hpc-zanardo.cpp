@@ -66,8 +66,10 @@ int main(int nNumberofArgs, char *argv[])
   converter.LLtoUTM_ForceZone(eId, Lat, Long, northing, easting, UTM_zone);
 
   std::cout << "Searching for nearest channel" << '\n';
-
-  int nearest_node = ChanNetwork.get_nodeindex_of_nearest_channel_for_specified_coordinates(easting, northing, 6, 5, FlowInfo);
+  std::cout << FlowInfo.get_NRows() << '\n';
+  std::cout << FlowInfo.get_NCols() << '\n';
+  std::cout << "------------------" << '\n';
+  int nearest_node = ChanNetwork.get_nodeindex_of_nearest_channel_for_specified_coordinates(easting, northing, 6, 25, FlowInfo);
   int nearest_junction = ChanNetwork.get_Junction_of_Node(nearest_node, FlowInfo);
 
   vector<int> sub_basin_sources = ChanNetwork.get_all_source_nodes_of_an_outlet_junction(nearest_junction);
