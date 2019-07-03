@@ -7133,7 +7133,6 @@ int LSDJunctionNetwork::get_nodeindex_of_nearest_channel_for_specified_coordinat
           // only test if it within size of the Stream Order array
           if(this_krow >= 0 && this_krow < NRows-1 && this_kcol >= 0 && this_kcol < NCols-1)
           {
-            cout << this_krow << " " << this_kcol << " " << endl;
             this_SO = StreamOrderArray[this_krow][this_kcol];
             if (this_SO >= threshold_stream_order && this_SO > largest_SO_in_kernal)
             {
@@ -7149,7 +7148,9 @@ int LSDJunctionNetwork::get_nodeindex_of_nearest_channel_for_specified_coordinat
       // check to if the kernal returned a channel node
       if(largest_SO_in_kernal != NoDataValue)
       {
+        cout << largest_SO_row << " " << largest_SO_col << " " << endl;
         NearestChannel = FlowInfo.NodeIndex[largest_SO_row][largest_SO_col];
+        std::cout << "success" << '\n';
       }
       else    // get the next node
       {
