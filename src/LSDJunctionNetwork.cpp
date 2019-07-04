@@ -5999,7 +5999,7 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV(LSDFlowInfo& flowinfo, string 
   WriteData.open(FileName.c_str());
 
   WriteData.precision(8);
-  WriteData << "latitude,longitude,Junction Index,Stream Order,NI" << endl;
+  WriteData << "latitude,longitude,Junction Index,Stream Order,NI,row,col" << endl;
 
   // the x and y locations
   double latitude,longitude;
@@ -6019,7 +6019,7 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV(LSDFlowInfo& flowinfo, string 
     flowinfo.retrieve_current_row_and_col(this_NI,row,col);
     get_lat_and_long_locations(row, col, latitude, longitude, Converter);
 
-    WriteData << latitude << "," << longitude << "," << JIvec[node] << "," << SOvec[node] << "," << NIvec[node] << endl;
+    WriteData << latitude << "," << longitude << "," << JIvec[node] << "," << SOvec[node] << "," << NIvec[node] << "," << row << "," << col << endl;
 
   }
 
