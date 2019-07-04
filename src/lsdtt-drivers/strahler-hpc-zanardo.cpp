@@ -58,7 +58,7 @@ int main(int nNumberofArgs, char *argv[])
   ss3 << Outpath << "full_network_" << DEMname;
   ChanNetwork.PrintChannelNetworkToCSV(FlowInfo, ss3.str());
 
-  //
+
   // double Lat = atof(argv[4]);
   // double Long = atof(argv[5]);
   // LSDCoordinateConverterLLandUTM converter;
@@ -75,23 +75,24 @@ int main(int nNumberofArgs, char *argv[])
   // std::cout << FlowInfo.get_NCols() << '\n';
   // std::cout << "------------------" << '\n';
   // int nearest_node = ChanNetwork.get_nodeindex_of_nearest_channel_for_specified_coordinates(easting, northing, 6, 25, FlowInfo);
-  // int nearest_junction = ChanNetwork.get_Junction_of_Node(nearest_node, FlowInfo);
-  //
-  // vector<int> sub_basin_sources = ChanNetwork.get_all_source_nodes_of_an_outlet_junction(nearest_junction);
-  //
-  // LSDJunctionNetwork SubChanNetwork(sub_basin_sources, FlowInfo);
-  //
-  // LSDStrahlerLinks Links(SubChanNetwork, FlowInfo);
-  // Links.CalculateTokunagaIndexes(SubChanNetwork, FlowInfo);
-  // Links.calculate_lengths(FlowInfo);
-  //
-  // stringstream ss;
-  // ss << DEMname << "_" << 1;
-  // Links.WriteTokunagaData(Outpath, ss.str());
-  //
-  // stringstream ss2;
-  // ss2 << Outpath << "toku_network_" << DEMname << "_" << 1;
-  // Links.WriteTokunagaChannelsCSV(SubChanNetwork, ss2.str());
+  int nearest_node = 54539327.0;
+  int nearest_junction = ChanNetwork.get_Junction_of_Node(nearest_node, FlowInfo);
+
+  vector<int> sub_basin_sources = ChanNetwork.get_all_source_nodes_of_an_outlet_junction(nearest_junction);
+
+  LSDJunctionNetwork SubChanNetwork(sub_basin_sources, FlowInfo);
+
+  LSDStrahlerLinks Links(SubChanNetwork, FlowInfo);
+  Links.CalculateTokunagaIndexes(SubChanNetwork, FlowInfo);
+  Links.calculate_lengths(FlowInfo);
+
+  stringstream ss;
+  ss << DEMname << "_" << 1;
+  Links.WriteTokunagaData(Outpath, ss.str());
+
+  stringstream ss2;
+  ss2 << Outpath << "toku_network_" << DEMname << "_" << 1;
+  Links.WriteTokunagaChannelsCSV(SubChanNetwork, ss2.str());
 
 
 
