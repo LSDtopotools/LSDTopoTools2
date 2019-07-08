@@ -54,25 +54,27 @@ int main(int nNumberofArgs, char *argv[])
   LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
   std::cout << "Built junction network" << '\n';
 
-  stringstream ss3;
-  ss3 << Outpath << "full_network_" << DEMname;
-  ChanNetwork.PrintChannelNetworkToCSV(FlowInfo, ss3.str());
+  // stringstream ss3;
+  // ss3 << Outpath << "full_network_" << DEMname;
+  // ChanNetwork.PrintChannelNetworkToCSV(FlowInfo, ss3.str());
 
   int nearest_node = atoi(argv[4]);
+  std::cout << "\nNearest node: " << nearest_node << '\n';
+
   int nearest_junction = ChanNetwork.get_Junction_of_Node(nearest_node, FlowInfo);
-  std::cout << nearest_junction << '\n';
+  std::cout << "\nConverted to junction:" << nearest_junction << '\n';
 
   int junct_node = ChanNetwork.get_Node_of_Junction(nearest_junction);
 
-  std::cout << junct_node << '\n';
+  std::cout << "\nback to node: " << junct_node << '\n';
 
   int blah = ChanNetwork.get_Junction_of_Node(junct_node, FlowInfo);
 
-  std::cout << blah << '\n';
+  std::cout << "\nback to junction: " << junct_blah << '\n';
 
   vector<int> sub_basin_sources = ChanNetwork.get_all_source_nodes_of_an_outlet_junction(nearest_junction);
 
-  std::cout << sub_basin_sources.size() << '\n';
+  std::cout << "Source count: " << sub_basin_sources.size() << '\n';
 
   LSDJunctionNetwork SubChanNetwork(sub_basin_sources, FlowInfo);
 
