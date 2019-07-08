@@ -1,7 +1,7 @@
 CC = g++
 CFLAGS= -c -Wall -O3
 OFLAGS = -Wall -O3
-SOURCES = strahler-hpc-zanardo.cpp \
+SOURCES = zanardo-1.cpp \
     ../LSDIndexRaster.cpp \
     ../LSDRaster.cpp \
     ../LSDFlowInfo.cpp \
@@ -13,7 +13,7 @@ SOURCES = strahler-hpc-zanardo.cpp \
 		../LSDMostLikelyPartitionsFinder.cpp \
 	  ../LSDStrahlerLinks.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
-EXECUTABLE=strahler-hpc-zanardo.out
+EXECUTABLE=zanardo-1.out
 
 all: $(SOURCES) $(EXECUTABLE)
 
