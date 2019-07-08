@@ -15,7 +15,7 @@ int main(int nNumberofArgs, char *argv[])
 {
 
   //Test for correct input arguments
-	if (nNumberofArgs!=6)
+	if (nNumberofArgs!=5)
 	{
 		cout << "FATAL ERROR: wrong number of inputs.";
 		exit(EXIT_FAILURE);
@@ -54,33 +54,25 @@ int main(int nNumberofArgs, char *argv[])
   LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
   std::cout << "Built junction network" << '\n';
 
-  // stringstream ss3;
-  // ss3 << Outpath << "full_network_" << DEMname;
-  // ChanNetwork.PrintChannelNetworkToCSV(FlowInfo, ss3.str());
+  stringstream ss3;
+  ss3 << Outpath << "full_network_" << DEMname;
+  ChanNetwork.PrintChannelNetworkToCSV(FlowInfo, ss3.str());
 
-  int nearest_node = FlowInfo.get_NodeIndex_from_row_col(6049, 4875);
-
-
-  // double Lat = atof(argv[4]);
-  // double Long = atof(argv[5]);
-  // LSDCoordinateConverterLLandUTM converter;
-  //
-  // double northing, easting;
-  // int UTM_zone;
-  // bool is_North;
-  // FlowInfo.get_UTM_information(UTM_zone, is_North);
-  // int eId = 22;             // defines the ellipsiod. This is WGS
-  // converter.LLtoUTM_ForceZone(eId, Lat, Long, northing, easting, UTM_zone);
-  //
-  // std::cout << "Searching for nearest channel" << '\n';
-  // std::cout << FlowInfo.get_NRows() << '\n';
-  // std::cout << FlowInfo.get_NCols() << '\n';
-  // std::cout << "------------------" << '\n';
-  // int nearest_node = ChanNetwork.get_nodeindex_of_nearest_channel_for_specified_coordinates(easting, northing, 6, 25, FlowInfo);
-  // int nearest_node = 54539327;
+  int nearest_node = atoi(argv[4]);
   int nearest_junction = ChanNetwork.get_Junction_of_Node(nearest_node, FlowInfo);
+  std::cout << nearest_junction << '\n';
+
+  int junct_node = ChanNetwork.get_Node_of_Junction(nearest_junction);
+
+  std::cout << junct_node << '\n';
+
+  int blah = ChanNetwork.get_Junction_of_Node(junct_node, FlowInfo);
+
+  std::cout << blah << '\n';
 
   vector<int> sub_basin_sources = ChanNetwork.get_all_source_nodes_of_an_outlet_junction(nearest_junction);
+
+  std::cout << sub_basin_sources.size() << '\n';
 
   LSDJunctionNetwork SubChanNetwork(sub_basin_sources, FlowInfo);
 
