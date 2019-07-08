@@ -64,18 +64,47 @@ int main(int nNumberofArgs, char *argv[])
 
   LSDJunctionNetwork SubChanNetwork(sub_basin_sources, FlowInfo);
 
-  LSDStrahlerLinks Links(SubChanNetwork, FlowInfo);
-  Links.CalculateTokunagaIndexes(SubChanNetwork, FlowInfo);
-  Links.calculate_lengths(FlowInfo);
+  int max_order = ChanNetwork.get_maximum_stream_order();
 
-  stringstream ss;
-  ss << DEMname << "_" << 1;
-  Links.WriteTokunagaData(Outpath, ss.str());
+  if (max_order > 6){
 
-  stringstream ss2;
-  ss2 << Outpath << "toku_network_" << DEMname << "_" << 1;
-  Links.WriteTokunagaChannelsCSV(SubChanNetwork, ss2.str());
+    vector<int> basin_junctions = SubChanNetwork.ExtractBasinJunctionOrderKeepEdgeBasins(7, FlowInfo);
+
+    for (int i = 0; i < int(basin_junctions.size()); ++i){
+
+      vector<int> sub_basin_sources = SubChanNetwork.get_all_source_nodes_of_an_outlet_junction(basin_junctions[i]);
+
+      LSDJunctionNetwork SubSubChanNetwork(sub_basin_sources, FlowInfo);
+
+      LSDStrahlerLinks Links(SubSubChanNetwork, FlowInfo);
+      Links.CalculateTokunagaIndexes(SubSubChanNetwork, FlowInfo);
+      Links.calculate_lengths(FlowInfo);
+
+      stringstream ss;
+      ss << DEMname << "_" << i;
+      Links.WriteTokunagaData(Outpath, ss.str());
+
+      stringstream ss2;
+      ss2 << Outpath << "toku_network_" << DEMname << "_" << i;
+      Links.WriteTokunagaChannelsCSV(SubSubChanNetwork, ss2.str());
+
+    }
 
 
+  } else{
+
+    LSDStrahlerLinks Links(SubChanNetwork, FlowInfo);
+    Links.CalculateTokunagaIndexes(SubChanNetwork, FlowInfo);
+    Links.calculate_lengths(FlowInfo);
+
+    stringstream ss;
+    ss << DEMname << "_" << 1;
+    Links.WriteTokunagaData(Outpath, ss.str());
+
+    stringstream ss2;
+    ss2 << Outpath << "toku_network_" << DEMname << "_" << 1;
+    Links.WriteTokunagaChannelsCSV(SubChanNetwork, ss2.str());
+
+  }
 
 }
