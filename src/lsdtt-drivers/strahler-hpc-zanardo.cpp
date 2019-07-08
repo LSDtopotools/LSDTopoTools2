@@ -70,7 +70,7 @@ int main(int nNumberofArgs, char *argv[])
 
   int blah = ChanNetwork.get_Junction_of_Node(junct_node, FlowInfo);
 
-  std::cout << "\nback to junction: " << junct_blah << '\n';
+  std::cout << "\nback to junction: " << blah << '\n';
 
   vector<int> sub_basin_sources = ChanNetwork.get_all_source_nodes_of_an_outlet_junction(nearest_junction);
 
