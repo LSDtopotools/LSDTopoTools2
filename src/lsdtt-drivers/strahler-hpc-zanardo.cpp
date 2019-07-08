@@ -61,16 +61,19 @@ int main(int nNumberofArgs, char *argv[])
   int nearest_node = atoi(argv[4]);
   std::cout << "\nNearest node: " << nearest_node << '\n';
 
-  int nearest_junction = ChanNetwork.get_Junction_of_Node(nearest_node, FlowInfo);
+  // int nearest_junction = ChanNetwork.get_Junction_of_Node(nearest_node, FlowInfo);
+
+  int nearest_junction = ChanNetwork.find_upstream_junction_from_channel_nodeindex(nearest_node, FlowInfo);
   std::cout << "\nConverted to junction:" << nearest_junction << '\n';
 
-  int junct_node = ChanNetwork.get_Node_of_Junction(nearest_junction);
 
-  std::cout << "\nback to node: " << junct_node << '\n';
-
-  int blah = ChanNetwork.get_Junction_of_Node(junct_node, FlowInfo);
-
-  std::cout << "\nback to junction: " << blah << '\n';
+  // int junct_node = ChanNetwork.get_Node_of_Junction(nearest_junction);
+  //
+  // std::cout << "\nback to node: " << junct_node << '\n';
+  //
+  // int blah = ChanNetwork.get_Junction_of_Node(junct_node, FlowInfo);
+  //
+  // std::cout << "\nback to junction: " << blah << '\n';
 
   vector<int> sub_basin_sources = ChanNetwork.get_all_source_nodes_of_an_outlet_junction(nearest_junction);
 
