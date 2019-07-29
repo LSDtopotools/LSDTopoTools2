@@ -147,13 +147,19 @@ int main (int nNumberofArgs,char *argv[])
   
   
   // The stuff below here is all for creating rasters for forward prediction of 
-  // erosion rates
+  // erosion rates.
+  // Note the effective erosion rate is in g/cm^2/yr
+  // To convert to mm/kyr you multiply by 10^7/(density in kg/m^3)
+  // 0.01 g/cm^2/yr is ~ 37 mm/kyr
+  // 0.1 g/cm^2/yr is ~ 370 mm/kyr or 0.37 mm/yr
   bool_default_map["make_production_raster"] = false;
   bool_default_map["make_all_shielding_and_scaling_rasters"] = false;
   bool_default_map["single_erosion_rate"] = false;
-  float_default_map["effective_erosion_rate"] = 0.001;
+  float_default_map["effective_erosion_rate"] = 0.01;
   float_default_map["self_shield_eff_thickness"] = 0;
   float_default_map["snow_shield_eff_thickness"] = 0;
+  bool_default_map["calculate_CRN_concentration_raster"] = false;
+
 
   // These parameters are for raster aggregation that is used for sediment routine and 
   // CRN concentration prediction
@@ -486,8 +492,11 @@ int main (int nNumberofArgs,char *argv[])
   // This makes all the appropriate rasters for constant values of the 
   // shielding and erosion. It prints the concenteration raster 
   // and the erosion raster
-  if(this_bool_map["make_all_shielding_and_scaling_rasters"])
+  if(this_bool_map["calculate_CRN_concentration_raster"])
   {
+    cout << "I will now calculate the concentration of your nuclide at each pixel in your raster." << endl;
+    cout << "For pixels with landslides, this is the mean concentration of the eroded material. " << endl;
+
     // The atmospheric data needs to be in the same directory as the directory
     // from which the programis called.
     // This should be modified later!!
@@ -523,7 +532,7 @@ int main (int nNumberofArgs,char *argv[])
     bool is_production_uncertainty_plus_on = false;
     bool is_production_uncertainty_minus_on = false;
     
-    ThisCosmoRaster.predict_mean_CRN_conc(Nuclide, Muon_scaling, ErosionRaster,
+    ThisCosmoRaster.calculate_CRN_concentration_raster(Nuclide, Muon_scaling, ErosionRaster,
                                           ProductionRaster, TopoShield, 
                                           SelfShield, SnowShield, 
                                           is_production_uncertainty_plus_on,

@@ -110,12 +110,16 @@ int main (int nNumberofArgs,char *argv[])
   string_default_map["CHeads_file"] = "NULL";
   bool_default_map["only_check_parameters"] = false;
   
+  // raster trimming, to take care of rasters that have a bunch of nodata at the edges
+  bool_default_map["print_trimmed_raster"] = false;
+  int_default_map["trimming_buffer_pixels"] = 0;
+
   // the most basic raster printing
   bool_default_map["write_hillshade"] = false;
   bool_default_map["print_raster_without_seas"] = false;
   bool_default_map["print_distance_from_outlet"] = false;
   bool_default_map["print_fill_raster"] = false;
-  
+
   // This converts all csv files to geojson (for easier loading in a GIS)
   bool_default_map["convert_csv_to_geojson"] = false;    
   
@@ -253,6 +257,21 @@ int main (int nNumberofArgs,char *argv[])
     cout << "the parameters to file and am now exiting." << endl;
     exit(0);
   }
+
+  //============================================================================
+  // Raster trimming
+  // This trims the raster to the smallest nodata. 
+  // It only prints the trimmed raster! It will not use it in computation. 
+  // This is because we want to avoid messed up georeferencing. 
+  // Print the trimmed raster and then use in raster the next steps
+  // of raster processing
+  if(this_bool_map["print_trimmed_raster"]) 
+  {
+    cout << "Let me trim that raster for you." << endl;
+    LSDRaster trimmed_raster = topography_raster.RasterTrimmerPadded(this_int_map["trimming_buffer_pixels"]);
+    string this_raster_name = OUT_DIR+OUT_ID+"_TRIM";
+    trimmed_raster.write_raster(this_raster_name,raster_ext);
+  } 
 
 
   //============================================================================

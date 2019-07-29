@@ -476,7 +476,7 @@ LSDRaster LSDCosmoRaster::calculate_production_raster(LSDRaster& Elevation_Data,
   {
     for(int col = 0; col<NCols; col++)
     {
-      
+      //cout << "Row: " << row << " col: " << col << endl;
       //exclude NDV from average
       if (Elevation_Data.get_data_element(row,col) != NDV)
       {
@@ -604,16 +604,16 @@ void LSDCosmoRaster::reset_scaling(LSDCRNParameters& LSDCRNP, string Muon_scalin
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// This drives the cosmo concentration calculation on the basis of a single
-// erosion rate value
+// This calculates the cosmogenic concentration eroded from each pixel
+// It is NOT a mass flux. This will be calculated using an accumulator function
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDCosmoRaster::predict_mean_CRN_conc(string Nuclide,
+void LSDCosmoRaster::calculate_CRN_concentration_raster(string Nuclide,
                                            string Muon_scaling, 
                                            LSDRaster& eff_erosion_rate,
                                            LSDRaster& ProductionScale, 
                                            LSDRaster& TopoShield, 
                                            LSDRaster& SelfShield,
-                                           LSDRaster& SnowShield, 
+                                           LSDRaster& SnowShield,  
                                            bool is_production_uncertainty_plus_on,
                                            bool is_production_uncertainty_minus_on)
 {
@@ -701,7 +701,7 @@ void LSDCosmoRaster::predict_mean_CRN_conc(string Nuclide,
 
         // Get the top and bottom effective depths from the snow and self shielding rasters
         this_top_eff_depth = SnowShield.get_data_element(row,col);
-        this_bottom_eff_depth = this_top_eff_depth+SnowShield.get_data_element(row,col);
+        this_bottom_eff_depth = this_top_eff_depth+SelfShield.get_data_element(row,col);
  
         // get the nuclide concentration from this node
         if (Nuclide == "Be10")

@@ -2771,23 +2771,27 @@ LSDRaster LSDFlowInfo::upslope_variable_accumulator_v2(LSDRaster& accum_raster, 
   {
     cout << "Warning!!, LSDFlowInfo::upslope_area_accumulator\n"
       << "Accumulation raster does not match dimensions of original raster\n"
-      << "I am resampling your raster to the same dimensions" << endl;
+      << "The resampling need to be done before that step! I will now crash... \n" 
+      << "I have heard that lsdtopytools does that for you automatically now!" << endl;
+    exit(EXIT_FAILURE);
+  // Joke apart I am deprecating that function as it modifies the area of the accumulation and makes it ambiguous
+  //   // Using a simple xy query approach
+  //   LSDRaster new_accum_raster(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, filled_raster.get_RasterData() );
+  //   // (int nrows, int ncols, double xmin, double ymin,
+  //   //         double cellsize, double ndv, Array2D<double> data)
+  //   for(size_t i=0; i< NRows; i++)
+  //   {
+  //     for(size_t j=0; j < NCols; j++)
+  //     {
+  //       float tx,ty,new_val;
+  //       new_accum_raster.get_x_and_y_locations(i,j,tx,ty);
+  //       new_val = accum_raster.get_value_of_point(tx,ty);
+  //       new_accum_raster.set_data_element(i,j,new_val);
+  //     }
+  //   }
 
-    // Using a simple xy query approach
-    LSDRaster new_accum_raster = filled_raster;
-    for(size_t i=0; i< NRows; i++)
-    {
-      for(size_t j=0; j < NCols; j++)
-      {
-        float tx,ty,new_val;
-        new_accum_raster.get_x_and_y_locations(i,j,tx,ty);
-        new_val = accum_raster.get_value_of_point(tx,ty);
-        new_accum_raster.set_data_element(i,j,new_val);
-      }
-    }
-
-    accum_raster = new_accum_raster;
-  // Resampling done!
+  //   accum_raster = new_accum_raster;
+  // // Resampling done!
 
   }
 
@@ -8670,142 +8674,142 @@ bool operator<( const base_level_node_sorter& lhs, const base_level_node_sorter&
   return lhs.n_donors_to_that_node < rhs.n_donors_to_that_node;
 }
 
-  // This function attemps to return a user friendly vectors of different element calculated in the FlowInfo object
-  // If you question the relevance of that function, try to get the stack vector of node from Braun and Willett
-  // just reading the comments of that file.
-  // the returned map has the several string keys:
-  // "stack order" -> the stack order sense Braun and willett, per node index
-  // ...
-  // B.G. 14/04/2019
-  map<string, vector< vector<int> > > LSDFlowInfo::get_map_of_vectors()
+// This function attemps to return a user friendly vectors of different element calculated in the FlowInfo object
+// If you question the relevance of that function, try to get the stack vector of node from Braun and Willett
+// just reading the comments of that file.
+// the returned map has the several string keys:
+// "stack order" -> the stack order sense Braun and willett, per node index
+// ...
+// B.G. 14/04/2019
+map<string, vector< vector<int> > > LSDFlowInfo::get_map_of_vectors()
+{
+  
+  // I first, I want the base levels again
+  priority_queue< base_level_node_sorter, vector<base_level_node_sorter>, less<base_level_node_sorter> > PriorityQueue;
+
+  vector<int> base_levels;
+  int check_my_vectors = 0;
+  for(size_t i=0; i<ReceiverVector.size(); i++)
   {
-    
-    // I first, I want the base levels again
-    priority_queue< base_level_node_sorter, vector<base_level_node_sorter>, less<base_level_node_sorter> > PriorityQueue;
-
-    vector<int> base_levels;
-    int check_my_vectors = 0;
-    for(size_t i=0; i<ReceiverVector.size(); i++)
+    check_my_vectors++;
+    // checking if this is a baselevel AND has some receivers
+    if(int(i) == ReceiverVector[i] && retrieve_ndonors_to_node(i) > 1)
     {
-      check_my_vectors++;
-      // checking if this is a baselevel AND has some receivers
-      if(int(i) == ReceiverVector[i] && retrieve_ndonors_to_node(i) > 1)
+      base_level_node_sorter BLNS;BLNS.Node_ID = int(i);BLNS.n_donors_to_that_node = retrieve_ndonors_to_node(i);
+      PriorityQueue.push( BLNS);
+    }
+  }
+
+  while(PriorityQueue.size()>0)
+  {
+    base_levels.push_back(PriorityQueue.top().Node_ID);
+    PriorityQueue.pop();
+  }
+
+  // cout << "Gougne: " << base_levels.size() << " || vs: " << check_my_vectors << endl;
+
+  vector<vector<int> > nodes_per_basins(base_levels.size()), inverted_nodes_per_basins(base_levels.size()), n_row(base_levels.size()), n_col(base_levels.size()), i_row(base_levels.size()), i_col(base_levels.size());
+  for(size_t i=0;i<base_levels.size();i++)
+  {
+    // First get the stack_order of that base_level
+    vector<int> this_vec = get_upslope_nodes(base_levels[i]);
+
+    if(this_vec.size() > 1)
+    {
+      this_vec.insert(this_vec.begin(),base_levels[i]); // Do not forget dat first node!!!
+      nodes_per_basins.push_back(this_vec);
+      vector<int> rev_vec;
+      for(int j= int(this_vec.size()-1); j>=0; j--)
       {
-        base_level_node_sorter BLNS;BLNS.Node_ID = int(i);BLNS.n_donors_to_that_node = retrieve_ndonors_to_node(i);
-        PriorityQueue.push( BLNS);
+        int new_val = this_vec[j];
+        rev_vec.push_back(new_val);
       }
-    }
-
-    while(PriorityQueue.size()>0)
-    {
-      base_levels.push_back(PriorityQueue.top().Node_ID);
-      PriorityQueue.pop();
-    }
-
-    // cout << "Gougne: " << base_levels.size() << " || vs: " << check_my_vectors << endl;
-
-    vector<vector<int> > nodes_per_basins(base_levels.size()), inverted_nodes_per_basins(base_levels.size()), n_row(base_levels.size()), n_col(base_levels.size()), i_row(base_levels.size()), i_col(base_levels.size());
-    for(size_t i=0;i<base_levels.size();i++)
-    {
-      // First get the stack_order of that base_level
-      vector<int> this_vec = get_upslope_nodes(base_levels[i]);
-
-      if(this_vec.size() > 1)
+ 
+      // reverse(rev_vec.begin(),rev_vec.end());
+      inverted_nodes_per_basins.push_back(rev_vec);
+      // Now getting the row and col
+      vector<int> this_n_row, this_n_col, this_i_row, this_i_col;
+      for(size_t j = 0; j< this_vec.size(); j++)
       {
-        this_vec.insert(this_vec.begin(),base_levels[i]); // Do not forget dat first node!!!
-        nodes_per_basins.push_back(this_vec);
-        vector<int> rev_vec;
-        for(int j= int(this_vec.size()-1); j>=0; j--)
-        {
-          int new_val = this_vec[j];
-          rev_vec.push_back(new_val);
-        }
-   
-        // reverse(rev_vec.begin(),rev_vec.end());
-        inverted_nodes_per_basins.push_back(rev_vec);
-        // Now getting the row and col
-        vector<int> this_n_row, this_n_col, this_i_row, this_i_col;
-        for(size_t j = 0; j< this_vec.size(); j++)
-        {
-          int this_node = this_vec[j];
-          int i_node = rev_vec[j];
+        int this_node = this_vec[j];
+        int i_node = rev_vec[j];
 
-          int row,col;
-          retrieve_current_row_and_col(this_node,row,col);
-          this_n_row.push_back(row);
-          this_n_col.push_back(col);
+        int row,col;
+        retrieve_current_row_and_col(this_node,row,col);
+        this_n_row.push_back(row);
+        this_n_col.push_back(col);
 
-          retrieve_current_row_and_col(i_node,row,col);
-          this_i_row.push_back(row);
-          this_i_col.push_back(col);
-        }
-
-        n_row.push_back(this_n_row);
-        n_col.push_back(this_n_col);
-        i_row.push_back(this_i_row);
-        i_col.push_back(this_i_col);
+        retrieve_current_row_and_col(i_node,row,col);
+        this_i_row.push_back(row);
+        this_i_col.push_back(col);
       }
 
+      n_row.push_back(this_n_row);
+      n_col.push_back(this_n_col);
+      i_row.push_back(this_i_row);
+      i_col.push_back(this_i_col);
     }
-
-
-    // formatting the output
-    map<string, vector< vector<int> > > output;
-
-    // adding a tracer
-    vector<vector<int> > tracer;
-    int cpt = 0;
-    for(size_t i = 0; i<size_t(nodes_per_basins.size()); i++ )
-    {
-      vector<int> goris2;
-      for(size_t j=0; j<nodes_per_basins[i].size();j++)
-        {
-          goris2.push_back(cpt);
-          cpt ++;
-        }
-        tracer.push_back(goris2);
-    }
-
-    output["stack_order"] = nodes_per_basins;
-    output["inverted_stack_order"] = inverted_nodes_per_basins;
-    output["rows"] = n_row;
-    output["cols"] = n_col;
-    output["inverted_rows"] = i_row;
-    output["inverted_cols"] = i_col;
-    output["tracer"] = tracer;
-
-    // DEBUGGING, KEEP FOR A BIT------------------------------------------------------------------------------------------------------------
-    // float goulg = 0;
-    // Array2D<float> checker(NRows,NCols,goulg);
-    // for(size_t i=0; i<i_row.size(); i++)
-    // {
-    //   for(size_t j=0; j<i_row[i].size() ; j++)
-    //   {
-    //     int row,col;
-    //     row = i_row[i][j];
-    //     col = i_col[i][j];
-    //     checker[row][col] = 1;
-    //   }
-    // }
-
-    // // Done
-    // int cpt2 = 0;
-    // for(size_t i=0;i<NRows;i++)
-    // {
-    //   for(size_t j=0;j<NCols;j++)
-    //   {
-    //     if(checker[i][j] == 0)
-    //       cpt2++;
-    //   }
-    // }
-
-    // cout << "DEBUG::ORERING::There are " << cpt2 << " 0s out of " << NRows*NCols  <<  endl;
-    // DEBUGGING, KEEP FOR A BIT------------------------------------------------------------------------------------------------------------
-
-
-    return output;
 
   }
+
+
+  // formatting the output
+  map<string, vector< vector<int> > > output;
+
+  // adding a tracer
+  vector<vector<int> > tracer;
+  int cpt = 0;
+  for(size_t i = 0; i<size_t(nodes_per_basins.size()); i++ )
+  {
+    vector<int> goris2;
+    for(size_t j=0; j<nodes_per_basins[i].size();j++)
+      {
+        goris2.push_back(cpt);
+        cpt ++;
+      }
+      tracer.push_back(goris2);
+  }
+
+  output["stack_order"] = nodes_per_basins;
+  output["inverted_stack_order"] = inverted_nodes_per_basins;
+  output["rows"] = n_row;
+  output["cols"] = n_col;
+  output["inverted_rows"] = i_row;
+  output["inverted_cols"] = i_col;
+  output["tracer"] = tracer;
+
+  // DEBUGGING, KEEP FOR A BIT------------------------------------------------------------------------------------------------------------
+  // float goulg = 0;
+  // Array2D<float> checker(NRows,NCols,goulg);
+  // for(size_t i=0; i<i_row.size(); i++)
+  // {
+  //   for(size_t j=0; j<i_row[i].size() ; j++)
+  //   {
+  //     int row,col;
+  //     row = i_row[i][j];
+  //     col = i_col[i][j];
+  //     checker[row][col] = 1;
+  //   }
+  // }
+
+  // // Done
+  // int cpt2 = 0;
+  // for(size_t i=0;i<NRows;i++)
+  // {
+  //   for(size_t j=0;j<NCols;j++)
+  //   {
+  //     if(checker[i][j] == 0)
+  //       cpt2++;
+  //   }
+  // }
+
+  // cout << "DEBUG::ORERING::There are " << cpt2 << " 0s out of " << NRows*NCols  <<  endl;
+  // DEBUGGING, KEEP FOR A BIT------------------------------------------------------------------------------------------------------------
+
+
+  return output;
+
+}
 
   // map<string, vector<int> > burn_raster_to_
 

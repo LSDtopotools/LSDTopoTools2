@@ -768,12 +768,14 @@ void LSDCRNParticle::update_10Be_SSfull_depth_integrated(double erosion_rate,
     top_eff_depth = temp_eff_depth;
   }
 
+  // If the top effective depth and the bottom effective depth are the same, then run the standard
+  // concentration for particles eroding from the top of this pixel
   if (top_eff_depth == bottom_eff_depth)
   {
     effective_dLoc = top_eff_depth;
     update_10Be_SSfull(erosion_rate, CRNp);
   }
-  else
+  else  // If they arent the same, this calculates the depth average concentrations of particles between the top and bottom effective depths.  
   {
     double this_term;
     double sum_term1 = 0;

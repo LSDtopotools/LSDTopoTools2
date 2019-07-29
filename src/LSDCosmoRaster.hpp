@@ -166,9 +166,43 @@ class LSDCosmoRaster: public LSDRaster
     LSDRaster calculate_atm_pressure_raster(LSDRaster& Elevation_Data, string path_to_atmospheric_data);
 
 
-    /// @brief this predicts the mean concentration of a nuclide within
-    ///  a basin. It does a full analyitical solution to account for
+    /// @brief this predicts the concentration of a nuclide for each pixel within a basin. 
+    /// It does a full analytical solution to account for
     ///  snow and self sheilding
+    /// @detail This is NOT an accumulator function! It is the concentration at that specific pixel. 
+    ///  For pixels with a landslide (e.g, places with TopoShield not = 0)
+    ///  This is the depth averaged concentration of particles emerging from that pixel during the landslide. 
+    /// @param eff_erosion rate The erosion rate in g/cm^2/yr
+    /// @param Nuclide a string with the nuclide name. At the moment the options are:
+    ///   Be10
+    ///   Al26
+    ///  These are case sensitive
+    /// @param Muon_scaling a string that gives the muon scaling scheme.
+    ///  options are Schaller, Braucher and Granger, and newCRONUS
+    /// @param eff_erosion_rate A raster of the effective erosion rate (in g/cm^2/yr)
+    /// @param ProductionScale A raster of the production scaling (uses Lal/Stone scheme)
+    /// @param TopoShield A raster of the topographic shielding. Varies from 0 to 1.
+    /// @param SelfShield A raster of self shielding in g/cm^2 (the effective thickenss of the layer removed) 
+    /// @param SnowShield A raster of snow shielding in g/cm^2 (the effective depth of the snow) 
+    /// @param is_production_uncertainty_plus_on a boolean that is true if the
+    ///  production rate uncertainty (+) is switched on
+    /// @param is_production_uncertainty_minus_on a boolean that is true if the
+    ///  production rate uncertainty (-) is switched on. If the + switch is
+    ///  true this parameter defauts to false.
+    /// @return the concentration of the nuclide averaged across the DEM
+    /// @author SMM
+    /// @date 18/11/2018
+    void calculate_CRN_concentration_raster(string Nuclide, string Muon_scaling, LSDRaster& eff_erosion_rate,
+                               LSDRaster& ProductionScale, LSDRaster& TopoShield, 
+                               LSDRaster& SelfShield, LSDRaster& SnowShield, 
+                               bool is_production_uncertainty_plus_on,
+                               bool is_production_uncertainty_minus_on);
+
+
+    /// @brief this predicts the mean concentration of a nuclide for each pixel within a basin. 
+    /// It does a full analytical solution to account for
+    ///  snow and self sheilding
+    /// @detail This is NOT an accumulator function! It is the concentration at that specific pixel. 
     /// @param eff_erosion rate The erosion rate in g/cm^2/yr
     /// @param Nuclide a string with the nuclide name. At the moment the options are:
     ///   Be10

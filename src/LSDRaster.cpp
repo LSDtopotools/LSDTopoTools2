@@ -9837,7 +9837,11 @@ LSDRaster LSDRaster::RasterTrimmerPadded(int padding_pixels)
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This is a raster trimmer that gets a rectangular DEM that doesn't have NoData
-// around the edges
+// around the edges.
+// That is, it finds the biggest possible raster from your data that is entirely
+// covered in data with no nodata nodes around the edge. 
+// This means that it will cut out valid data points if there are nodata
+// values sitting in the middle. 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 LSDRaster LSDRaster::RasterTrimmerSpiral()
 {
