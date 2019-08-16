@@ -51,7 +51,7 @@ int main(int nNumberofArgs, char *argv[])
   raster_selection.push_back(0);
   raster_selection.push_back(0);
 
-  int WindowSize = 9;
+  int WindowSize = 100;
 
   vector<LSDRaster> Surfaces = FilledDEM.calculate_polyfit_surface_metrics(WindowSize, raster_selection);
   LSDRaster Slope = Surfaces[1];
@@ -64,12 +64,15 @@ int main(int nNumberofArgs, char *argv[])
 
   //get the sources
   vector<int> sources;
-  sources = FlowInfo.get_sources_index_threshold(ContributingPixels, 103);
+  int drainage_threshold = 103;
+  sources = FlowInfo.get_sources_index_threshold(ContributingPixels, drainage_threshold);
 
   // now get the junction network
   LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
 
   int max_order = ChanNetwork.get_maximum_stream_order();
+
+  float datares = FilledDEM.get_DataResolution();
 
   if (max_order > 5){
 
@@ -87,17 +90,16 @@ int main(int nNumberofArgs, char *argv[])
 
       sub_basin.set_AspectMean(FlowInfo, Aspect);
       sub_basin.set_SlopeMean(FlowInfo, Slope);
-      sub_basin.set_DrainageDensity();
       float max_elev = sub_basin.CalculateBasinMax(FlowInfo, FilledDEM);
       float min_elev = sub_basin.CalculateBasinMin(FlowInfo, FilledDEM);
-      int n_heads = int(sub_basin_sources.size());
+      float unchan_area = int(sub_basin_sources.size()) * (drainage_threshold * (datares * datares));
 
       stringstream ss;
       ss << Outpath << "BasinData_" << DEMname << "_" << i << ".csv";
 
       ofstream basin_data_writer;
       basin_data_writer.open(ss.str().c_str());
-      basin_data_writer << n_heads << "," << sub_basin.get_SlopeMean() << "," << sub_basin.get_AspectMean() << "," << sub_basin.get_Area() << "," << sub_basin.get_DrainageDensity() << "," << max_elev << "," << min_elev << endl;
+      basin_data_writer << unchan_area << "," << sub_basin.get_SlopeMean() << "," << sub_basin.get_AspectMean() << "," << sub_basin.get_Area() << "," << max_elev << "," << min_elev << endl;
       basin_data_writer.close();
 
     }
