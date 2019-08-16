@@ -83,7 +83,7 @@ int main(int nNumberofArgs, char *argv[])
 
       LSDJunctionNetwork SubChanNetwork(sub_basin_sources, FlowInfo);
 
-      LSDBasin sub_basin = LSDBasin(FlowInfo, SubChanNetwork);
+      LSDBasin sub_basin = LSDBasin(basin_junctions[i], FlowInfo, SubChanNetwork);
 
       sub_basin.set_AspectMean(FlowInfo, Aspect);
       sub_basin.set_SlopeMean(FlowInfo, Slope);
