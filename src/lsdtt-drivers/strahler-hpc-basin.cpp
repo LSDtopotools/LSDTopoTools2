@@ -83,22 +83,22 @@ int main(int nNumberofArgs, char *argv[])
 
       LSDJunctionNetwork SubChanNetwork(sub_basin_sources, FlowInfo);
 
-      // LSDBasin sub_basin = LSDBasin(basin_junctions[i], FlowInfo, SubChanNetwork);
-      //
-      // sub_basin.set_AspectMean(FlowInfo, Aspect);
-      // sub_basin.set_SlopeMean(FlowInfo, Slope);
-      // sub_basin.set_DrainageDensity();
-      // float max_elev = sub_basin.CalculateBasinMax(FlowInfo, FilledDEM);
-      // float min_elev = sub_basin.CalculateBasinMin(FlowInfo, FilledDEM);
-      // int n_heads = int(sub_basin_sources.size());
-      //
-      // stringstream ss;
-      // ss << Outpath << "BasinData_" << DEMname << "_" << i << ".csv";
-      //
-      // ofstream basin_data_writer;
-      // basin_data_writer.open(ss.str().c_str());
-      // basin_data_writer << n_heads << "," << sub_basin.get_SlopeMean() << "," << sub_basin.get_AspectMean() << "," << sub_basin.get_Area() << "," << sub_basin.get_DrainageDensity() << "," << max_elev << "," << min_elev << endl;
-      // basin_data_writer.close();
+      LSDBasin sub_basin = LSDBasin(basin_junctions[i], FlowInfo, ChanNetwork);
+
+      sub_basin.set_AspectMean(FlowInfo, Aspect);
+      sub_basin.set_SlopeMean(FlowInfo, Slope);
+      sub_basin.set_DrainageDensity();
+      float max_elev = sub_basin.CalculateBasinMax(FlowInfo, FilledDEM);
+      float min_elev = sub_basin.CalculateBasinMin(FlowInfo, FilledDEM);
+      int n_heads = int(sub_basin_sources.size());
+
+      stringstream ss;
+      ss << Outpath << "BasinData_" << DEMname << "_" << i << ".csv";
+
+      ofstream basin_data_writer;
+      basin_data_writer.open(ss.str().c_str());
+      basin_data_writer << n_heads << "," << sub_basin.get_SlopeMean() << "," << sub_basin.get_AspectMean() << "," << sub_basin.get_Area() << "," << sub_basin.get_DrainageDensity() << "," << max_elev << "," << min_elev << endl;
+      basin_data_writer.close();
 
     }
 }
