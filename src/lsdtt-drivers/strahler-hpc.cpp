@@ -45,7 +45,7 @@ int main(int nNumberofArgs, char *argv[])
 
   //get the sources
   vector<int> sources;
-  sources = FlowInfo.get_sources_index_threshold(ContributingPixels, 3500);
+  sources = FlowInfo.get_sources_index_threshold(ContributingPixels, 103);
 
   // now get the junction network
   LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
