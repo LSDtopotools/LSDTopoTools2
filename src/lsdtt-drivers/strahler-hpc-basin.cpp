@@ -93,7 +93,7 @@ int main(int nNumberofArgs, char *argv[])
       int n_heads = int(sub_basin_sources.size());
 
       stringstream ss;
-      ss << outpath << "BasinData_" << DEMname << "_" << i << ".csv";
+      ss << Outpath << "BasinData_" << DEMname << "_" << i << ".csv";
 
       ofstream basin_data_writer;
       basin_data_writer.open(ss.str().c_str());
