@@ -183,6 +183,16 @@ class LSDJunctionNetwork
   /// @date 01/09/12
   vector<int> get_upslope_junctions(int junction_number_outlet);
 
+  // this returns all the upstream junction of a given order junction_number_outlet
+  /// @brief This returns all the upstream junction of a junction_number_outlet.
+  /// @param junction_number_outlet Integer of junction of interest.
+  /// @param stream order
+  /// @return integer vector containing all the junction numbers upslope
+  /// of the chosen junction.
+  /// @author FJC
+  /// @date 13/08/19
+  vector<int> get_upslope_junctions_by_order(int junction_number_outlet, int stream_order);
+
   /// @brief This finds all the junctions that are source junctions upslope of a
   ///  given junction
   /// @param junction_number_outlet The junction number of the outlet
@@ -1405,6 +1415,24 @@ vector<int> GetChannelHeadsChiMethodFromValleys(vector<int> ValleyNodes,
   int get_junction_of_nearest_channel_from_lat_long(double latitude, double longitude, LSDFlowInfo& FlowInfo, LSDCoordinateConverterLLandUTM Converter);
   int get_upstream_junction_from_lat_long(double latitude, double longitude, LSDFlowInfo& FlowInfo, LSDCoordinateConverterLLandUTM Converter);
 
+  /// @brief Function to snap input coordinates to the nearest channel node from latitude and longitude
+  /// @param X_coordinate in local coordinates
+  /// @param Y_coordinate in local coordinates
+  /// @param threshold_SO The threshold stream order
+  /// @param FlowInfo LSDFlowInfo object.
+  /// @return Returns the NodeIndex of the nearest channel node that has a stream order greater than the threshold stream order.
+  /// @author SMM
+  /// @date 01/08/19
+  int find_nearest_downslope_channel(float X_coordinate, float Y_coordinate, int threshold_SO, LSDFlowInfo& FlowInfo);
+
+  /// @brief Function to snap input coordinates to the nearest channel node from latitude and longitude
+  /// @param starting node: the node index of the starting node
+  /// @param threshold_SO The threshold stream order
+  /// @param FlowInfo LSDFlowInfo object.
+  /// @return Returns the NodeIndex of the nearest channel node that has a stream order greater than the threshold stream order.
+  /// @author SMM
+  /// @date 01/08/19
+  int find_nearest_downslope_channel(int starting_node, int threshold_SO, LSDFlowInfo& FlowInfo);
 
 	/// @brief Function to get info about the nearest channel node of a given node.
   /// @param StartingNode index of node of interest
@@ -1488,6 +1516,32 @@ vector<int> GetChannelHeadsChiMethodFromValleys(vector<int> ValleyNodes,
                 int search_radius_nodes, int threshold_stream_order,
                 LSDFlowInfo& FlowInfo, vector<int>& valid_cosmo_points,
                 vector<int>& snapped_node_indices, vector<int>& snapped_junction_indices);
+
+  /// @brief this function is a wrapper that takes a list of x and y locations,
+  ///  filters them to make sure they are in the data bounds,
+  ///  and then calculates the nearest channel node index
+  /// @detail Unlike the other version of this function, the code snaps to a node index
+  ///  rather than the nearest upslope junction.
+  /// @param x_locs the x locations of the points
+  /// @param y_locs the y locations of the points
+  /// @param search_radius_nodes the number of nodes around the point to search
+  ///  for a channel
+  /// @param threshold_stream_order the minimum stream order to which the point
+  ///  will snap
+  /// @param FlowInfo the LSDFlowInfo object
+  /// @param valid_cosmo_points a vector<int> of indices into the x and y vectors.
+  ///  for example if the only valid points were at x_loc[12] and x_loc[34] this
+  ///  would return a vector with two elements, 12 and 34. This vector is overwritten
+  ///  by this function
+  /// @param snapped_node_indices a vector containing the node indices of the
+  ///  points snapped to the nearest channel.
+  /// @author SMM
+  /// @date 01/08/2019
+  void snap_point_locations_to_nearest_channel_node_index(vector<float> x_locs,
+                vector<float> y_locs,
+                int search_radius_nodes, int threshold_stream_order,
+                LSDFlowInfo& FlowInfo, vector<int>& valid_cosmo_points,
+                vector<int>& snapped_node_indices);
 
   /// @brief This functions takes a junction number and then follwos the receiver
   /// junctions until it hits a baselevel junction.
@@ -1817,7 +1871,7 @@ void write_river_profiles_to_csv(vector<int>& BasinJunctions, LSDFlowInfo& FlowI
 /// @param csv_filename the output csv file name
 /// @author FJC
 /// @date 02/05/18
-void write_river_profiles_to_csv_all_tributaries(vector<int>& BasinJunctions, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& Elevation, string csv_filename);
+void write_river_profiles_to_csv_all_tributaries(vector<int>& BasinJunctions, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& Elevation, string csv_filename, int window_size);
 
 /// @brief function get the total length of channels upstream of a node
 /// @param this_node node of interest

@@ -309,7 +309,7 @@ int main (int nNumberofArgs,char *argv[])
       string csv_filename = OUT_DIR+DEM_ID+"_all_tribs";
       vector<int> BasinJunctions;
       BasinJunctions.push_back(this_int_map["junction_number"]);
-      JunctionNetwork.write_river_profiles_to_csv_all_tributaries(BasinJunctions, FlowInfo, DistanceFromOutlet, filled_topography, csv_filename);
+      JunctionNetwork.write_river_profiles_to_csv_all_tributaries(BasinJunctions, FlowInfo, DistanceFromOutlet, filled_topography, csv_filename, this_int_map["slope_window_size"]);
     }
   }
   if ( this_bool_map["select_basins_by_order"] )
@@ -320,14 +320,14 @@ int main (int nNumberofArgs,char *argv[])
     if( this_bool_map["print_spaghetti_profiles_to_csv"])
     {
       string csv_filename = OUT_DIR+OUT_ID+"_spaghetti_profiles.csv";
-      JunctionNetwork.write_river_profiles_to_csv(BasinJunctions, FlowInfo, DistanceFromOutlet, filled_topography, csv_filename);
+      JunctionNetwork.write_river_profiles_to_csv(BasinJunctions, FlowInfo, DistanceFromOutlet, filled_topography, csv_filename, this_int_map["slope_window_size"]);
     }
 
     // print profiles for all tributaries for each third order basin
     if( this_bool_map["print_all_tributaries_to_csv"])
     {
       string csv_filename = OUT_DIR+OUT_ID+"_all_tribs";
-      JunctionNetwork.write_river_profiles_to_csv_all_tributaries(BasinJunctions, FlowInfo, DistanceFromOutlet, filled_topography, csv_filename);
+      JunctionNetwork.write_river_profiles_to_csv_all_tributaries(BasinJunctions, FlowInfo, DistanceFromOutlet, filled_topography, csv_filename, this_int_map["slope_window_size"]);
     }
 
     // print profiles for all tributaries for each third order basin
@@ -354,7 +354,7 @@ int main (int nNumberofArgs,char *argv[])
     if( this_bool_map["print_all_tributaries_to_csv"])
     {
       string csv_filename = OUT_DIR+OUT_ID+"_all_tribs";
-      JunctionNetwork.write_river_profiles_to_csv_all_tributaries(BasinJunctions, FlowInfo, DistanceFromOutlet, filled_topography, csv_filename);
+      JunctionNetwork.write_river_profiles_to_csv_all_tributaries(BasinJunctions, FlowInfo, DistanceFromOutlet, filled_topography, csv_filename, this_int_map["slope_window_size"]);
     }
   }
 

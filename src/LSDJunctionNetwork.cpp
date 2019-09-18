@@ -941,6 +941,43 @@ vector<int> LSDJunctionNetwork::get_upslope_junctions(int junction_number_outlet
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//
+// This function returns a integer vector containing all the junction numbers upslope
+// of of the junction with number junction_number_outlet of a specified order
+//
+// FJC 13/08/19
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+vector<int> LSDJunctionNetwork::get_upslope_junctions_by_order(int junction_number_outlet, int stream_order)
+{
+  vector<int> us_junctions;
+
+  if(junction_number_outlet < 0 || junction_number_outlet > NJunctions-1)
+  {
+    cout << "Tried LSDJunctionNetwork::get_upslope_junctions but the"
+         << "  junction number does not exist" << endl;
+    exit(0);
+  }
+
+  int start_SVector_junction = SVectorIndex[junction_number_outlet];
+  int end_SVector_junction = start_SVector_junction+NContributingJunctions[junction_number_outlet];
+
+  for(int junction = start_SVector_junction; junction < end_SVector_junction; junction++)
+  {
+    int this_jn = SVector[junction];
+    int this_SO = get_StreamOrder_of_Junction(this_jn);
+    if (this_SO == stream_order)
+    {
+      us_junctions.push_back(SVector[junction]);
+    }
+  }
+
+  return us_junctions;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This function takes a junction and finds all the source junction upstream of the
 // junction.
@@ -7115,8 +7152,8 @@ int LSDJunctionNetwork::get_nodeindex_of_nearest_channel_for_specified_coordinat
   int largest_SO_row, largest_SO_col;
 
   // Shift origin to that of dataset
-  float X_coordinate_shifted_origin = X_coordinate - XMinimum;
-  float Y_coordinate_shifted_origin = Y_coordinate - YMinimum;
+  float X_coordinate_shifted_origin = X_coordinate - XMinimum - DataResolution*0.5;
+  float Y_coordinate_shifted_origin = Y_coordinate - YMinimum - DataResolution*0.5;
 
   // Get row and column of point
   int col_point = int(X_coordinate_shifted_origin/DataResolution);
@@ -7218,6 +7255,81 @@ int LSDJunctionNetwork::get_nodeindex_of_nearest_channel_for_specified_coordinat
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
+// This function just flows downslope until it finds a channel of stream order greater
+// than the threshold stream order
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+int LSDJunctionNetwork::find_nearest_downslope_channel(float X_coordinate, float Y_coordinate, int threshold_SO, LSDFlowInfo& FlowInfo)
+{
+  // Shift origin to that of dataset
+  float X_coordinate_shifted_origin = X_coordinate - XMinimum - DataResolution*0.5;
+  float Y_coordinate_shifted_origin = Y_coordinate - YMinimum - DataResolution*0.5;
+
+  // Get row and column of point
+  int col_point = int(X_coordinate_shifted_origin/DataResolution);
+  int row_point = (NRows - 1) - int(round(Y_coordinate_shifted_origin/DataResolution));
+  int CurrentNode = FlowInfo.NodeIndex[row_point][col_point];
+  int channel_node = find_nearest_downslope_channel(CurrentNode,threshold_SO, FlowInfo);
+  return channel_node;
+
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This function just flows downslope until it finds a channel of stream order greater
+// than the threshold stream order
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+int LSDJunctionNetwork::find_nearest_downslope_channel(int StartingNode, int threshold_SO, LSDFlowInfo& FlowInfo)
+{
+	int ChannelNode = -9999;
+  int row, col;
+	int CurrentNode = StartingNode;
+	int BaseLevel = FlowInfo.is_node_base_level(CurrentNode);
+	FlowInfo.retrieve_current_row_and_col(StartingNode, row, col);
+	//check if you are already at a channel
+	if (StreamOrderArray[row][col] != NoDataValue && StreamOrderArray[row][col] >= threshold_SO
+	&& BaseLevel == 0)
+	{
+		ChannelNode = FlowInfo.NodeIndex[row][col];
+	}
+	//if not at a channel, move downstream
+	else
+	{
+		bool ReachedChannel = false;
+		while (ReachedChannel == false)
+		{
+			//get receiver information
+			int ReceiverNode, ReceiverRow, ReceiverCol;
+			FlowInfo.retrieve_receiver_information(CurrentNode, ReceiverNode, ReceiverRow, ReceiverCol);
+			//if node is at baselevel then exit
+			if (CurrentNode == ReceiverNode)
+			{
+				ChannelNode = FlowInfo.NodeIndex[ReceiverRow][ReceiverCol];
+				ReachedChannel = true;
+				//cout << "You reached a baselevel node, returning baselevel" << endl;
+			}
+			//if receiver is a channel > threshold then get the stream order
+			if (StreamOrderArray[ReceiverRow][ReceiverCol] != NoDataValue &&
+			StreamOrderArray[ReceiverRow][ReceiverCol] >= threshold_SO)
+			{
+				ChannelNode = FlowInfo.NodeIndex[ReceiverRow][ReceiverCol];
+				ReachedChannel = true;
+			}
+			else
+			{
+				//move downstream
+				CurrentNode = ReceiverNode;
+			}
+		}
+	}
+  return ChannelNode;
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
 // This function returns information on the nearest channel pixel to a node
 //
 // FJC 08/09/16
@@ -7276,8 +7388,9 @@ void LSDJunctionNetwork::get_info_nearest_channel_to_node(int& StartingNode, int
 			}
 		}
 	}
-
 }
+
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -7556,15 +7669,15 @@ void LSDJunctionNetwork::snap_point_locations_to_channels(vector<float> x_locs,
 
     if(is_in_raster)
     {
-      cout << "JN 4307 This point is in the raster!" << endl;
+      cout << "Snapping: This point is in the raster!" << endl;
       this_chan_node = get_nodeindex_of_nearest_channel_for_specified_coordinates(x_loc, y_loc,
                        search_radius_nodes, threshold_stream_order,
                        FlowInfo);
-      cout << "JN 431 Got channel!, channel node is: " << this_chan_node << endl;
+      cout << "Snapping: Got channel!, channel node is: " << this_chan_node << endl;
       if(this_chan_node != NoDataValue)
       {
         this_junc = find_upstream_junction_from_channel_nodeindex(this_chan_node, FlowInfo);
-        cout << "JN line 4314, got_this_junc!" << endl;
+        cout << "Snapping, got_this_junc with the node index " << this_chan_node <<  endl;
         snapped_node_indices.push_back(this_chan_node);
         snapped_junction_indices.push_back(this_junc);
         valid_cosmo_points.push_back(samp);
@@ -7589,6 +7702,94 @@ void LSDJunctionNetwork::snap_point_locations_to_channels(vector<float> x_locs,
   }
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This function takes a CRN file and returns the node index
+// of the nearest channels.
+// It does not move to nearest junction index
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDJunctionNetwork::snap_point_locations_to_nearest_channel_node_index(vector<float> x_locs,
+                vector<float> y_locs,
+                int search_radius_nodes, int threshold_stream_order,
+                LSDFlowInfo& FlowInfo, vector<int>& valid_cosmo_points,
+                vector<int>& snapped_node_indices)
+{
+  // First reset the vectors that will be copied
+  vector<int> empty_vec;
+  valid_cosmo_points = empty_vec;
+  snapped_node_indices = empty_vec;
+
+  vector<int> reciever_junc;
+  int this_junc, this_chan_node;
+
+  float x_loc,y_loc;
+
+  //cout << "JN LINE 4287, XMinimum is: " << XMinimum << " YMinimum is: "
+  //     << YMinimum << endl;
+
+  // now loop through cosmo points recording the junctions
+  int n_cosmo_points = int(x_locs.size());
+  for (int samp = 0; samp<n_cosmo_points; samp++)
+  //for (int samp = 0; samp<1; samp++)
+  {
+    x_loc = x_locs[samp];
+    y_loc = y_locs[samp];
+
+    cout << "Snapping to nearest channel node index. x_loc: " << x_loc << " y_loc: " << y_loc << endl;
+
+    // check to see if the node is in the raster
+    bool is_in_raster = FlowInfo.check_if_point_is_in_raster(x_loc,y_loc);
+
+    // check that the point is not nodata and set is_in_raster to false if it is
+    int tmpNode = FlowInfo.get_node_index_of_coordinate_point(x_loc,y_loc);
+    int tmpRow;
+    int tmpCol;
+    //cout << "Node Index: " << tmpNode << endl;
+    if (tmpNode != NoDataValue)
+    {
+
+      FlowInfo.retrieve_current_row_and_col(tmpNode, tmpRow, tmpCol);
+
+      if (FlowInfo.get_LocalFlowDirection(tmpRow, tmpCol) == NoDataValue){
+        is_in_raster = false;
+      }
+    }
+    else { is_in_raster = false; }
+
+    if(is_in_raster)
+    {
+      cout << "Snapping: This point is in the raster!" << endl;
+      this_chan_node = find_nearest_downslope_channel(x_loc, y_loc,threshold_stream_order,FlowInfo);
+      cout << "Snapping: Got channel!, channel node is: " << this_chan_node << endl;
+      if(this_chan_node != NoDataValue)
+      {
+        cout << "Snapping, got the node index!" << endl;
+        snapped_node_indices.push_back(this_chan_node);
+        valid_cosmo_points.push_back(samp);
+      }
+      else
+      {
+        cout << endl << "+++" << endl;
+        cout << "WARNING LSDJunctionNetwork::snap_point_locations_to_channels." << endl;
+        cout << "This node is in the DEM but I have not found a nearby channel." << endl;
+        cout << "+++" << endl << endl;
+      }
+
+      //cout << "channel node index is: " << this_chan_node << " and receiver_junc is: "
+      //     << this_junc << endl;
+    }
+    else
+    {
+      cout << "WARNING LSDJunctionNetwork::snap_point_locations_to_channels." << endl;
+      cout << "This point at location: " << x_loc << " " << y_loc << endl
+           << "does not seem to be in the raster, or is in a NoData region." << endl;
+    }
+  }
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
@@ -8598,7 +8799,7 @@ void LSDJunctionNetwork::write_river_profiles_to_csv(vector<int>& BasinJunctions
 // all the tributaries to a csv
 // FJC 06/05/18
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDJunctionNetwork::write_river_profiles_to_csv_all_tributaries(vector<int>& BasinJunctions, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& Elevation, string csv_filename)
+void LSDJunctionNetwork::write_river_profiles_to_csv_all_tributaries(vector<int>& BasinJunctions, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& Elevation, string csv_filename, int window_size)
 {
   int this_node, row, col, stream_order;
   double latitude, longitude;
@@ -8610,7 +8811,7 @@ void LSDJunctionNetwork::write_river_profiles_to_csv_all_tributaries(vector<int>
   string this_fname = csv_filename+".csv";
   chan_out.open(this_fname.c_str());
 
-  chan_out << "basin_id,id,node,distance_from_outlet,elevation,drainage_area,stream_order,latitude,longitude" << endl;
+  chan_out << "basin_id,id,node,distance_from_outlet,elevation,drainage_area,stream_order,slope,latitude,longitude" << endl;
 
   // for each basin, get the profile
   for (int i = 0; i < int(BasinJunctions.size()); i++)
@@ -8637,7 +8838,15 @@ void LSDJunctionNetwork::write_river_profiles_to_csv_all_tributaries(vector<int>
 
       LSDIndexChannel ThisChannel(SourceJunctions[j], SourceNodes[j], BasinJunctions[i], outlet_node, FlowInfo);
       vector<int> NodeSequence = ThisChannel.get_NodeSequence();
+      int UpstreamNode = NodeSequence.front();
       int DownstreamNode = NodeSequence.back();
+
+      // make an LSDChannel object. this is the same as the index channel but has elevation data, etc.
+      float downslope_chi=1;
+      float m_over_n=0.5;
+      LSDChannel ThisChan(UpstreamNode, DownstreamNode, downslope_chi, m_over_n, downslope_chi, FlowInfo, Elevation);
+      // get channel slopes from LSDChannel
+      vector<float> channel_slopes = ThisChan.calculate_channel_slopes(window_size, DistanceFromOutlet);
       for (int n = 0; n < int(NodeSequence.size()); n++)
       {
         this_node = NodeSequence[n];
@@ -8653,7 +8862,8 @@ void LSDJunctionNetwork::write_river_profiles_to_csv_all_tributaries(vector<int>
                  << dist_from_outlet << ","
                  << Elevation.get_data_element(row,col) << ","
                  << drainage_area << ","
-                 << stream_order << ",";
+                 << stream_order << ","
+                 << channel_slopes[n] << ",";
         chan_out.precision(9);
         chan_out << latitude << "," << longitude << endl;
       }
