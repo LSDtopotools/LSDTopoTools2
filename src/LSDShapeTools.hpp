@@ -822,12 +822,6 @@ class LSDCoordinateConverter
     /// @date 23/01/2019
     pair<double,double> UTM_inverse(pair<double,double> Easting_Northing);
 
-    /// @brief A forward conversion from lat long to british national grid system
-    /// @param Lat_Long a pair containing the latitude and longitude
-    /// @return a pair containing the false easting and false northing in local coordinates
-    /// @author SMM 
-    /// @date 21/01/2019
-    pair<double,double> BNG_forward(pair<double,double> Lat_Long);
 
                
 

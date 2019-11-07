@@ -61,6 +61,7 @@
 #include "../LSDShapeTools.hpp"
 #include "../LSDRasterSpectral.hpp"
 #include "../LSDChiTools.hpp"
+#include "../LSDBasin.hpp"
 
 int main (int nNumberofArgs,char *argv[])
 {
@@ -110,6 +111,12 @@ int main (int nNumberofArgs,char *argv[])
   string_default_map["CHeads_file"] = "NULL";
   bool_default_map["only_check_parameters"] = false;
   
+  // Various ways of trimming your raster
+  bool_default_map["remove_nodes_influenced_by_edge"] = false;
+  bool_default_map["isolate_pixels_draining_to_fixed_channel"] = false;
+  string_default_map["fixed_channel_csv_name"] = "single_channel_nodes"; 
+
+  
   // raster trimming, to take care of rasters that have a bunch of nodata at the edges
   bool_default_map["print_trimmed_raster"] = false;
   int_default_map["trimming_buffer_pixels"] = 0;
@@ -134,6 +141,7 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["print_tangential_curvature"]= false;
   bool_default_map["print_point_classification"]= false;
   bool_default_map["print_directional_gradients"] = false;
+  bool_default_map["calculate_basin_statistics"] = false;
 
   // Window size estimation
   bool_default_map["calculate_window_size"] = false;
@@ -154,6 +162,12 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["print_QuinnMD_drainage_area_raster"] = false;
   bool_default_map["print_FreemanMD_drainage_area_raster"] = false;
   bool_default_map["print_MD_drainage_area_raster"] = false;
+
+
+  // Extracting a single channel
+  bool_default_map["extract_single_channel"] = false;
+  bool_default_map["use_dinf_for_single_channel"] = false;
+  string_default_map["channel_source_fname"] = "singe_channel_source";
 
 
   // Basic channel network
@@ -403,11 +417,13 @@ int main (int nNumberofArgs,char *argv[])
     doing_polyfit = true;
   }
   
-  
+  // We place the surface fitting vector outside because we will need this information
+  // later for the basin statistics. 
+  vector<LSDRaster> surface_fitting;
   if (doing_polyfit)
   {
     cout << "I am running the polyfit function. This could take some time." << endl;
-    vector<LSDRaster> surface_fitting; 
+     
     surface_fitting = topography_raster.calculate_polyfit_surface_metrics_directional_gradients(this_float_map["surface_fitting_radius"], raster_selection);
     if(this_bool_map["print_smoothed_elevation"])
     {
@@ -607,7 +623,11 @@ int main (int nNumberofArgs,char *argv[])
         || this_bool_map["print_junctions_to_csv"]
         || this_bool_map["find_basins"]
         || this_bool_map["print_chi_data_maps"]
-        || this_bool_map["print_junction_angles_to_csv"])
+        || this_bool_map["print_junction_angles_to_csv"]
+        || this_bool_map["extract_single_channel"]
+        || this_bool_map["remove_nodes_influenced_by_edge"]
+        || this_bool_map["isolate_pixels_draining_to_fixed_channel"]
+        || this_bool_map["calculate_basin_statistics"])
   {
     cout << "I will need to compute flow information, because you are getting drainage area or channel networks." << endl;
     //==========================================================================
@@ -648,6 +668,30 @@ int main (int nNumberofArgs,char *argv[])
     // get a flow info object
     LSDFlowInfo FlowInfo(boundary_conditions,filled_topography);
     cout << "Finished flow routing." << endl;
+
+    if (this_bool_map["remove_nodes_influenced_by_edge"])
+    {
+      cout << "I am going to print a raster that has nodata for all nodes influenced by the edge or nodata" << endl;
+      LSDRaster NodesRemovedRaster = FlowInfo.remove_nodes_influneced_by_edge(filled_topography);
+      string remove_raster_name = OUT_DIR+OUT_ID+"_NoEdge";
+      NodesRemovedRaster.write_raster(remove_raster_name,raster_ext);
+    }
+
+    if(this_bool_map["isolate_pixels_draining_to_fixed_channel"])
+    {
+      // first read the 
+      // Get the latitude and longitude
+      cout << "I am reading points from the file: "+ this_string_map["fixed_channel_csv_name"] << endl;
+      LSDSpatialCSVReader source_points_data( RI, (DATA_DIR+this_string_map["fixed_channel_csv_name"]) );
+
+      vector<int> nodes_from_channel = source_points_data.get_nodeindex_vector();
+
+      // Now run the flowinfo routine
+      LSDRaster NodesRemovedRaster = FlowInfo.find_nodes_not_influenced_by_edge_draining_to_nodelist(nodes_from_channel,filled_topography);
+      string remove_raster_name = OUT_DIR+OUT_ID+"_IsolateFixedChannel";
+      NodesRemovedRaster.write_raster(remove_raster_name,raster_ext);
+        
+    }
 
     //=================================================================
     // Now, if you want, calculate drainage areas
@@ -701,7 +745,8 @@ int main (int nNumberofArgs,char *argv[])
     LSDRaster FD;
     if(this_bool_map["print_distance_from_outlet"] ||
        this_bool_map["find_basins"] ||
-       this_bool_map["print_chi_data_maps"])
+       this_bool_map["print_chi_data_maps"] ||
+       this_bool_map["extract_single_channel"])
     {
       cout << "I need to calculate the flow distance now." << endl;
       FD = FlowInfo.distance_from_outlet();
@@ -713,6 +758,57 @@ int main (int nNumberofArgs,char *argv[])
         FD.write_raster(FD_raster_name,raster_ext);
       }
     }
+
+    // Logic for printing single channel
+    if (this_bool_map["extract_single_channel"])
+    {
+      // Get the latitude and longitude
+      
+      LSDRaster DA;
+      if (this_bool_map["use_dinf_for_single_channel"])
+      {
+        LSDRaster DA1 = filled_topography.D_inf();
+        DA = DA1.D_inf_ConvertFlowToArea();
+      }
+      else
+      {
+        DA = FlowInfo.write_DrainageArea_to_LSDRaster();  
+      }
+
+      cout << "I am reading points from the file: "+ this_string_map["channel_source_fname"] << endl;
+      LSDSpatialCSVReader source_points_data( RI, (DATA_DIR+this_string_map["channel_source_fname"]) );
+      
+      // Get the local coordinates
+      vector<float> fUTM_easting,fUTM_northing;
+      source_points_data.get_x_and_y_from_latlong(fUTM_easting,fUTM_northing);
+      float X,Y;
+
+      if ( int(fUTM_easting.size()) != 0)
+      {
+        
+        
+        X = fUTM_easting[0];
+        Y = fUTM_northing[0];
+
+        cout << "Looking for the single source. " << endl;
+        cout << "Easting is is: " << X << " and northing is: " << Y << endl;
+
+
+        vector<int> node_list = FlowInfo.get_flow_path(X,Y);
+
+        cout << "Your node list has " << node_list.size() << "nodes" << endl;
+
+        string fname = "single_channel";
+        FlowInfo.print_vector_of_nodeindices_to_csv_file_with_latlong(node_list,DATA_DIR, fname, 
+                                                      filled_topography, FD, DA);
+
+      }
+      else
+      { 
+        cout << "You are trying to make a channel but I cannot find the source." << endl;
+      }
+    }
+
 
     // This is the logic for a simple stream network
     if (this_bool_map["print_channels_to_csv"]
@@ -820,7 +916,8 @@ int main (int nNumberofArgs,char *argv[])
       
       // Now we check if we are going to deal with basins
       if(this_bool_map["find_basins"] ||
-         this_bool_map["print_chi_data_maps"])
+         this_bool_map["print_chi_data_maps"] ||
+         this_bool_map["calculate_basin_statistics"] )
       {
         cout << "I am now going to extract some basins for you." << endl;
         vector<int> BaseLevelJunctions;
@@ -901,9 +998,9 @@ int main (int nNumberofArgs,char *argv[])
             cout << BaseLevelJunctions[i] << endl;
           }
           
-        }    // end logic for reading from juncitons list
+        }    // end logic for reading from junctions list
         
-        // Now check for larges basin, if that is what you want.
+        // Now check for largest basin, if that is what you want.
         if (this_bool_map["only_take_largest_basin"])
         {
           cout << "I am only going to take the largest basin." << endl;
@@ -926,7 +1023,63 @@ int main (int nNumberofArgs,char *argv[])
             cout << BaseLevelJunctions[i] << ", ";  
           }
           cout << endl;
-        }          
+        }
+
+        // Now for the logic for basin statistics.
+        if(this_bool_map["calculate_basin_statistics"])
+        {
+          cout << "Hello there, I am getting some basin statistics." << endl;
+
+          string basin_details_fname = OUT_DIR+OUT_ID+"_basin_details.csv";
+          ofstream bd_out;
+          bd_out.open(basin_details_fname.c_str());
+          bd_out << "id,junction_number";
+
+          if(this_bool_map["print_slope"])
+          {
+            bd_out << ",slope_max,slope_84,slope_median,slope_16,slope_min";
+          }
+          if(this_bool_map["print_curvature"])
+          {
+            bd_out << ",curv_max,curv_84,curv_median,curv_16,curv_min";
+          }
+          bd_out << endl;
+
+
+          int N_BL = int(BaseLevelJunctions.size());
+          for(int bsn = 0; bsn < N_BL; bsn++)
+          {
+            cout << "Processing basin " << bsn << " of " << N_BL << endl;
+            LSDBasin ThisBasin(BaseLevelJunctions[bsn], FlowInfo, JunctionNetwork);
+
+            bd_out << bsn << "," << BaseLevelJunctions[bsn];
+
+            if(this_bool_map["print_slope"])
+            {
+              float slope_max,slope_84,slope_median,slope_16,slope_min;
+              slope_max = ThisBasin.CalculateBasinMax(FlowInfo, surface_fitting[1]);
+              slope_84 = ThisBasin.CalculateBasinPercentile(FlowInfo, surface_fitting[1], 84);
+              slope_median =  ThisBasin.CalculateBasinMedian(FlowInfo, surface_fitting[1]);
+              slope_16 = ThisBasin.CalculateBasinPercentile(FlowInfo, surface_fitting[1], 16);
+              slope_min = ThisBasin.CalculateBasinMin(FlowInfo, surface_fitting[1]);
+              bd_out << "," << slope_max << "," << slope_84 << "," << slope_median << "," << slope_16 << "," << slope_min;
+            }
+
+            if(this_bool_map["print_curvature"])
+            {
+              float curv_max,curv_84,curv_median,curv_16,curv_min;
+              curv_max = ThisBasin.CalculateBasinMax(FlowInfo, surface_fitting[3]);
+              curv_84 = ThisBasin.CalculateBasinPercentile(FlowInfo, surface_fitting[3], 84);
+              curv_median =  ThisBasin.CalculateBasinMedian(FlowInfo, surface_fitting[3]);
+              curv_16 = ThisBasin.CalculateBasinPercentile(FlowInfo, surface_fitting[3], 16);
+              curv_min = ThisBasin.CalculateBasinMin(FlowInfo, surface_fitting[3]);
+              bd_out << "," << curv_max << "," << curv_84 << "," << curv_median << "," << curv_16 << "," << curv_min;
+            }
+            bd_out << endl;
+
+          }
+        }
+
 
         // Now we get the channel segments. This information is used for plotting
         vector<int> source_nodes;

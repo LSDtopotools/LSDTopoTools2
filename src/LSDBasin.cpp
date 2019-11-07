@@ -1399,7 +1399,7 @@ LSDRaster LSDBasin::write_real_data_to_LSDRaster(float Param, LSDFlowInfo FlowIn
 // Cookie cut data from an LSDRaster into the shape of the basin.
 // SWDG 12/12/13
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-LSDRaster LSDBasin::write_raster_data_to_LSDRaster(LSDRaster Data, LSDFlowInfo FlowInfo)
+LSDRaster LSDBasin::write_raster_data_to_LSDRaster(LSDRaster& Data, LSDFlowInfo& FlowInfo)
 {
 
   int i;

@@ -521,7 +521,7 @@ class LSDBasin
   /// @return LSDRaster of the data in the shape of the basin.
   /// @author SWDG
   /// @date 12/12/13
-  LSDRaster write_raster_data_to_LSDRaster(LSDRaster Data, LSDFlowInfo FlowInfo);
+  LSDRaster write_raster_data_to_LSDRaster(LSDRaster& Data, LSDFlowInfo& FlowInfo);
 
   /// @brief check whether a test node is in the basin or not
   /// @param test_node node to test

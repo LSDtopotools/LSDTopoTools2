@@ -342,7 +342,7 @@ class LSDJunctionNetwork
   /// @date 01/09/12
   LSDIndexRaster StreamOrderArray_to_LSDIndexRaster();
 
-  /// @brief Method to flatten an te stream order array and place the non NDV values in a csv file.
+  /// @brief Method to flatten a stream order array and place the non NDV values in a csv file.
   /// @detail Each value is placed on its own line, so that it can be read more quickly in python etc.
   ///   It includes the lat long coordinates in CSV, in WGS84 coordinate system EPSG:4326
   /// @param FileName_prefix The prefix of the file to write, if no path is included it will write to the current directory.
@@ -1871,7 +1871,7 @@ void write_river_profiles_to_csv(vector<int>& BasinJunctions, LSDFlowInfo& FlowI
 /// @param csv_filename the output csv file name
 /// @author FJC
 /// @date 02/05/18
-void write_river_profiles_to_csv_all_tributaries(vector<int>& BasinJunctions, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& Elevation, string csv_filename, int window_size);
+void write_river_profiles_to_csv_all_tributaries(vector<int>& BasinJunctions, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& Elevation, string csv_filename);
 
 /// @brief function get the total length of channels upstream of a node
 /// @param this_node node of interest

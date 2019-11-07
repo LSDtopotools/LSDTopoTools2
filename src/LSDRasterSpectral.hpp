@@ -113,6 +113,23 @@ public:
         float cellsize, float ndv, Array2D<float> data)
   { create(nrows, ncols, xmin, ymin, cellsize, ndv, data); }
 
+  /// @brief Create an LSDRasterSpectral from memory.
+  /// @return LSDRasterSpectral
+  /// @param nrows An integer of the number of rows.
+  /// @param ncols An integer of the number of columns.
+  /// @param xmin A float of the minimum X coordinate.
+  /// @param ymin A float of the minimum Y coordinate.
+  /// @param cellsize A float of the cellsize.
+  /// @param ndv An integer of the no data value.
+  /// @param data An Array2D of floats in the shape nrows*ncols,
+  /// containing the data to be written.
+  /// @author SMM
+  /// @date 18/12/2012
+  LSDRasterSpectral(int nrows, int ncols, float xmin, float ymin,
+        float cellsize, float ndv, Array2D<float> data, map<string,string> GRS)
+  { create(nrows, ncols, xmin, ymin, cellsize, ndv, data, GRS); }
+
+
   /// @brief Create an LSDRasterSpectral from an LSDRaster object.
   /// @param An_LSDRaster LSDRaster object.
   /// @return LSDRasterSpectral.

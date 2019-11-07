@@ -78,6 +78,7 @@ void LSDRasterMaker::create(int NRows, int NCols)
 // this creates a LSDRasterModel raster from another LSDRaster
 void LSDRasterMaker::create(LSDRaster& An_LSDRaster)
 {
+  cout << "Lets get some info!" << endl;
   NRows = An_LSDRaster.get_NRows();
   NCols = An_LSDRaster.get_NCols();
   XMinimum = An_LSDRaster.get_XMinimum();
@@ -320,6 +321,28 @@ void LSDRasterMaker::smooth(int boundary_type)
 
   RasterData = new_data.copy();
 
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Some functions for making random values in the rasters
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterMaker::random_values(float minimum_value, float maximum_value)
+{
+  long seed = time(NULL);
+
+  for(int row = 0; row<NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      if (RasterData[row][col] != NoDataValue)
+      {
+        RasterData[row][col] = ran3(&seed);  
+      }
+    }
+  }
+
+  // Now scale to min and max
+  scale_to_new_minimum_and_maximum_value(minimum_value, minimum_value);
 }
 
 

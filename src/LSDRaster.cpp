@@ -257,6 +257,35 @@ void LSDRaster::create(int nrows, int ncols, float xmin, float ymin,
     exit(EXIT_FAILURE);
   }
 }
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Creates an LSDRaster from an LSDIndexRaster
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRaster::create(LSDIndexRaster& IntLSDRaster)
+{
+  NRows = IntLSDRaster.get_NRows();
+  NCols = IntLSDRaster.get_NCols();
+  XMinimum = IntLSDRaster.get_XMinimum();
+  YMinimum = IntLSDRaster.get_YMinimum();
+  DataResolution = IntLSDRaster.get_DataResolution();
+  NoDataValue = IntLSDRaster.get_NoDataValue();
+  GeoReferencingStrings = IntLSDRaster.get_GeoReferencingStrings();
+  Array2D<int> RasterDataInt = IntLSDRaster.get_RasterData();
+  vector<int> list_unique_values;
+
+  //Declarations
+  Array2D<int> RasterDataFloat(NRows,NCols,NoDataValue);
+
+  for (int i=0; i<NRows; ++i)
+  {
+    for (int j=0; j<NCols; ++j)
+    {
+      RasterDataFloat[i][j] = float(RasterDataInt[i][j]);
+    }
+  }
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 
@@ -14065,8 +14094,8 @@ LSDRaster LSDRaster::Breaching_Lindsay2016()
   Array2D<uint8_t> visited(NRows,NCols);
   Array2D<uint8_t> pits(NRows,NCols);
   // cout << "1" << endl;
-  for(size_t i=0;i<NRows;i++)
-  for(size_t j=0;j<NCols;j++)
+  for(int i=0;i<NRows;i++)
+  for(int j=0;j<NCols;j++)
   {
     visited[i][j] = 0;
     pits[i][j] = 0;
@@ -14115,8 +14144,8 @@ LSDRaster LSDRaster::Breaching_Lindsay2016()
       if(n==0 && n2==0)
         continue;
 
-      const int nx = x+n;
-      const int ny = y+n2;
+      //const int nx = x+n;
+      //const int ny = y+n2;
       
       //No need for an inGrid check here because edge cells are filtered above
       // TOCHECK -> BG
@@ -14167,7 +14196,8 @@ LSDRaster LSDRaster::Breaching_Lindsay2016()
       //Trace path back to a cell low enough for the path to drain into it, or
       //to an edge of the DEM
       size_t ti = c.RowIndex, tj = c.ColIndex;
-      while(cc!=NO_BACK_LINK && tRasterData[ti][tj]>=target_height){
+      while(cc!=int(NO_BACK_LINK) && tRasterData[ti][tj]>=target_height)
+      {
 
         tRasterData[ti][tj] = target_height;
         cc      = backlinks[ti][tj]; //Follow path back

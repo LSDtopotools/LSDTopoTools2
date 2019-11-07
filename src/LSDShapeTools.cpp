@@ -2895,11 +2895,7 @@ pair<double,double> LSDCoordinateConverter::UTM_inverse(pair<double,double> East
   return Lat_Long;  
 }
 
-// This does a british national grid forward conversion. 
-pair<double,double> LSDCoordinateConverter::BNG_forward(pair<double,double> Lat_Long)
-{
-  cout << "I need some computation here." << endl;
-}
+
 
 
 #endif

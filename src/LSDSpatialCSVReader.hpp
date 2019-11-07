@@ -207,7 +207,11 @@ class LSDSpatialCSVReader
                                     vector<string>& data_vector);
 
 
-
+    /// @brief Checks if a column is in the data map
+    /// @param column_name a string column name to check
+    /// @author SMM
+    /// @date 03/10/2019
+    bool is_column_in_csv(string column_name);
 
     /// @brief This gets a data column from the csv file
     /// @param column_name a string that holds the column name
@@ -264,10 +268,25 @@ class LSDSpatialCSVReader
     void get_nodeindices_from_x_and_y_coords(LSDFlowInfo& FlowInfo, vector<float>& X_coords, vector<float>& Y_coords, vector<int>& NodeIndices);
 
     /// @brief Function to get vector of node indices from the csv file
-    /// @param: FlowInfo LSDFlowInfo object
-    /// @author: FJC
-    /// @date: 28/09/18
+    /// @param FlowInfo LSDFlowInfo object
+    /// @author FJC
+    /// @date 28/09/18
     vector<int> get_nodeindices_from_lat_long(LSDFlowInfo& FlowInfo);
+
+    /// @brief Function to extract the nodeindex
+    ///  The nodeindex needs to be in the object, will take "node", "id", and "nodeindex" as columns
+    /// @author SMM
+    /// @return A vectoe of the nodeindices
+    /// @date 08/10/2019
+    vector<int> get_nodeindex_vector();
+
+    /// @brief Function to create a map with nodeindex as the key
+    ///  The nodeindex needs to be in the object
+    /// @param column name
+    /// @author SMM
+    /// @date 03/10/2019
+    map<int,float> get_nodeindex_map_float(string column_name);
+
 
     /// @brief This selects specified data and crease a new csv object with just that data
     /// @param selection_column The name of the column from which the data will be selected
@@ -316,6 +335,8 @@ class LSDSpatialCSVReader
     /// Gets the various data members
     vector<double> get_latitude() const {return latitude;}
     vector<double> get_longitude() const {return longitude;}
+
+
 
 
   protected:

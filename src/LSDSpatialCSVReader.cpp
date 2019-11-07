@@ -406,6 +406,26 @@ bool LSDSpatialCSVReader::check_if_all_data_columns_same_length()
 }
 //==============================================================================
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// Checks if a column is in the csv
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+bool LSDSpatialCSVReader::is_column_in_csv(string column_name)
+{
+  bool is_in_csv = false;
+  if ( data_map.find(column_name) == data_map.end() )
+  {
+    // not found
+    cout << "I'm afraid the column "<< column_name << " is not in this dataset" << endl;
+  }
+  else
+  {
+    is_in_csv = true;
+  }
+  return  is_in_csv;
+}
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
@@ -951,6 +971,148 @@ vector<int> LSDSpatialCSVReader::get_nodeindices_from_lat_long(LSDFlowInfo& Flow
 
   return NIs;
 
+}
+
+
+vector<int> LSDSpatialCSVReader::get_nodeindex_vector()
+{
+  vector<int> ni_vec;
+  
+  bool is_nodeindex = false;
+  bool is_id = false;
+  bool is_node = false;
+
+  //bool ni_exists = false;
+
+  string nistr1 = "nodeindex";
+  string nistr2 = "node";
+  string nistr3 = "id";
+  string ni_column = nistr1;
+
+  // Because we have been sloppy, the nodeindex can appear in csv files as "id", "node", or "nodeindex"
+  // we check for all three of these
+
+  cout << "The column headers are: " << endl;
+  print_data_map_keys_to_screen();
+
+  cout << "Checking columns to find node index" << endl;
+  is_nodeindex = is_column_in_csv(nistr1);
+  is_node = is_column_in_csv(nistr2);
+  is_id = is_column_in_csv(nistr3);
+  cout << "Okay, done checking columns." << endl;
+ 
+  if (not is_nodeindex && not is_node && not is_id)
+  {
+    cout << "I could not find a nodeindex column. Returning and empty map." << endl;
+  }
+  else 
+  {
+    // This load of switches basically says that the order of preference if there are 
+    // more than one liklely columns is nodeindex, node, id.
+    if (is_nodeindex)
+    {
+      ni_column = nistr1;
+    }
+    else
+    {
+      if (is_node)
+      {
+        ni_column = nistr2;
+      }
+      else
+      {
+        cout << "I found the code 'id'" << endl;
+        ni_column = nistr3;
+      } 
+    }
+
+    // now get the data
+    cout << "Grabbing the data from columns " << ni_column << endl;
+    ni_vec = data_column_to_int(ni_column);      
+  }
+
+  return ni_vec;
+}
+
+// This uses a nodeindex colum and creates a data map with the column data
+map<int,float> LSDSpatialCSVReader::get_nodeindex_map_float(string column_name)
+{
+  map<int,float> nodeindex_map;
+  
+  bool is_nodeindex = false;
+  bool is_id = false;
+  bool is_node = false;
+
+  //bool ni_exists = false;
+
+  string nistr1 = "nodeindex";
+  string nistr2 = "node";
+  string nistr3 = "id";
+  string ni_column = nistr1;
+
+  // Because we have been sloppy, the nodeindex can appear in csv files as "id", "node", or "nodeindex"
+  // we check for all three of these
+
+  cout << "The column headers are: " << endl;
+  print_data_map_keys_to_screen();
+
+  cout << "Checking columns to find node index" << endl;
+  is_nodeindex = is_column_in_csv(nistr1);
+  is_node = is_column_in_csv(nistr2);
+  is_id = is_column_in_csv(nistr3);
+  cout << "Okay, done checking columns." << endl;
+
+  cout << "The column name is: " << column_name << endl;
+  bool is_data_column = is_column_in_csv(column_name);
+
+  if (not is_data_column)
+  {
+    cout << "I can't find your data column" << endl;
+  }
+  else
+  {  
+    cout << "I found your data column." << endl;
+    if (not is_nodeindex && not is_node && not is_id)
+    {
+      cout << "I could not find a nodeindex column. Returning and empty map." << endl;
+    }
+    else 
+    {
+      // This load of switches basically says that the order of preference if there are 
+      // more than one liklely columns is nodeindex, node, id.
+      if (is_nodeindex)
+      {
+        ni_column = nistr1;
+      }
+      else
+      {
+        if (is_node)
+        {
+          ni_column = nistr2;
+        }
+        else
+        {
+          cout << "I found the code 'id'" << endl;
+          ni_column = nistr3;
+        } 
+      }
+
+      // now get the data
+      cout << "Grabbing the data from columns " << ni_column << " and " << column_name << endl;
+      vector<int> ni_vec = data_column_to_int(ni_column);
+      vector<float> data_vec = data_column_to_float(column_name);
+
+      // now make the map
+      for (int i = 0; i< int(ni_vec.size()); i++)
+      {
+        nodeindex_map[ ni_vec[i] ] = data_vec[i];
+      }
+        
+    }
+  }
+
+
+  return nodeindex_map;
 }
 
 

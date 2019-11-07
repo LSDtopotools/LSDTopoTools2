@@ -956,7 +956,7 @@ double LSDCRNParticle::apparent_erosion_10Be_neutron_only(double rho, LSDCRNPara
   double exp_term = exp(-effective_dLoc/Gamma_neutron);
 
   //cout << "LSDCRNParticle line 741, S_t: " << CRNp.neutron_S_t << " P0: " << CRNp.P0_10Be 
-  //     << " total spallation: " << CRNp.S_t*CRNp.P0_10Be << endl 
+  //     << " total spallation: " << CRNp.neutron_S_t*CRNp.P0_10Be << endl 
   //     << " and the F_0: " << CRNp.F_10Be[0] << endl;
 
   app_eff_eros = Gamma_neutron*(exp_term*CRNp.neutron_S_t*CRNp.P0_10Be

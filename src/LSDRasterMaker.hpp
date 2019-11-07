@@ -144,6 +144,13 @@ class LSDRasterMaker: public LSDRaster
     /// @date 01/09/2017
     void sine_waves(vector<float> x_coefficients, vector<float> y_coefficients);
 
+    /// @brief This function makes some random values
+    /// @param new_minimum does what it says on the tin.
+    /// @param new_maxuimum does what it says on the tin
+    /// @author SMM
+    /// @date 30/07/2019
+    void random_values(float minimum_value, float maximum_value);
+
     /// @brief This returns a clipped raster that has the same dimensions as the
     ///  smaller raster
     /// @param smaller_raster the raster to which the bigger raster should be

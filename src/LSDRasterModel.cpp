@@ -42,6 +42,7 @@
 #include <string>
 #include <math.h>
 #include <string.h>
+#include <queue>
 #include <sys/stat.h>
 #include <ctime>
 #include <cstdlib>
@@ -57,6 +58,8 @@
 #include "LSDStatsTools.hpp"
 #include "LSDIndexRaster.hpp"
 #include "LSDRasterModel.hpp"
+#include "LSDSpatialCSVReader.hpp"
+#include "LSDRasterInfo.hpp"
 #include "LSDCRNParameters.hpp"
 #include "LSDParticleColumn.hpp"
 using namespace std;
@@ -73,7 +76,8 @@ LSDRasterModel& LSDRasterModel::operator=(const LSDRasterModel& rhs)
   if (&rhs != this)
    {
     create(rhs.get_NRows(),rhs.get_NCols(),rhs.get_XMinimum(),rhs.get_YMinimum(),
-           rhs.get_DataResolution(),rhs.get_NoDataValue(),rhs.get_RasterData());
+           rhs.get_DataResolution(),rhs.get_NoDataValue(),rhs.get_RasterData(), 
+           rhs.get_GeoReferencingStrings());
    }
   return *this;
  }
@@ -125,7 +129,8 @@ void LSDRasterModel::create(string filename, string extension)
 
 // this creates a raster filled with no data values
 void LSDRasterModel::create(int nrows, int ncols, float xmin, float ymin,
-            float cellsize, float ndv, Array2D<float> data)
+            float cellsize, float ndv, Array2D<float> data,
+            map<string,string> GRS)
 {
   NRows = nrows;
   NCols = ncols;
@@ -133,6 +138,7 @@ void LSDRasterModel::create(int nrows, int ncols, float xmin, float ymin,
   YMinimum = ymin;
   DataResolution = cellsize;
   NoDataValue = ndv;
+  GeoReferencingStrings =  GRS;
 
   RasterData = data.copy();
 
@@ -147,9 +153,9 @@ void LSDRasterModel::create(int nrows, int ncols, float xmin, float ymin,
     exit(EXIT_FAILURE);
   }
 
-  int zone = 1;
-  string NorS = "N";
-  impose_georeferencing_UTM(zone, NorS);
+  //int zone = 1;
+  //string NorS = "N";
+  //impose_georeferencing_UTM(zone, NorS);
 
 }
 
@@ -1642,7 +1648,7 @@ void LSDRasterModel::reset_model( void )
 LSDRasterModel LSDRasterModel::create_buffered_surf(int b_type)
 {
   Array2D<float> surf = RasterData.copy();
-   Array2D<float> buff(NRows+2,NCols+2);
+  Array2D<float> buff(NRows+2,NCols+2);
   Array2D<float> buff_surf = buff.copy();
 //
 //   switch(b_type)
@@ -1674,7 +1680,7 @@ LSDRasterModel LSDRasterModel::create_buffered_surf(int b_type)
           buff_surf[row+1][col+1]=surf[row][col];
         }
       }
-      LSDRasterModel BufferedSurface(NRows+2, NCols+2, XMinimum-DataResolution, YMinimum-DataResolution, DataResolution, NoDataValue, buff_surf);
+      LSDRasterModel BufferedSurface(NRows+2, NCols+2, XMinimum-DataResolution, YMinimum-DataResolution, DataResolution, NoDataValue, buff_surf, GeoReferencingStrings);
       return BufferedSurface;
 //       break;
 //
@@ -1717,7 +1723,7 @@ LSDRasterModel LSDRasterModel::create_buffered_surf(float South_boundary_elevati
       buff_surf[row+1][col+1]=surf[row][col];
     }
   }
-  LSDRasterModel BufferedSurface(NRows+2, NCols+2, (XMinimum-DataResolution), (YMinimum-DataResolution), DataResolution, NoDataValue, buff_surf);
+  LSDRasterModel BufferedSurface(NRows+2, NCols+2, (XMinimum-DataResolution), (YMinimum-DataResolution), DataResolution, NoDataValue, buff_surf, GeoReferencingStrings);
   return BufferedSurface;
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -1941,7 +1947,7 @@ LSDRasterModel LSDRasterModel::uplift_surface(float UpliftRate, float dt)
   // make a new rastermodel with the updated data.
   // SMM Note: this is a bit risky since only a very limited subset of the
   // data members are translated across
-  LSDRasterModel Zeta(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, ZetaRaster);
+  LSDRasterModel Zeta(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, ZetaRaster, GeoReferencingStrings);
   return Zeta;
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -1970,7 +1976,7 @@ LSDRasterModel LSDRasterModel::uplift_surface(Array2D<float> UpliftRate, float d
   // make a new rastermodel with the updated data.
   // SMM Note: this is a bit risky since only a very limited subset of the
   // data members are translated across
-  LSDRasterModel Zeta(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, ZetaRaster);
+  LSDRasterModel Zeta(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, ZetaRaster, GeoReferencingStrings);
   return Zeta;
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -2846,7 +2852,7 @@ LSDRasterModel LSDRasterModel::run_model_implicit_hillslope_and_fluvial(string p
   string erosion_rate_fname;
 
   // data elements: vectors and arrays
-  LSDRasterModel Zeta(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, get_RasterData());
+  LSDRasterModel Zeta(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, get_RasterData(), GeoReferencingStrings);
   Array2D<float> ZetaOld;            // surface from last timestep (for getting sediment flux)
   Array2D<float> ZetaTemp(NRows,NCols);
   Array2D<float> ZetaDivergence;      // del dot zeta
@@ -4348,7 +4354,6 @@ void LSDRasterModel::soil_diffusion_fv_nonlinear( void )
 }
 
 
-
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // This takes the model and calculates the steady state fluvial surface derived from
 // a chi map
@@ -4358,7 +4363,7 @@ void LSDRasterModel::fluvial_snap_to_steady_state(float U)
   Array2D<float> zeta=RasterData.copy();
 
   // Step one, create donor "stack" etc. via FlowInfo
-  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta);
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
 
   // need to fill the raster to ensure there are no internal base level nodes
   float slope_for_fill = 0.0001;
@@ -4404,6 +4409,280 @@ void LSDRasterModel::fluvial_snap_to_steady_state(float U)
   RasterData = zeta.copy();
 }
 
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// This snaps to steady based on an input file with elevations and node indicies
+// overloaded from the previous function
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDRasterModel::fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_values, LSDRaster& U_values, LSDSpatialCSVReader& source_points_data, bool carve_before_fill)
+{
+
+  string column_name = "elevation(m)";
+
+
+  Array2D<float> zeta=RasterData.copy();
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
+
+  // need to fill the raster to ensure there are no internal base level nodes
+  cout << "I am going to carve and fill" << endl;
+  float slope_for_fill = 0.0001; 
+  LSDRaster filled_topography,carved_topography;
+  if(carve_before_fill)
+  {
+    cout << "Carving and filling." << endl;
+    carved_topography = temp.Breaching_Lindsay2016();
+    filled_topography = carved_topography.fill(slope_for_fill);
+  }
+  else
+  {
+    cout << "Filling." << endl;
+    filled_topography = temp.fill(slope_for_fill);
+  }
+  cout << "Getting the flow info. This might take some time." << endl;
+  LSDFlowInfo flow(boundary_conditions, filled_topography);
+  // update the raster
+  zeta = filled_topography.get_RasterData();
+
+  // Get the local node index as well as the elevations
+  vector<int> ni = source_points_data.get_nodeindices_from_lat_long(flow);
+  vector<float> elev = source_points_data.data_column_to_float(column_name);
+  // make the map
+  cout << "I am making an elevation map. This will not work if points in the raster lie outside of the csv channel points." << endl;
+  map<int,float> elevation_map;
+  for(int i = 0; i< int(ni.size()); i++)
+  {
+    elevation_map[ ni[i] ] =  elev[i]; 
+  }
+
+  float m_exp = get_m();
+  float n_exp = get_n();
+  float one_over_n = 1/n_exp;
+
+  //float FP_NDV = K_values.get_NoDataValue();
+  float FP_value, K_value, U_value, receiver_elev, parenth_term, area_pow;
+
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  vector <int> nodeList = flow.get_SVector();
+  int numNodes = nodeList.size();
+  int node, row, col, receiver, receiver_row, receiver_col;
+  float drainageArea, dx;
+
+  // these save a bit of computational expense.
+  float root_2 = pow(2, 0.5);
+  float dx_root2 = root_2*DataResolution;
+  float DR2 = DataResolution*DataResolution;
+
+  // Step two calculate new height
+  //for (int i=numNodes-1; i>=0; --i)
+  for (int i=0; i<numNodes; ++i)
+  {
+
+    // get the information about node relationships from the flow info object
+    node = nodeList[i];
+    flow.retrieve_current_row_and_col(node, row, col);
+    flow.retrieve_receiver_information(node, receiver, receiver_row, receiver_col);
+    drainageArea = flow.retrieve_contributing_pixels_of_node(node) *  DR2;
+
+
+    // check if this is a baselevel node
+    if(node == receiver)
+    {
+      //cout << "This is a base level node. I don't update this node." << endl;
+    }
+    else if(elevation_map.find(node) != elevation_map.end())
+    {
+      //cout << "This is one of the fixed channel nodes. I don't update this node." << endl;
+      FP_value = elevation_map[node];
+      zeta[row][col]= FP_value;
+    }
+    else
+    {
+      // Get the data from the individual points
+      K_value = K_values.get_data_element(row,col);
+      U_value = U_values.get_data_element(row,col);
+
+      // get the distance between nodes. Depends on flow direction
+      switch (flow.retrieve_flow_length_code_of_node(node))
+      {
+        case 0:
+          dx = -99;
+        break;
+        case 1:
+          dx = DataResolution;
+        break;
+        case 2:
+          dx = dx_root2;
+        break;
+        default:
+          dx = -99;
+        break;
+      }
+
+
+      receiver_elev = zeta[receiver_row][receiver_col];
+      area_pow = pow(drainageArea,m_exp);
+      parenth_term = U_value/(K_value*area_pow);
+      zeta[row][col] = receiver_elev+ dx*( pow(parenth_term,one_over_n));
+
+    }
+    
+
+
+
+  }
+  //return LSDRasterModel(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta);
+  this->RasterData = zeta.copy();
+
+  RasterData = zeta.copy();
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// This snaps to steady based on an input file with elevations and node indicies
+// overloaded from the previous function
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDRasterModel::fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_values, LSDRaster& U_values, string csv_of_fixed_channel, bool carve_before_fill)
+{
+  LSDRasterInfo RI(K_values);
+
+  cout << "I am reading points from the file: "+ csv_of_fixed_channel << endl;
+  LSDSpatialCSVReader source_points_data( RI,csv_of_fixed_channel );
+
+  //*****************************
+  // Working from here
+  // Need to get out map that has key as node index and value as elevation
+  //******************************
+  string column_name = "elevation(m)";
+
+
+  Array2D<float> zeta=RasterData.copy();
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
+
+  // need to fill the raster to ensure there are no internal base level nodes
+  float slope_for_fill = 0.0001; 
+  LSDRaster filled_topography,carved_topography;
+  if(carve_before_fill)
+  {
+    cout << "Carving and filling." << endl;
+    carved_topography = temp.Breaching_Lindsay2016();
+    filled_topography = carved_topography.fill(slope_for_fill);
+  }
+  else
+  {
+    cout << "Filling." << endl;
+    filled_topography = temp.fill(slope_for_fill);
+  }
+  cout << "Getting the flow info. This might take some time." << endl;
+  LSDFlowInfo flow(boundary_conditions, filled_topography);
+  // update the raster
+  zeta = filled_topography.get_RasterData();
+
+
+  // Get the local node index as well as the elevations
+  vector<int> ni = source_points_data.get_nodeindices_from_lat_long(flow);
+  vector<float> elev = source_points_data.data_column_to_float(column_name);
+  // make the map
+  cout << "I am making an elevation map. This will not work if points in the raster lie outside of the csv channel points." << endl;
+  map<int,float> elevation_map;
+  for(int i = 0; i< int(ni.size()); i++)
+  {
+    elevation_map[ ni[i] ] =  elev[i]; 
+  }
+
+  float m_exp = get_m();
+  float n_exp = get_n();
+  float one_over_n = 1/n_exp;
+
+  //float FP_NDV = K_values.get_NoDataValue();
+  float FP_value, K_value, U_value, receiver_elev, parenth_term, area_pow;
+
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  vector <int> nodeList = flow.get_SVector();
+  int numNodes = nodeList.size();
+  int node, row, col, receiver, receiver_row, receiver_col;
+  float drainageArea, dx;
+
+  // these save a bit of computational expense.
+  float root_2 = pow(2, 0.5);
+  float dx_root2 = root_2*DataResolution;
+  float DR2 = DataResolution*DataResolution;
+
+  // Step two calculate new height
+  //for (int i=numNodes-1; i>=0; --i)
+  float new_zeta;
+  for (int i=0; i<numNodes; ++i)
+  {
+
+    // get the information about node relationships from the flow info object
+    node = nodeList[i];
+    flow.retrieve_current_row_and_col(node, row, col);
+    flow.retrieve_receiver_information(node, receiver, receiver_row, receiver_col);
+    drainageArea = flow.retrieve_contributing_pixels_of_node(node) *  DR2;
+
+
+    // check if this is a baselevel node
+    if(node == receiver)
+    {
+      //cout << "This is a base level node. I don't update this node." << endl;
+    }
+    else if(elevation_map.find(node) != elevation_map.end())
+    {
+      //cout << "This is one of the fixed channel nodes. I don't update this node." << endl;
+      FP_value = elevation_map[node];
+      zeta[row][col]= FP_value;
+    }
+    else
+    {
+      // Get the data from the individual points
+      K_value = K_values.get_data_element(row,col);
+      U_value = U_values.get_data_element(row,col);
+
+      // get the distance between nodes. Depends on flow direction
+      switch (flow.retrieve_flow_length_code_of_node(node))
+      {
+        case 0:
+          dx = -99;
+        break;
+        case 1:
+          dx = DataResolution;
+        break;
+        case 2:
+          dx = dx_root2;
+        break;
+        default:
+          dx = -99;
+        break;
+      }
+
+
+      receiver_elev = zeta[receiver_row][receiver_col];
+      area_pow = pow(drainageArea,m_exp);
+      parenth_term = U_value/(K_value*area_pow);
+      new_zeta = receiver_elev+ dx*( pow(parenth_term,one_over_n));
+
+      // now check to make sure the new zeta is not above the fixed channel
+
+
+    }
+    
+
+
+
+  }
+  //return LSDRasterModel(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta);
+  this->RasterData = zeta.copy();
+
+  RasterData = zeta.copy();
+}
+
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // This takes the model and calculates the steady state fluvial surface derived from
 // a chi map
@@ -4413,7 +4692,7 @@ float LSDRasterModel::fluvial_snap_to_steady_state_tune_K_for_relief(float U, fl
   Array2D<float> zeta=RasterData.copy();
 
   // Step one, create donor "stack" etc. via FlowInfo
-  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta);
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
 
   // We need to fill the raster so we don't get internally drained catchments
   float slope_for_fill = 0.0001;
@@ -4493,7 +4772,7 @@ float LSDRasterModel::fluvial_calculate_K_for_steady_state_relief(float U, float
   Array2D<float> zeta=RasterData.copy();
 
   // Step one, create donor "stack" etc. via FlowInfo
-  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta);
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
 
   // We need to fill the raster so we don't get internally drained catchments
   float slope_for_fill = 0.0001;
@@ -4533,6 +4812,410 @@ float LSDRasterModel::fluvial_calculate_K_for_steady_state_relief(float U, float
 
   return(K);
 }
+
+
+
+
+
+//============================================================================================================================
+// WORKING HERE
+// TRYING TO GET CRITICAL SLOPES WORKING
+//============================================================================================================================
+
+
+// Just a structure that define a node by ID and elevation
+// Same principle that Martin's filling algorithm
+struct MyNode
+{
+  float elevation;
+  std::pair<int,int> ID;
+};
+bool operator>( const MyNode& lhs, const MyNode& rhs )
+{
+  return lhs.elevation > rhs.elevation;
+}
+bool operator<( const MyNode& lhs, const MyNode& rhs )
+{
+  return lhs.elevation < rhs.elevation;
+}
+
+
+
+LSDRaster LSDRasterModel::basic_valley_fill_critical_slope(float critical_slope, int contributing_pixel_threshold)
+{
+  
+  Array2D<float> zeta=RasterData.copy();
+  float sqrt2 = sqrt(2);
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);  
+
+  // We need to fill the raster so we don't get internally drained catchments
+  cout << "I'm getting the flow info" << endl;
+  float slope_for_fill = 0.0001;
+  LSDRaster filled = temp.fill(slope_for_fill);
+  LSDFlowInfo flow(boundary_conditions, filled);
+  int contributing_pixels;
+
+  vector<int> S_vec = flow.get_SVector();
+
+  // also I want to keep track on which nodes have been processed
+  map<pair<int,int> ,bool> has_been_proc;
+  //And a map that check whether a node is in the river
+  map<pair<int,int> ,bool> is_river;
+  // This tests the exsitence of the node in a stack
+  map<pair<int,int> ,bool> is_in_DEM;
+  // Let's initialise my output as well
+  Array2D<float> output(NRows,NCols, NoDataValue);
+  // Before processing my nodes, I need to set up my priority queue
+  // And set 2 priority queues that will work together
+  priority_queue< MyNode, vector<MyNode>, greater<MyNode> > PriorityQueue_1, PriorityQueue_2;
+  // I'll need a switch to know which PQ is getting filled
+  int working_PQ = 1;
+  
+  
+  // let's go through the stack and get the river nodes
+  // I'll fill my PQ1 with the river_nodes
+  cout << "Filling the priority queues. The no data value is: " << NoDataValue <<endl;
+  //cout << "NRows: " << NRows << " and NCols: " << NCols << endl;
+  int this_row,this_col, current_node;
+  for(size_t i =0; i<S_vec.size(); i++)
+  {
+    // Row and col of the next element from the stack, starting from the baselevel of the given stack
+    current_node = S_vec[i];
+    flow.retrieve_current_row_and_col(current_node,this_row,this_col);
+    
+    // Topo and drainage area stack
+    float this_elev =temp.get_data_element(this_row,this_col);
+    contributing_pixels = flow.retrieve_contributing_pixels_of_node(current_node);
+    pair<int,int> this_node = {this_row, this_col};
+
+    is_in_DEM[this_node] = true;
+    
+    // Initialising my node
+    MyNode this_MyNode;
+    this_MyNode.ID = this_node;
+    this_MyNode.elevation = this_elev;
+
+    // is it a river
+    if(contributing_pixels>=contributing_pixel_threshold)
+    {
+      PriorityQueue_1.push(this_MyNode);
+      is_river[this_node] = true;
+      output[this_row][this_col] = this_elev;
+      has_been_proc[this_node] = true;
+    }
+    else
+    {
+      is_river[this_node] = false;
+      output[this_row][this_col] = NoDataValue;
+      has_been_proc[this_node] = false;
+    }
+  }
+  // std::cout << "is empty??"
+  
+  //cout << "Now it is time to create the slopes" << endl;
+  // Alright, I have my list of node ordered by elevation (thanks to fastscape and stuff)
+  while(PriorityQueue_1.empty() == false || PriorityQueue_2.empty() == false)
+  {
+    //cout << "Whohoo, starting with the priority queueueueueue" << endl;
+    // I'll want my node
+    pair<int,int> this_node;
+    MyNode this_MyNode;
+    if(working_PQ == 1)
+    {
+      this_MyNode = PriorityQueue_1.top();
+      PriorityQueue_1.pop();
+    }
+    else
+    {
+      this_MyNode = PriorityQueue_2.top();
+      PriorityQueue_2.pop();
+    }
+    this_node = this_MyNode.ID;
+    float this_elevation = this_MyNode.elevation;
+    int this_row = this_node.first;
+    int this_col = this_node.second;
+    // let me go through the neighbors
+    //cout << "z: " << this_elevation << " r: " << this_row << " c: " << this_col << endl;
+    vector<int> row_neighbors = {this_row-1,this_row,this_row+1};
+    vector<int> col_neighbors = {this_col-1,this_col,this_col+1};
+    for(int nR=0;nR<int(row_neighbors.size());nR++)
+    {
+      for(int nC=0;nC<int(col_neighbors.size());nC++)
+      {
+        // ignore that node
+        if(nR ==1 && nC == 1)
+        {
+          continue;
+        }
+        // getting this neighbor
+        int neighb_row = row_neighbors[nR];
+        int neighb_col = col_neighbors[nC];
+
+
+
+        // Make sure it is not at the edge of the DEM
+        if (neighb_row >= 0 && neighb_row <= NRows - 1 && neighb_col >= 0 && neighb_col <= NCols - 1)
+        {
+
+    
+          //cout << "nr: " << neighb_row << " nc: " << neighb_col << endl;
+          pair<int,int> nenode = {neighb_row,neighb_col};
+
+          if(not is_in_DEM[nenode])
+          {
+            //cout << "Hey this neighbour isn't in the DEM" << endl;
+          }  
+          else
+          {
+            if(not is_river[nenode] && not has_been_proc[nenode])
+            {
+              // If we got this far it means the node needs to be processed. 
+              float dx;
+              if((nR == 0 || nR == 2) && (nC == 0 || nC == 2))
+              {
+                dx = sqrt2*DataResolution;
+              }
+              else
+              {
+                dx = DataResolution;
+              }
+              // backcalculating the slope
+              //cout << "I'm getting a slope at r: " << neighb_row << " c: " << neighb_col << " elev: " << this_elevation << endl; 
+              float new_elev = critical_slope * dx + this_elevation;
+              //cout << "1..";
+              output[neighb_row][neighb_col] = new_elev;
+              //cout << "2..";
+              has_been_proc[nenode] = true;
+              //cout << "done" <<endl;
+              MyNode nextnode; 
+              nextnode.ID = nenode;
+              nextnode.elevation = new_elev;
+              if(working_PQ == 1)
+              {
+                PriorityQueue_2.push(nextnode);
+                // std::cout << "didd" << std::endl;
+              }
+              else
+              {
+                PriorityQueue_1.push(nextnode);
+              }
+            }       
+          }
+        }
+      }
+      if(working_PQ == 1 && PriorityQueue_1.empty() == true)
+      {
+        working_PQ = 2;
+      }
+      else if(working_PQ == 2 && PriorityQueue_2.empty() == true)
+      {
+        working_PQ = 1;
+      }
+    }
+  }
+  // for(size_t i=0)
+
+  cout << "Right, all finished. Generating the output raster" << endl;
+  LSDRaster output_raster(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, output, GeoReferencingStrings);  
+  return output_raster;
+}
+
+
+
+
+LSDRaster LSDRasterModel::basic_valley_fill_critical_slope(LSDRaster& S_c_raster, int contributing_pixel_threshold)
+{
+  
+  Array2D<float> zeta=RasterData.copy();
+  float sqrt2 = sqrt(2);
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);  
+
+  // We need to fill the raster so we don't get internally drained catchments
+  cout << "I'm getting the flow info" << endl;
+  float slope_for_fill = 0.0001;
+  LSDRaster filled = temp.fill(slope_for_fill);
+  LSDFlowInfo flow(boundary_conditions, filled);
+  int contributing_pixels;
+
+  vector<int> S_vec = flow.get_SVector();
+
+  // also I want to keep track on which nodes have been processed
+  map<pair<int,int> ,bool> has_been_proc;
+  //And a map that check whether a node is in the river
+  map<pair<int,int> ,bool> is_river;
+  // This tests the exsitence of the node in a stack
+  map<pair<int,int> ,bool> is_in_DEM;
+  // Let's initialise my output as well
+  Array2D<float> output(NRows,NCols, NoDataValue);
+  // Before processing my nodes, I need to set up my priority queue
+  // And set 2 priority queues that will work together
+  priority_queue< MyNode, vector<MyNode>, greater<MyNode> > PriorityQueue_1, PriorityQueue_2;
+  // I'll need a switch to know which PQ is getting filled
+  int working_PQ = 1;
+  
+  
+  // let's go through the stack and get the river nodes
+  // I'll fill my PQ1 with the river_nodes
+  cout << "Filling the priority queues. The no data value is: " << NoDataValue <<endl;
+  //cout << "NRows: " << NRows << " and NCols: " << NCols << endl;
+  int this_row,this_col, current_node;
+  for(size_t i =0; i<S_vec.size(); i++)
+  {
+    // Row and col of the next element from the stack, starting from the baselevel of the given stack
+    current_node = S_vec[i];
+    flow.retrieve_current_row_and_col(current_node,this_row,this_col);
+    
+    // Topo and drainage area stack
+    float this_elev =temp.get_data_element(this_row,this_col);
+    contributing_pixels = flow.retrieve_contributing_pixels_of_node(current_node);
+    pair<int,int> this_node = {this_row, this_col};
+
+    is_in_DEM[this_node] = true;
+    
+    // Initialising my node
+    MyNode this_MyNode;
+    this_MyNode.ID = this_node;
+    this_MyNode.elevation = this_elev;
+
+    // is it a river
+    if(contributing_pixels>=contributing_pixel_threshold)
+    {
+      PriorityQueue_1.push(this_MyNode);
+      is_river[this_node] = true;
+      output[this_row][this_col] = this_elev;
+      has_been_proc[this_node] = true;
+    }
+    else
+    {
+      is_river[this_node] = false;
+      output[this_row][this_col] = NoDataValue;
+      has_been_proc[this_node] = false;
+    }
+  }
+  // std::cout << "is empty??"
+  
+  //cout << "Now it is time to create the slopes" << endl;
+  // Alright, I have my list of node ordered by elevation (thanks to fastscape and stuff)
+  while(PriorityQueue_1.empty() == false || PriorityQueue_2.empty() == false)
+  {
+    //cout << "Whohoo, starting with the priority queueueueueue" << endl;
+    // I'll want my node
+    pair<int,int> this_node;
+    MyNode this_MyNode;
+    if(working_PQ == 1)
+    {
+      this_MyNode = PriorityQueue_1.top();
+      PriorityQueue_1.pop();
+    }
+    else
+    {
+      this_MyNode = PriorityQueue_2.top();
+      PriorityQueue_2.pop();
+    }
+    this_node = this_MyNode.ID;
+    float this_elevation = this_MyNode.elevation;
+    int this_row = this_node.first;
+    int this_col = this_node.second;
+    // let me go through the neighbors
+    //cout << "z: " << this_elevation << " r: " << this_row << " c: " << this_col << endl;
+    vector<int> row_neighbors = {this_row-1,this_row,this_row+1};
+    vector<int> col_neighbors = {this_col-1,this_col,this_col+1};
+    for(int nR=0;nR<int(row_neighbors.size());nR++)
+    {
+      for(int nC=0;nC<int(col_neighbors.size());nC++)
+      {
+        // ignore that node
+        if(nR ==1 && nC == 1)
+        {
+          continue;
+        }
+        // getting this neighbor
+        int neighb_row = row_neighbors[nR];
+        int neighb_col = col_neighbors[nC];
+
+
+
+        // Make sure it is not at the edge of the DEM
+        if (neighb_row >= 0 && neighb_row <= NRows - 1 && neighb_col >= 0 && neighb_col <= NCols - 1)
+        {
+
+    
+          //cout << "nr: " << neighb_row << " nc: " << neighb_col << endl;
+          pair<int,int> nenode = {neighb_row,neighb_col};
+
+          if(not is_in_DEM[nenode])
+          {
+            //cout << "Hey this neighbour isn't in the DEM" << endl;
+          }  
+          else
+          {
+            if(not is_river[nenode] && not has_been_proc[nenode])
+            {
+              // If we got this far it means the node needs to be processed. 
+              float dx;
+              if((nR == 0 || nR == 2) && (nC == 0 || nC == 2))
+              {
+                dx = sqrt2*DataResolution;
+              }
+              else
+              {
+                dx = DataResolution;
+              }
+              // backcalculating the slope
+              //cout << "I'm getting a slope at r: " << neighb_row << " c: " << neighb_col << " elev: " << this_elevation << endl; 
+              float new_elev = S_c_raster.get_data_element(neighb_row,neighb_col) * dx + this_elevation;
+              //cout << "1..";
+              output[neighb_row][neighb_col] = new_elev;
+              //cout << "2..";
+              has_been_proc[nenode] = true;
+              //cout << "done" <<endl;
+              MyNode nextnode; 
+              nextnode.ID = nenode;
+              nextnode.elevation = new_elev;
+              if(working_PQ == 1)
+              {
+                PriorityQueue_2.push(nextnode);
+                // std::cout << "didd" << std::endl;
+              }
+              else
+              {
+                PriorityQueue_1.push(nextnode);
+              }
+            }       
+          }
+        }
+      }
+      if(working_PQ == 1 && PriorityQueue_1.empty() == true)
+      {
+        working_PQ = 2;
+      }
+      else if(working_PQ == 2 && PriorityQueue_2.empty() == true)
+      {
+        working_PQ = 1;
+      }
+    }
+  }
+  // for(size_t i=0)
+
+  cout << "Right, all finished. Generating the output raster" << endl;
+  LSDRaster output_raster(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, output, GeoReferencingStrings);  
+  return output_raster;
+}
+
+
+
+
+
+
+
+
+
+
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Calculates a new elevation raster based on instantaneous tilting of the model
@@ -4667,7 +5350,7 @@ void LSDRasterModel::fluvial_incision( void )
       drainageArea = flow.retrieve_contributing_pixels_of_node(i) *  DR2;
       cout << drainageArea << " ";
       if (((i+1)%NCols) == 0)
-  cout << endl;
+      cout << endl;
     }
   }
 

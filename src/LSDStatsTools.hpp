@@ -488,6 +488,13 @@ vector<int> Unique(vector<int> InputVector);
 // SWDG - 22/7/16
 vector<float> Unique(vector<float> InputVector);
 
+// Given a vector of ints, return a new vector which only contains values that occur more than once.
+// The returned vector will contain one of each duplicate value. If there are no duplicates, an empty
+// vector will be returned.
+//
+// SWDG - 23/5/19
+vector<int> duplicates(vector<int> data);
+
 // Generate vector of evenly spaced numbers between two points
 vector<float> linspace(float min, float max, int n);
 
@@ -879,5 +886,31 @@ class UnivariateDensityDerivative{
 
 
 vector<double> TV1D_denoise_v2(vector<double> input,  double lambda);
+
+/* -------------------------------------------------------------
+    Fast approximation of the exp() function to replace math.h
+    Is claimed to have a max relative error <= 2e-3 when x is
+    in the range -87 to +88
+
+    Modified from an implementation found on StackOverflow:
+    https://stackoverflow.com/questions/10552280/fast-exp-calculation-possible-to-improve-accuracy-without-losing-too-much-perfo
+
+    an explanation of the computation can be found here:
+    https://stackoverflow.com/questions/47025373/fastest-implementation-of-exponential-function-using-sse
+
+    "The basic idea is to transform the computation of the standard
+    exponential function into computation of a power of 2:
+      expf (x) = exp2f (x / logf (2.0f)) = exp2f (x * 1.44269504).
+
+    We split t = x * 1.44269504 into an integer i and a fraction f,
+    such that t = i + f and 0 <= f <= 1.
+
+    We can now compute 2f with a polynomial approximation,
+    then scale the result by 2i by adding i to the exponent field
+    of the single-precision floating-point result."
+
+    Added by MDH, July 2019
+----------------------------------------------------------------*/
+float fastexp(float x);
 
 #endif

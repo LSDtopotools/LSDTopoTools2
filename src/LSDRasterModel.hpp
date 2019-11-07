@@ -46,6 +46,7 @@
 #include "LSDRaster.hpp"
 #include "LSDRasterSpectral.hpp"
 #include "LSDJunctionNetwork.hpp"
+#include "LSDSpatialCSVReader.hpp"
 #include "LSDParticleColumn.hpp"
 #include "LSDCRNParameters.hpp"
 using namespace std;
@@ -101,10 +102,10 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @param data An Array2D of floats in the shape nrows*ncols,
   ///containing the data to be written.
   LSDRasterModel(int nrows, int ncols, float xmin, float ymin,
-            float cellsize, float ndv, Array2D<float> data)
+            float cellsize, float ndv, Array2D<float> data, map<string,string> GRS)
   {
     default_parameters();
-    create(nrows, ncols, xmin, ymin, cellsize, ndv, data);
+    create(nrows, ncols, xmin, ymin, cellsize, ndv, data, GRS);
   }
 
   /// @brief Constructor. Create an LSDRasterModel from an LSDRaster.
@@ -685,6 +686,47 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @author SMM
   /// @date 29/08/2017
   float fluvial_calculate_K_for_steady_state_relief(float U, float desired_relief);
+
+  /// @brief This checks for rivers (using a drainage area threshold) and then any remaining pixels
+  ///  are popped to a critical slope. Creates a river network with striaght slopes in between
+  /// @brief Very rudimentary: only uses slopes in the D8 direction so the slopes will 
+  ///  not be very accurate if the polyfit slope code is run. It should be considered a maximum relief
+  /// @param critical_slope the critical gradient for each D8 connection between pixels
+  /// @param contributing_pixel_threshold the threshold in pixles for a channel to form
+  /// @author BG, edited by SMM
+  /// @date 09/10/2019
+  LSDRaster basic_valley_fill_critical_slope(float critical_slope, int contributing_pixel_threshold);
+
+  /// @brief This checks for rivers (using a drainage area threshold) and then any remaining pixels
+  ///  are popped to a critical slope. Creates a river network with striaght slopes in between
+  /// @brief Very rudimentary: only uses slopes in the D8 direction so the slopes will 
+  ///  not be very accurate if the polyfit slope code is run. It should be considered a maximum relief
+  /// @param S_c_raster a raster with S_c values. Need to be same dimensions as the model raster
+  /// @param contributing_pixel_threshold the threshold in pixles for a channel to form
+  /// @author SMM
+  /// @date 10/10/2019
+  LSDRaster basic_valley_fill_critical_slope(LSDRaster& S_c_raster, int contributing_pixel_threshold);
+
+  /// @brief This method snaps to steady with spatially variable uplift and erodibility fields
+  ///  It also allows fixed base level. 
+  /// @param K_values a raster of erodiblity
+  /// @param U_values a raster of uplift
+  /// @param Source_points_data a spatialc csv reader with the appropriate file
+  /// @param carve_before_fill if true, run the carving algorithm before the filling algorithm
+  /// @author SMM
+  /// @date 01/10/2019
+  void fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_values, LSDRaster& U_values, LSDSpatialCSVReader& Source_points_data, bool carve_before_fill);
+
+  /// @brief This method snaps to steady with spatially variable uplift and erodibility fields
+  ///  It also allows fixed base level. 
+  /// @detail In this version the base level is read from a csv file
+  /// @param K_values a raster of erodiblity
+  /// @param U_values a raster of uplift
+  /// @param csv_points_file the full path to a fiel with the elevation and node index data
+  /// @param carve_before_fill if true, run the carving algorithm before the filling algorithm
+  /// @author SMM
+  /// @date 03/10/2019
+  void fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_values, LSDRaster& U_values, string csv_of_fixed_channel, bool carve_before_fill);
 
   /// @brief This method instantaneously tilts the landscape by a certain angle.
   /// @param angle the tilt angle in degrees
@@ -1740,7 +1782,7 @@ class LSDRasterModel: public LSDRasterSpectral
   void create(string master_param);
   void create(string filename, string extension);
   void create(int ncols, int nrows, float xmin, float ymin,
-        float cellsize, float ndv, Array2D<float> data);
+        float cellsize, float ndv, Array2D<float> data, map<string,string>);
   void create(LSDRaster& An_LSDRaster);
   void default_parameters( void );
 

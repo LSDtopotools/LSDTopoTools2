@@ -21,15 +21,18 @@
 #include <vector>
 #include <string>
 #include <ctime>
+#include <chrono>  // for high_resolution_clock
 #include <cmath>
 #include "TNT/tnt.h"
 #include "LSDRaster.hpp"
+#include "LSDFlowInfo.hpp"
 #include "LSDIndexRaster.hpp"
 #include "LSDCosmoRaster.hpp"
 #include "LSDStatsTools.hpp"
 #include "LSDCosmoRaster.hpp"
 #include "LSDCRNParameters.hpp"
 #include "LSDParticle.hpp"
+#include "LSDRasterMaker.hpp"
 using namespace std;
 using namespace TNT;
 
@@ -607,7 +610,7 @@ void LSDCosmoRaster::reset_scaling(LSDCRNParameters& LSDCRNP, string Muon_scalin
 // This calculates the cosmogenic concentration eroded from each pixel
 // It is NOT a mass flux. This will be calculated using an accumulator function
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDCosmoRaster::calculate_CRN_concentration_raster(string Nuclide,
+LSDRaster LSDCosmoRaster::calculate_CRN_concentration_raster(string Nuclide,
                                            string Muon_scaling, 
                                            LSDRaster& eff_erosion_rate,
                                            LSDRaster& ProductionScale, 
@@ -617,6 +620,13 @@ void LSDCosmoRaster::calculate_CRN_concentration_raster(string Nuclide,
                                            bool is_production_uncertainty_plus_on,
                                            bool is_production_uncertainty_minus_on)
 {
+  int NRows = ProductionScale.get_NRows();
+  int NCols = ProductionScale.get_NCols();
+  float NDV =  ProductionScale.get_NoDataValue();
+  
+  Array2D<float> CRN_conc_at_pixel(NRows,NCols,NDV);
+  
+  
   // the CRN conc in each pixel
   float this_conc;
   
@@ -674,9 +684,7 @@ void LSDCosmoRaster::calculate_CRN_concentration_raster(string Nuclide,
       {
         RasterData[row][col] == NoDataValue;    
       }
-      
-      // Only calculate if there is a data value at the pixel. 
-      if(RasterData[row][col] != NoDataValue)
+      else
       { 
         // reset scaling parameters. This is necessary since the F values are
         // reset for local scaling
@@ -728,12 +736,801 @@ void LSDCosmoRaster::calculate_CRN_concentration_raster(string Nuclide,
           this_conc=eroded_particle.getConc_10Be();
         }
         
-        RasterData[row][col] = this_conc;
+        CRN_conc_at_pixel[row][col] = this_conc;
         
         
       }           // End nodata logic                 
     }             // End cols loop                 
-  }               // End rows loop    
+  }               // End rows loop  
+  
+  float XMinimum = ProductionScale.get_XMinimum();
+  float YMinimum = ProductionScale.get_YMinimum();
+  float DataResolution = ProductionScale.get_DataResolution();
+  map<string,string> GeoReferencingStrings = ProductionScale.get_GeoReferencingStrings();
+
+  LSDRaster CRN_conc(NRows, NCols, XMinimum, YMinimum, DataResolution,
+                               NDV, CRN_conc_at_pixel,GeoReferencingStrings);  
+  return  CRN_conc;
 }                        
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This calculates the cosmogenic concentration eroded from each pixel
+// It is NOT a mass flux. This will be calculated using an accumulator function
+// This is overloaded so that it can get the CRN concentrations upslope of 
+// a single base level node. This version just takes the base level node 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDRaster LSDCosmoRaster::calculate_CRN_concentration_raster(string Nuclide,
+                                           string Muon_scaling, 
+                                           LSDRaster& eff_erosion_rate,
+                                           LSDRaster& ProductionScale, 
+                                           LSDRaster& TopoShield, 
+                                           LSDRaster& SelfShield,
+                                           LSDRaster& SnowShield,
+                                           LSDFlowInfo& FlowInfo,
+                                           int outlet_node,  
+                                           bool is_production_uncertainty_plus_on,
+                                           bool is_production_uncertainty_minus_on)
+{
+  vector<int> upslope_nodes_including_outlet = FlowInfo.get_upslope_nodes_include_outlet(outlet_node);
+  int n_nodes = upslope_nodes_including_outlet.size();
+  LSDRaster CRN_conc = calculate_CRN_concentration_raster(Nuclide,Muon_scaling,eff_erosion_rate,ProductionScale, 
+                                      TopoShield, SelfShield,SnowShield,FlowInfo,upslope_nodes_including_outlet,
+                                      is_production_uncertainty_plus_on,is_production_uncertainty_minus_on);
+  return  CRN_conc;
+
+}   
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This calculates the cosmogenic concentration eroded from each pixel
+// It is NOT a mass flux. This will be calculated using an accumulator function
+// This is overloaded so that it can get the CRN concentrations upslope of 
+// a single base level node. 
+// You need to calculate the nodes separately. 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDRaster LSDCosmoRaster::calculate_CRN_concentration_raster(string Nuclide,
+                                           string Muon_scaling, 
+                                           LSDRaster& eff_erosion_rate,
+                                           LSDRaster& ProductionScale, 
+                                           LSDRaster& TopoShield, 
+                                           LSDRaster& SelfShield,
+                                           LSDRaster& SnowShield,
+                                           LSDFlowInfo& FlowInfo,
+                                           vector<int> upslope_nodes,  
+                                           bool is_production_uncertainty_plus_on,
+                                           bool is_production_uncertainty_minus_on)
+{
+  // the CRN conc in each pixel
+  float this_conc;
+
+  int NRows = ProductionScale.get_NRows();
+  int NCols = ProductionScale.get_NCols();
+  float NDV =  ProductionScale.get_NoDataValue();
+  
+  Array2D<float> CRN_conc_at_pixel(NRows,NCols,NDV);
+  
+  float this_top_eff_depth;
+  float this_bottom_eff_depth;
+  
+  // Throw a warning if the upslope node vector is empty
+  int n_nodes = int(upslope_nodes.size());
+  if (upslope_nodes.size() == 0)
+  {
+    cout << "Warning, the upslope nodes vector is empty" << endl;
+  }
+  
+  // set the scaling vector
+  vector<bool> nuclide_scaling_switches(4,false);
+  if (Nuclide == "Be10")
+  {
+    nuclide_scaling_switches[0] = true;
+  }
+  else if (Nuclide == "Al26")
+  {
+    nuclide_scaling_switches[1] = true;
+  }
+  else
+  {
+    cout << "LSDBasin line 1583, You didn't choose a valid nuclide. Defaulting"
+         << " to 10Be." << endl;
+    Nuclide = "Be10";
+    nuclide_scaling_switches[0] = true;
+  }
+
+  // the total shielding. A product of snow, topographic and production scaling
+  double total_shielding;
+
+  // initiate a particle. We'll just repeatedly call this particle
+  // for the sample.
+  int startType = 0;
+  double Xloc = 0;
+  double Yloc = 0;
+  double  startdLoc = 0.0;
+  double  start_effdloc = 0.0;
+  double startzLoc = 0.0;
+
+  // create a particle at zero depth
+  LSDCRNParticle eroded_particle(startType, Xloc, Yloc,
+                               startdLoc, start_effdloc, startzLoc);
+
+  // now create the CRN parameters object
+  LSDCRNParameters LSDCRNP;
+
+  // loop through the affected nodes
+  int row, col;
+  for (int node = 0; node < n_nodes; node++)
+  {
+    // Get the current row and column  
+    FlowInfo.retrieve_current_row_and_col(upslope_nodes[node],row,col);
+
+    //exclude NDV from average
+    if (ProductionScale.get_data_element(row,col) == NoDataValue ||
+        TopoShield.get_data_element(row,col) == NoDataValue ||
+        SelfShield.get_data_element(row,col) == NoDataValue ||
+        SnowShield.get_data_element(row,col) == NoDataValue || 
+        eff_erosion_rate.get_data_element(row,col) == NoDataValue )
+    {
+      CRN_conc_at_pixel[row][col] == NoDataValue;    
+    }
+    else
+    { 
+      // reset scaling parameters. This is necessary since the F values are
+      // reset for local scaling
+      reset_scaling(LSDCRNP, Muon_scaling);
+  
+      // set the scaling to the correct production uncertainty
+      vector<double> test_uncert;
+      if(is_production_uncertainty_plus_on)
+      {
+        test_uncert = LSDCRNP.set_P0_CRONUS_uncertainty_plus();
+      }
+      else if(is_production_uncertainty_minus_on)
+      {
+        test_uncert = LSDCRNP.set_P0_CRONUS_uncertainty_minus();
+      }
+
+      // Get the scaling and shielding
+      total_shielding = ProductionScale.get_data_element(row,col)*TopoShield.get_data_element(row,col);
+
+      // scale the F values
+      LSDCRNP.scale_F_values(total_shielding,nuclide_scaling_switches);
+
+      // Get the top and bottom effective depths from the snow and self shielding rasters
+      this_top_eff_depth = SnowShield.get_data_element(row,col);
+      this_bottom_eff_depth = this_top_eff_depth+SelfShield.get_data_element(row,col);
+ 
+      // get the nuclide concentration from this node
+      if (Nuclide == "Be10")
+      {
+        //cout << "LInE 2271, 10Be" << endl;
+        eroded_particle.update_10Be_SSfull_depth_integrated(double(eff_erosion_rate.get_data_element(row,col)),LSDCRNP,
+                                           this_top_eff_depth, this_bottom_eff_depth);
+        this_conc=eroded_particle.getConc_10Be();
+      }
+      else if (Nuclide == "Al26")
+      {
+        //cout << "LINE 2278, 26Al" << endl;
+        eroded_particle.update_26Al_SSfull_depth_integrated(double(eff_erosion_rate.get_data_element(row,col)),LSDCRNP,
+                                           this_top_eff_depth, this_bottom_eff_depth);
+        this_conc=eroded_particle.getConc_26Al();
+      }
+      else
+      {
+        cout << "You didn't give a valid nuclide. You chose: " << Nuclide << endl;
+        cout << "Choices are 10Be, 26Al.  Note these case sensitive and cannot" << endl;
+        cout << "contain spaces or control characters. Defaulting to 10Be." << endl;
+        eroded_particle.update_10Be_SSfull_depth_integrated(double(eff_erosion_rate.get_data_element(row,col)),LSDCRNP,
+                                           this_top_eff_depth, this_bottom_eff_depth);
+        this_conc=eroded_particle.getConc_10Be();
+      }  
+      CRN_conc_at_pixel[row][col] = this_conc;    
+    }           // End nodata logic                                 
+  }  
+  float XMinimum = ProductionScale.get_XMinimum();
+  float YMinimum = ProductionScale.get_YMinimum();
+  float DataResolution = ProductionScale.get_DataResolution();
+  map<string,string> GeoReferencingStrings = ProductionScale.get_GeoReferencingStrings();
+
+  LSDRaster CRN_conc(NRows, NCols, XMinimum, YMinimum, DataResolution,
+                               NDV, CRN_conc_at_pixel,GeoReferencingStrings);  
+  return  CRN_conc;
+
+}                        
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This calculates the "erosion rate" incorporating landslides.
+// The flux of material through the system is just the eorsion rate (in g/m^2/yr)
+// where there is no landslide. The landslide flux is 
+// the depth of the landslide and it is assumed it all goes in the river over the year
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDRaster LSDCosmoRaster::calculate_landslide_dump_erate(LSDRaster& eff_erosion_rate,
+                                           LSDRaster& SelfShield)
+{
+  
+  int NRows = eff_erosion_rate.get_NRows();
+  int NCols = eff_erosion_rate.get_NCols();
+  float NDV =  eff_erosion_rate.get_NoDataValue();
+  
+  Array2D<float> erate_at_pixel_after_dump(NRows,NCols,NDV);
+  for(int row = 0; row<NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      if (eff_erosion_rate.get_data_element(row,col)!=NDV)
+      {
+        if(SelfShield.get_data_element(row,col)==NDV)
+        {
+          erate_at_pixel_after_dump[row][col] = eff_erosion_rate.get_data_element(row,col);
+        }
+        else
+        {
+          if( SelfShield.get_data_element(row,col) < eff_erosion_rate.get_data_element(row,col) )
+          {
+            erate_at_pixel_after_dump[row][col] = eff_erosion_rate.get_data_element(row,col);
+          }
+          else
+          {
+            erate_at_pixel_after_dump[row][col] = SelfShield.get_data_element(row,col);
+          }
+        }
+      }
+    }
+  } 
+
+  float XMinimum = eff_erosion_rate.get_XMinimum();
+  float YMinimum = eff_erosion_rate.get_YMinimum();
+  float DataResolution = eff_erosion_rate.get_DataResolution();
+  map<string,string> GeoReferencingStrings = eff_erosion_rate.get_GeoReferencingStrings();
+
+  LSDRaster erate_after_dump(NRows, NCols, XMinimum, YMinimum, DataResolution,
+                               NDV, erate_at_pixel_after_dump,GeoReferencingStrings);   
+
+  return erate_after_dump;
+
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This gets the accumulated CRN
+// This version accumulates every pixel
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDRaster LSDCosmoRaster::calculate_accumulated_CRN_concentration(LSDRaster& CRN_conc, 
+                                          LSDRaster& eff_erosion_rate,
+                                          LSDFlowInfo& FlowInfo)
+{
+  // you need two bits of information: the nulcides delivered in quartz (we do it in a year, for the number of atoms)
+  // then the mass of flux. 
+  // The accumulated concentration is then the nucludes divided by the mass (of quartz)
+  // In this version we don't have variable quartz concentrations. 
+
+  cout << "Let me accumulate some CRN." << endl;
+  LSDRaster AtomsFlux = CRN_conc.MapAlgebra_multiply(eff_erosion_rate);
+  LSDRaster AccumCRN =  FlowInfo.upslope_variable_accumulator_v2(AtomsFlux);
+  LSDRaster Accum_eros=  FlowInfo.upslope_variable_accumulator_v2(eff_erosion_rate);
+
+  LSDRaster AccumConc = AccumCRN.MapAlgebra_divide(Accum_eros);
+
+  return AccumConc;
+
+}  
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This gets the accumulated CRN
+// This version accumulates every pixel
+// This is an overloaded version that takes a quartz conentration raster
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDRaster LSDCosmoRaster::calculate_accumulated_CRN_concentration(LSDRaster& CRN_conc, 
+                                          LSDRaster& eff_erosion_rate,
+                                          LSDRaster& quartz_concentration,
+                                          LSDFlowInfo& FlowInfo)
+{
+  // you need two bits of information: the nulcides delivered in quartz (we do it in a year, for the number of atoms)
+  // then the mass of flux. 
+  // The accumulated concentration is then the nucludes divided by the mass (of quartz)
+  // In this version we don't have variable quartz concentrations. 
+
+  LSDRaster AtomsInQuartz = CRN_conc.MapAlgebra_multiply(quartz_concentration);
+  LSDRaster AtomsFlux = AtomsInQuartz.MapAlgebra_multiply(eff_erosion_rate);
+
+  LSDRaster QuartzErosion = quartz_concentration.MapAlgebra_multiply(eff_erosion_rate);
+
+  cout << "Let me accumulate some CRN." << endl;
+  LSDRaster AccumCRN =  FlowInfo.upslope_variable_accumulator_v2(AtomsFlux);
+  LSDRaster Accum_eros=  FlowInfo.upslope_variable_accumulator_v2(QuartzErosion);
+
+  LSDRaster AccumConc = AccumCRN.MapAlgebra_divide(Accum_eros);
+
+  return AccumConc;
+
+}  
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This gets the accumulated CRN from a node list
+// This version accumulates a single pixel
+// The upslope nodes should include the outlet
+// use LSDFlowInfo::get_uplsope_nodes_include_outlet
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+float LSDCosmoRaster::calculate_accumulated_CRN_concentration(LSDRaster& CRN_conc, 
+                                          LSDRaster& eff_erosion_rate,
+                                          LSDFlowInfo& FlowInfo,
+                                          vector<int> upslope_nodes_including_outlet) 
+{
+
+  int n_nodes = upslope_nodes_including_outlet.size();
+  
+  // loop through the affected nodes
+  int row, col,rrow,rcol;
+  float this_accumulated_atoms = 0;
+  float this_accumulated_mass = 0;
+  float accum_conc;
+
+  float increment_mass_flux;
+  float increment_atoms;
+
+  // Loop through nodes, accumulating
+  for (int node = 0; node <n_nodes; node++)
+  {
+    // Get the current row and column  
+    FlowInfo.retrieve_current_row_and_col(upslope_nodes_including_outlet[node],row,col);
+
+    this_accumulated_mass += eff_erosion_rate.get_data_element(row,col);
+    this_accumulated_atoms += CRN_conc.get_data_element(row,col)*eff_erosion_rate.get_data_element(row,col);
+
+  }
+
+  accum_conc = this_accumulated_atoms/this_accumulated_mass;
+
+  return accum_conc;
+} 
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This gets the accumulated CRN from an outlet node
+// This version accumulates a single pixel
+// This is an overloaded version that takes a quartz concentration raster
+// The upslope nodes should include the outlet
+// use LSDFlowInfo::get_uplsope_nodes_include_outlet
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+float LSDCosmoRaster::calculate_accumulated_CRN_concentration(LSDRaster& CRN_conc, 
+                                          LSDRaster& eff_erosion_rate,
+                                          LSDRaster& quartz_concentration,
+                                          LSDFlowInfo& FlowInfo,
+                                          vector<int> upslope_nodes_including_outlet) 
+{
+  int n_nodes = upslope_nodes_including_outlet.size();
+  
+  // loop through the affected nodes
+  int row, col,rrow,rcol;
+  float this_accumulated_atoms = 0;
+  float this_accumulated_mass = 0;
+  float accum_conc;
+
+  float increment_mass_flux;
+  float increment_atoms;
+
+  // Loop through nodes, accumulating
+  for (int node = 0; node <n_nodes; node++)
+  {
+    // Get the current row and column  
+    FlowInfo.retrieve_current_row_and_col(upslope_nodes_including_outlet[node],row,col);
+
+    this_accumulated_mass += eff_erosion_rate.get_data_element(row,col)*quartz_concentration.get_data_element(row,col);
+    this_accumulated_atoms += CRN_conc.get_data_element(row,col)*eff_erosion_rate.get_data_element(row,col)*quartz_concentration.get_data_element(row,col);
+
+  }
+
+  accum_conc = this_accumulated_atoms/this_accumulated_mass;
+
+  return accum_conc;
+} 
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This gets the accumulated CRN from an outlet node
+// This version accumulates a single pixel
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+float LSDCosmoRaster::calculate_accumulated_CRN_concentration(LSDRaster& CRN_conc, 
+                                          LSDRaster& eff_erosion_rate,
+                                          LSDFlowInfo& FlowInfo,
+                                          int outlet_node) 
+{
+  vector<int> upslope_nodes_including_outlet = FlowInfo.get_upslope_nodes_include_outlet(outlet_node);
+  int n_nodes = upslope_nodes_including_outlet.size();
+  
+  // loop through the affected nodes
+  int row, col,rrow,rcol;
+  float this_accumulated_atoms = 0;
+  float this_accumulated_mass = 0;
+  float accum_conc;
+
+  float increment_mass_flux;
+  float increment_atoms;
+
+  // Loop through nodes, accumulating
+  for (int node = 0; node <n_nodes; node++)
+  {
+    // Get the current row and column  
+    FlowInfo.retrieve_current_row_and_col(upslope_nodes_including_outlet[node],row,col);
+
+    this_accumulated_mass += eff_erosion_rate.get_data_element(row,col);
+    this_accumulated_atoms += CRN_conc.get_data_element(row,col)*eff_erosion_rate.get_data_element(row,col);
+
+  }
+
+  accum_conc = this_accumulated_atoms/this_accumulated_mass;
+
+  return accum_conc;
+} 
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This gets the accumulated CRN from an outlet node
+// This version accumulates a single pixel
+// This is an overloaded version that takes a quartz concentration raster
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+float LSDCosmoRaster::calculate_accumulated_CRN_concentration(LSDRaster& CRN_conc, 
+                                          LSDRaster& eff_erosion_rate,
+                                          LSDRaster& quartz_concentration,
+                                          LSDFlowInfo& FlowInfo,
+                                          int outlet_node) 
+{
+  vector<int> upslope_nodes_including_outlet = FlowInfo.get_upslope_nodes_include_outlet(outlet_node);
+  int n_nodes = upslope_nodes_including_outlet.size();
+  
+  // loop through the affected nodes
+  int row, col,rrow,rcol;
+  float this_accumulated_atoms = 0;
+  float this_accumulated_mass = 0;
+  float accum_conc;
+
+  float increment_mass_flux;
+  float increment_atoms;
+
+  // Loop through nodes, accumulating
+  for (int node = 0; node <n_nodes; node++)
+  {
+    // Get the current row and column  
+    FlowInfo.retrieve_current_row_and_col(upslope_nodes_including_outlet[node],row,col);
+
+    this_accumulated_mass += eff_erosion_rate.get_data_element(row,col)*quartz_concentration.get_data_element(row,col);
+    this_accumulated_atoms += CRN_conc.get_data_element(row,col)*eff_erosion_rate.get_data_element(row,col)*quartz_concentration.get_data_element(row,col);
+
+  }
+
+  accum_conc = this_accumulated_atoms/this_accumulated_mass;
+
+  return accum_conc;
+} 
+
+//===================================================================
+// Newton-raphson routines for getting the correct erosion rate
+// Will be overloaded to have a number of different scenarios
+//===================================================================
+                                           
+float LSDCosmoRaster::calculate_eff_erate_from_conc(float Nuclide_conc,
+                                    string Nuclide,string Muon_scaling, 
+                                    LSDRaster& known_eff_erosion_rate,
+                                    LSDRaster& Production_raster,
+                                    LSDRaster& TopoShield, 
+                                    LSDRaster& SelfShield,
+                                    LSDRaster& SnowShield,
+                                    LSDRaster& quartz_concentration,
+                                    LSDFlowInfo& FlowInfo,
+                                    int outlet_node)
+{
+
+  // WORKING HERE!!
+  // NEED TO TEST THIS FUNCTION
+  // SMM 22-AUG-2019
+
+  // Need to put in the logic for the newton raphson
+  // it iterates on an effective erate that will reproduce the nuclide concentration
+  // 
+  // calculate concentration
+  // accumulate concentration
+  // do iteration on accumulated concentration
+  // repeat.
+
+  // First set all the scalings
+
+  // First thing to do is to make an erosion rate guess
+  float eff_erate_guess = get_erate_guess(Nuclide_conc, Nuclide,Muon_scaling, 
+                                            Production_raster,TopoShield, 
+                                            SelfShield,SnowShield,
+                                            FlowInfo, outlet_node);
+  cout << "The first guess is: " << eff_erate_guess << endl;
+
+  // now we enter the Newton-Raphson
+  double eff_e_new = double(eff_erate_guess); // the erosion rate upon which we iterate
+  double eff_e_change;                // the change in erosion rate between iterations
+  int threshold_steps = 15;           // the maximum number of iterations before it just takes the best guess
+  double tolerance = 1e-7;           // tolerance for a change in the erosion rate
+                                      // between Newton-Raphson iterations
+  double eff_e_displace = 1e-4;       // A small displacment in the erosion rate used
+                                      // to calculate the derivative
+  double N_this_step;                 // the concentration of the nuclide reported this step
+  double N_displace;                  // the concentration at the displaced erosion rate
+  double N_derivative;                // dN/de derivative for Newton-Raphson
+  double f_x;                         // the function being tested by newton raphson
+  double f_x_displace;                // the displaced function (for calculating the derivative)
+
+  double this_step_prod_uncert;       // the uncertainty in the production rate
+                                      // from this step
+  double displace_uncertainty;        // the uncertainty from the displaced calculations
+                                      // is not used so a dummy variable is used here
+
+  double this_step_average_production;// the average production rate for this step
+  double displace_average_production; // aveage production for the displace step
+
+  // These need to be fed to the function later. 
+  bool is_production_uncertainty_plus_on  = false;
+  bool is_production_uncertainty_minus_on  = false;
+
+  // need the raster maker for the calculations
+  LSDRasterMaker MakeItYeah(Production_raster);
+  LSDRaster eff_erosion_raster;    
+
+
+  // Now lets loop 
+  LSDRaster cosmo_conc_raster;
+  float closest_guess = eff_erate_guess;
+  float closest_N_difference = 10e10;
+  int N_steps = 0;
+  do
+  {
+    N_steps++;
+    // To get the concentrations we need to get the concentration at points, 
+    // derived from the erosion rate raster which can be modified by the known erosion rate
+    // and then calculate the accumulated concentration. 
+    // The whole thing takes three steps.
+    
+    //eff_erosion_raster = make_eff_erate_raster_from_known_erate_and_float_erate(eff_e_new, 
+    //                                                known_eff_erosion_rate,
+    //                                                outlet_node, FlowInfo);
+
+    MakeItYeah.set_to_constant_value(float(eff_e_new));
+    eff_erosion_raster =  MakeItYeah.return_as_raster();
+    cosmo_conc_raster = calculate_CRN_concentration_raster(Nuclide, Muon_scaling, 
+                                       eff_erosion_raster,Production_raster, 
+                                       TopoShield, SelfShield,SnowShield,
+                                       FlowInfo,outlet_node,  
+                                       is_production_uncertainty_plus_on,
+                                       is_production_uncertainty_minus_on);
+    N_this_step = calculate_accumulated_CRN_concentration(cosmo_conc_raster, 
+                                          eff_erosion_raster, 
+                                          FlowInfo, outlet_node); 
+    //cout << " Conc: " << N_this_step << endl;
+
+    // now get the derivative
+    //eff_erosion_rate = make_eff_erate_raster_from_known_erate_and_float_erate(eff_e_new+eff_e_displace, 
+    //                                                known_eff_erosion_rate,
+    //                                                outlet_node, FlowInfo);
+    
+    MakeItYeah.set_to_constant_value(float(eff_e_new+eff_e_displace));
+    eff_erosion_raster =  MakeItYeah.return_as_raster();
+    cosmo_conc_raster = calculate_CRN_concentration_raster(Nuclide, Muon_scaling, 
+                                       eff_erosion_raster,Production_raster, 
+                                       TopoShield, SelfShield,SnowShield,
+                                       FlowInfo,outlet_node,  
+                                       is_production_uncertainty_plus_on,
+                                       is_production_uncertainty_minus_on);
+    N_displace = calculate_accumulated_CRN_concentration(cosmo_conc_raster, 
+                                          eff_erosion_raster, 
+                                          FlowInfo, outlet_node); 
+    //cout << " Conc after displace: " << N_displace << endl;
+
+    // This is the Newton-Raphson bit. 
+    f_x =  N_this_step-Nuclide_conc;
+    f_x_displace =  N_displace-Nuclide_conc;
+
+    // Updates the closest guess so far
+    // I need this if it isn't converging
+    if (fabs(f_x) <  closest_N_difference)
+    {
+      closest_N_difference = fabs(f_x);
+      closest_guess = eff_e_new;  
+    }
+
+    //cout << "Conc diff is: " << N_this_step - N_displace << endl;
+    //cout << "Diff from target conc is: " << f_x << endl;
+    //cout << "f_x displace is: " << f_x_displace << endl;
+
+    N_derivative = (f_x_displace-f_x)/eff_e_displace;
+    //cout << "N derivative is: " << N_derivative << endl;
+
+    if(N_derivative != 0)
+    {
+      // Check the change
+      eff_e_change = f_x/N_derivative;
+
+      // Put a brake on to stop negative erosion rates
+      if (eff_e_change > eff_e_new)
+      {
+        eff_e_change = 0.5*eff_e_new;
+      }
+
+      eff_e_new = eff_e_new-eff_e_change;
+
+      //cout << "Absolute Effective e change is: " << fabs(eff_e_change) << " and new erosion rate is: " << eff_e_new << endl;
+
+    }
+    else
+    {
+      eff_e_change = 0;
+    }
+
+    // This is an escape hatch that takes the best guess if there is no convergence. 
+    if(N_steps > threshold_steps)
+    {
+      eff_e_change = 0;
+      eff_e_new = closest_guess;
+
+    }
+
+  } while(fabs(eff_e_change) > tolerance);
+
+  
+  //cout << "I got an erosion rate after " << N_steps <<" steps! It is: " << eff_e_new << endl; 
+  //cout << "==============================" << endl << endl << endl;
+  return eff_e_new;
+}
+
+
+
+
+// This guesses an erosion rate using the production rate at the outlet. It is just the first
+// guess of the erosion  rate at a given pixel.
+float LSDCosmoRaster::get_erate_guess(float Nuclide_conc, string Nuclide,string Muon_scaling, 
+                                      LSDRaster& Production_raster,
+                                      LSDRaster& TopoShield, 
+                                      LSDRaster& SelfShield,
+                                      LSDRaster& SnowShield,
+                                      LSDFlowInfo& FlowInfo,
+                                      int outlet_node)
+{
+  // set the scaling vector
+  vector<bool> nuclide_scaling_switches(4,false);
+  if (Nuclide == "Be10")
+  {
+    nuclide_scaling_switches[0] = true;
+  }
+  else if (Nuclide == "Al26")
+  {
+    nuclide_scaling_switches[1] = true;
+  }
+  else
+  {
+    cout << "LSDBasin line 1583, You didn't choose a valid nuclide. Defaulting"
+         << " to 10Be." << endl;
+    Nuclide = "Be10";
+    nuclide_scaling_switches[0] = true;
+  }
+
+  // the total shielding. A product of snow, topographic and production scaling
+  double total_shielding;
+
+  // initiate a particle. We'll just repeatedly call this particle
+  // for the sample.
+  int startType = 0;
+  double Xloc = 0;
+  double Yloc = 0;
+  double  startdLoc = 0.0;
+  double  start_effdloc = 0.0;
+  double startzLoc = 0.0;
+
+  // create a particle at zero depth
+  LSDCRNParticle eroded_particle(startType, Xloc, Yloc,
+                               startdLoc, start_effdloc, startzLoc);
+
+  // now create the CRN parameters object
+  LSDCRNParameters LSDCRNP;  
+
+  // reset scaling parameters. This is necessary since the F values are
+  // reset for local scaling
+  reset_scaling(LSDCRNP, Muon_scaling);
+
+  // Get the scaling and shielding
+  // get the nodes upstream including the outlet
+  vector<int> upslope_nodes_including_outlet = FlowInfo.get_upslope_nodes_include_outlet(outlet_node);
+  int n_nodes = upslope_nodes_including_outlet.size();
+
+  // loop through the nodes, replacing values where necessary
+  int row,col;
+  float sum_shielding = 0;
+  float N_shielding = 0;
+  float NDV = TopoShield.get_NoDataValue();
+  for (int node = 0; node <n_nodes; node++)
+  {
+    // Get the current row and column  
+    FlowInfo.retrieve_current_row_and_col(upslope_nodes_including_outlet[node],row,col);
+
+    if(Production_raster.get_data_element(row,col) != NDV &&
+       TopoShield.get_data_element(row,col) != NDV)
+    {
+      N_shielding+=1.0;
+      sum_shielding += Production_raster.get_data_element(row,col)*TopoShield.get_data_element(row,col);
+    }
+  }
+  total_shielding = sum_shielding/N_shielding; 
+  cout << "total_shielding is: " << total_shielding << " and nuclide concentration is: " <<Nuclide_conc << endl;
+
+  // scale the F values
+  float rho = 2650;
+  float first_erate_guess;
+  LSDCRNP.scale_F_values(total_shielding,nuclide_scaling_switches);
+  LSDCRNP.set_neutron_scaling(total_shielding, 1.0, 1.0);
+
+  // get the nuclide concentration from this node
+  float first_eff_erate;
+
+  if (Nuclide == "Be10")
+  {
+    eroded_particle.setConc_10Be(Nuclide_conc);
+    first_erate_guess = eroded_particle.apparent_erosion_10Be_neutron_only(rho, LSDCRNP);
+    first_eff_erate = eroded_particle.convert_m_to_gpercm2(first_erate_guess,rho);
+  }
+  else if (Nuclide == "Al26")
+  {
+    eroded_particle.setConc_26Al(Nuclide_conc);
+    first_erate_guess = eroded_particle.apparent_erosion_26Al_neutron_only(rho, LSDCRNP);
+    first_eff_erate = eroded_particle.convert_m_to_gpercm2(first_erate_guess,rho);
+  }
+  else
+  {
+    cout << "You didn't give a valid nuclide. You chose: " << Nuclide << endl;
+    cout << "Choices are 10Be, 26Al.  Note these case sensitive and cannot" << endl;
+    cout << "contain spaces or control characters. Defaulting to 10Be." << endl;
+    first_erate_guess = eroded_particle.apparent_erosion_10Be_neutron_only(rho, LSDCRNP);
+    first_eff_erate = eroded_particle.convert_m_to_gpercm2(first_erate_guess,rho);
+  }  
+
+  return first_eff_erate;     
+}
+
+// This function takes a known erosion rate raster, with numbers where the 
+// erosion rate (in g/m^2/yr) is known and nodata where it isn't
+// and then creates a raster (only on the upslope nodes), with the known
+// values
+LSDRaster LSDCosmoRaster::make_eff_erate_raster_from_known_erate_and_float_erate(float eff_erate, 
+                                                    LSDRaster& known_erate_raster,
+                                                    int outlet_node,
+                                                    LSDFlowInfo& FlowInfo)
+{
+  // make a new array for holding the values
+  int NRows = known_erate_raster.get_NRows();
+  int NCols = known_erate_raster.get_NCols();
+  float NDV =  known_erate_raster.get_NoDataValue();
+  
+  Array2D<float> erate(NRows,NCols,eff_erate);
+
+  // get the nodes upstream including the outlet
+  vector<int> upslope_nodes_including_outlet = FlowInfo.get_upslope_nodes_include_outlet(outlet_node);
+  int n_nodes = upslope_nodes_including_outlet.size();
+
+  // loop through the nodes, replacing values where necessary
+  int row,col;
+  for (int node = 0; node <n_nodes; node++)
+  {
+    // Get the current row and column  
+    FlowInfo.retrieve_current_row_and_col(upslope_nodes_including_outlet[node],row,col);
+
+    if(known_erate_raster.get_data_element(row,col) != NDV)
+    {
+      erate[row][col] = known_erate_raster.get_data_element(row,col);
+    }
+  } 
+
+  float XMinimum = known_erate_raster.get_XMinimum();
+  float YMinimum = known_erate_raster.get_YMinimum();
+  float DataResolution = known_erate_raster.get_DataResolution();
+  map<string,string> GeoReferencingStrings = known_erate_raster.get_GeoReferencingStrings();
+
+  LSDRaster thiserate(NRows, NCols, XMinimum, YMinimum, DataResolution,
+                               NDV, erate,GeoReferencingStrings);   
+
+  return thiserate;
+}
+
 
 #endif

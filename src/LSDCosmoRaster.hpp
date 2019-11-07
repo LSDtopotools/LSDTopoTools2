@@ -20,6 +20,7 @@
 #include <string>
 #include "TNT/tnt.h"
 #include "LSDRaster.hpp"
+#include "LSDFlowInfo.hpp"
 #include "LSDCRNParameters.hpp"
 using namespace std;
 using namespace TNT;
@@ -189,16 +190,200 @@ class LSDCosmoRaster: public LSDRaster
     /// @param is_production_uncertainty_minus_on a boolean that is true if the
     ///  production rate uncertainty (-) is switched on. If the + switch is
     ///  true this parameter defauts to false.
-    /// @return the concentration of the nuclide averaged across the DEM
+    /// @return the concentration of the nuclide at each pixel for the given erosion rate
     /// @author SMM
     /// @date 18/11/2018
-    void calculate_CRN_concentration_raster(string Nuclide, string Muon_scaling, LSDRaster& eff_erosion_rate,
+    LSDRaster calculate_CRN_concentration_raster(string Nuclide, string Muon_scaling, LSDRaster& eff_erosion_rate,
                                LSDRaster& ProductionScale, LSDRaster& TopoShield, 
                                LSDRaster& SelfShield, LSDRaster& SnowShield, 
                                bool is_production_uncertainty_plus_on,
                                bool is_production_uncertainty_minus_on);
 
+    /// @brief this predicts the concentration of a nuclide for each pixel within a basin. 
+    /// It does a full analytical solution to account for
+    ///  snow and self sheilding. This is overloaded and only calculates the concentrations
+    ///  based on an outlet node
+    /// @detail This is NOT an accumulator function! It is the concentration at that specific pixel. 
+    ///  For pixels with a landslide (e.g, places with TopoShield not = 0)
+    ///  This is the depth averaged concentration of particles emerging from that pixel during the landslide. 
+    /// @param eff_erosion rate The erosion rate in g/cm^2/yr
+    /// @param Nuclide a string with the nuclide name. At the moment the options are:
+    ///   Be10
+    ///   Al26
+    ///  These are case sensitive
+    /// @param Muon_scaling a string that gives the muon scaling scheme.
+    ///  options are Schaller, Braucher and Granger, and newCRONUS
+    /// @param eff_erosion_rate A raster of the effective erosion rate (in g/cm^2/yr)
+    /// @param ProductionScale A raster of the production scaling (uses Lal/Stone scheme)
+    /// @param TopoShield A raster of the topographic shielding. Varies from 0 to 1.
+    /// @param SelfShield A raster of self shielding in g/cm^2 (the effective thickenss of the layer removed) 
+    /// @param SnowShield A raster of snow shielding in g/cm^2 (the effective depth of the snow) 
+    /// @param FlowInfo A flow info object
+    /// @param upslope nodes The nodes upslope of an arbitrary outlet node. 
+    /// @param is_production_uncertainty_plus_on a boolean that is true if the
+    ///  production rate uncertainty (+) is switched on
+    /// @param is_production_uncertainty_minus_on a boolean that is true if the
+    ///  production rate uncertainty (-) is switched on. If the + switch is
+    ///  true this parameter defauts to false.
+    /// @return the concentration of the nuclide at each pixel for the given erosion rate
+    /// @author SMM
+    /// @date 31/07/2019
+    LSDRaster calculate_CRN_concentration_raster(string Nuclide, string Muon_scaling, LSDRaster& eff_erosion_rate,
+                               LSDRaster& ProductionScale, LSDRaster& TopoShield, 
+                               LSDRaster& SelfShield, LSDRaster& SnowShield, 
+                               LSDFlowInfo& FlowInfo, int outlet_node,
+                               bool is_production_uncertainty_plus_on,
+                               bool is_production_uncertainty_minus_on);
 
+
+    /// @brief this predicts the concentration of a nuclide for each pixel within a basin. 
+    /// It does a full analytical solution to account for
+    ///  snow and self sheilding. This is overloaded and only calculates the concentrations
+    ///  based on a node list derived from a flowinfo object. 
+    /// @detail This is NOT an accumulator function! It is the concentration at that specific pixel. 
+    ///  For pixels with a landslide (e.g, places with TopoShield not = 0)
+    ///  This is the depth averaged concentration of particles emerging from that pixel during the landslide. 
+    /// @param eff_erosion rate The erosion rate in g/cm^2/yr
+    /// @param Nuclide a string with the nuclide name. At the moment the options are:
+    ///   Be10
+    ///   Al26
+    ///  These are case sensitive
+    /// @param Muon_scaling a string that gives the muon scaling scheme.
+    ///  options are Schaller, Braucher and Granger, and newCRONUS
+    /// @param eff_erosion_rate A raster of the effective erosion rate (in g/cm^2/yr)
+    /// @param ProductionScale A raster of the production scaling (uses Lal/Stone scheme)
+    /// @param TopoShield A raster of the topographic shielding. Varies from 0 to 1.
+    /// @param SelfShield A raster of self shielding in g/cm^2 (the effective thickenss of the layer removed) 
+    /// @param SnowShield A raster of snow shielding in g/cm^2 (the effective depth of the snow) 
+    /// @param FlowInfo A flow info object
+    /// @param upslope nodes The nodes upslope of an arbitrary outlet node. 
+    /// @param is_production_uncertainty_plus_on a boolean that is true if the
+    ///  production rate uncertainty (+) is switched on
+    /// @param is_production_uncertainty_minus_on a boolean that is true if the
+    ///  production rate uncertainty (-) is switched on. If the + switch is
+    ///  true this parameter defauts to false.
+    /// @return the concentration of the nuclide at each pixel for the given erosion rate
+    /// @author SMM
+    /// @date 29/07/2019
+    LSDRaster calculate_CRN_concentration_raster(string Nuclide, string Muon_scaling, LSDRaster& eff_erosion_rate,
+                               LSDRaster& ProductionScale, LSDRaster& TopoShield, 
+                               LSDRaster& SelfShield, LSDRaster& SnowShield, 
+                               LSDFlowInfo& FlowInfo, vector<int> upslope_nodes,
+                               bool is_production_uncertainty_plus_on,
+                               bool is_production_uncertainty_minus_on);
+
+    /// @brief This returns a raster that has the erosion rate including a "dump" of sediment from landslides
+    /// @param eff_erosion rate The erosion rate in g/cm^2/yr
+    /// @param SelfShield A raster of self shielding in g/cm^2 (the effective thickenss of the layer removed) 
+    /// @return The rate (in g/cm^2/yr) where the "dumped" sediment appears in the rate (e.g., assumed to be delived to the system over a year)
+    ///  or perhaps a better way to think about it is that the sediment in the system is at the background erosion rate and one year's worth of this
+    ///  sediment is diluted by the landslide material. 
+    /// @author SMM
+    /// @date 30/07/2019    
+    LSDRaster calculate_landslide_dump_erate(LSDRaster& eff_erosion_rate,
+                                           LSDRaster& SelfShield);
+
+    /// @brief This accumulates CRN and gets detrital CRN concentrations. It is a heavily overloaded function
+    ///  This version assumes all quartz content is the same and does every pixel in the DEM
+    /// @param CRN_conc The concentration of CRN derived from the 
+    ///   calculate_CRN_concentration_raster function
+    /// @param eff_erosion rate The erosion rate in g/cm^2/yr
+    /// @param FlowInfo A flow info object
+    /// @return the concentration of the nuclide at each pixel for the given erosion rate that is accumulated in detrital sediment
+    /// @author SMM
+    /// @date 30/07/2019
+    LSDRaster calculate_accumulated_CRN_concentration(LSDRaster& CRN_conc, 
+                                          LSDRaster& eff_erosion_rate,
+                                          LSDFlowInfo& FlowInfo);
+
+    /// @brief This accumulates CRN and gets detrital CRN concentrations. It is a heavily overloaded function
+    ///  This version takes a quartz concentration raster
+    /// @param CRN_conc The concentration of CRN derived from the 
+    ///   calculate_CRN_concentration_raster function
+    /// @param eff_erosion rate The erosion rate in g/cm^2/yr
+    /// @param quartz_concentration The quartz "concentration": in fact this is the relative mass fraction of quartz in eroded material 
+    ///  in each pixel. 
+    /// @param FlowInfo A flow info object
+    /// @return the concentration of the nuclide at each pixel for the given erosion rate that is accumulated in detrital sediment
+    /// @author SMM
+    /// @date 30/07/2019
+    LSDRaster calculate_accumulated_CRN_concentration(LSDRaster& CRN_conc, 
+                                          LSDRaster& eff_erosion_rate,
+                                          LSDRaster& quartz_concentration,
+                                          LSDFlowInfo& FlowInfo);                                      
+
+    /// @brief This accumulates CRN and gets detrital CRN concentrations. It is a heavily overloaded function
+    ///  This is for a single pixel
+    /// @param CRN_conc The concentration of CRN derived from the 
+    ///   calculate_CRN_concentration_raster function
+    /// @param eff_erosion rate The erosion rate in g/cm^2/yr
+    /// @param quartz_concentration The quartz "concentration": in fact this is the relative mass fraction of quartz in eroded material 
+    ///  in each pixel. 
+    /// @param FlowInfo A flow info object
+    /// @param upslope_nodes_and_outlet node indices of uplsope nodes and the outlet. 
+    ///  get from LSDFlowInfo::get_uplsope_nodes_include_outlet
+    /// @return the concentration of the accumulated nuclide at the outlet node
+    /// @author SMM
+    /// @date 30/07/2019
+    float calculate_accumulated_CRN_concentration(LSDRaster& CRN_conc, 
+                                          LSDRaster& eff_erosion_rate,
+                                          LSDFlowInfo& FlowInfo, 
+                                          vector<int> upslope_nodes_and_outlet);    
+
+    /// @brief This accumulates CRN and gets detrital CRN concentrations. It is a heavily overloaded function
+    ///  This version takes a quartz concentration raster and is for a single pixel
+    /// @param CRN_conc The concentration of CRN derived from the 
+    ///   calculate_CRN_concentration_raster function
+    /// @param eff_erosion rate The erosion rate in g/cm^2/yr
+    /// @param quartz_concentration The quartz "concentration": in fact this is the relative mass fraction of quartz in eroded material 
+    ///  in each pixel. 
+    /// @param FlowInfo A flow info object
+    /// @param upslope_nodes_and_outlet node indices of uplsope nodes and the outlet. 
+    ///  get from LSDFlowInfo::get_uplsope_nodes_include_outlet
+    /// @return the concentration of the accumulated nuclide at the outlet node
+    /// @author SMM
+    /// @date 30/07/2019
+    float calculate_accumulated_CRN_concentration(LSDRaster& CRN_conc, 
+                                          LSDRaster& eff_erosion_rate,
+                                          LSDRaster& quartz_concentration,
+                                          LSDFlowInfo& FlowInfo, 
+                                          vector<int> upslope_nodes_and_outlet);    
+
+    /// @brief This accumulates CRN and gets detrital CRN concentrations. It is a heavily overloaded function
+    ///  This version is for a single pixel
+    /// @param CRN_conc The concentration of CRN derived from the 
+    ///   calculate_CRN_concentration_raster function
+    /// @param eff_erosion rate The erosion rate in g/cm^2/yr
+    /// @param quartz_concentration The quartz "concentration": in fact this is the relative mass fraction of quartz in eroded material 
+    ///  in each pixel. 
+    /// @param FlowInfo A flow info object
+    /// @param outlet_node node index of outlet node. 
+    /// @return the concentration of the accumulated nuclide at the outlet node
+    /// @author SMM
+    /// @date 30/07/2019
+    float calculate_accumulated_CRN_concentration(LSDRaster& CRN_conc, 
+                                          LSDRaster& eff_erosion_rate,
+                                          LSDFlowInfo& FlowInfo, 
+                                          int outlet_node);    
+
+    /// @brief This accumulates CRN and gets detrital CRN concentrations. It is a heavily overloaded function
+    ///  This version takes a quartz concentration raster and is for a single pixel
+    /// @param CRN_conc The concentration of CRN derived from the 
+    ///   calculate_CRN_concentration_raster function
+    /// @param eff_erosion rate The erosion rate in g/cm^2/yr
+    /// @param quartz_concentration The quartz "concentration": in fact this is the relative mass fraction of quartz in eroded material 
+    ///  in each pixel. 
+    /// @param FlowInfo A flow info object
+    /// @param outlet_node node index of outlet node. 
+    /// @return the concentration of the accumulated nuclide at the outlet node
+    /// @author SMM
+    /// @date 30/07/2019
+    float calculate_accumulated_CRN_concentration(LSDRaster& CRN_conc, 
+                                          LSDRaster& eff_erosion_rate,
+                                          LSDRaster& quartz_concentration,
+                                          LSDFlowInfo& FlowInfo, 
+                                          int outlet_node);                                         
+ 
     /// @brief this predicts the mean concentration of a nuclide for each pixel within a basin. 
     /// It does a full analytical solution to account for
     ///  snow and self sheilding
@@ -230,6 +415,81 @@ class LSDCosmoRaster: public LSDRaster
                                bool is_production_uncertainty_minus_on);
 
 
+                                       
+
+    /// @brief This uses newton-raphson iteration to get the erosion rate in unknown pixels
+    ///  that reproduced a known nuclide concentration
+    /// @param Nuclide a string with the nuclide name. At the moment the options are:
+    ///   Be10
+    ///   Al26
+    ///  These are case sensitive
+    /// @param Muon_scaling a string that gives the muon scaling scheme.
+    ///  options are Schaller, Braucher and Granger, and newCRONUS
+    /// @param known_eff_erosion_rate A raster of the effective erosion rate (in g/cm^2/yr) where it is known
+    ///  nodata elsewhere
+    /// @param ProductionScale A raster of the production scaling (uses Lal/Stone scheme)
+    /// @param TopoShield A raster of the topographic shielding. Varies from 0 to 1.
+    /// @param SelfShield A raster of self shielding in g/cm^2 (the effective thickenss of the layer removed) 
+    /// @param SnowShield A raster of snow shielding in g/cm^2 (the effective depth of the snow) 
+    /// @paramquartz_concentration The relative concentration of quartz
+    /// @param is_production_uncertainty_minus_on a boolean that is true if the
+    ///  production rate uncertainty (-) is switched on. If the + switch is
+    ///  true this parameter defauts to false.
+    /// @return the concentration of the nuclide averaged across the DEM
+    /// @author SMM
+    /// @date 18/11/2018
+    float calculate_eff_erate_from_conc(float Nuclide_conc,
+                                    string Nuclide,string Muon_scaling, 
+                                    LSDRaster& known_eff_erosion_rate,
+                                    LSDRaster& ProductionScale,
+                                    LSDRaster& TopoShield, 
+                                    LSDRaster& SelfShield,
+                                    LSDRaster& SnowShield,
+                                    LSDRaster& quartz_concentration,
+                                    LSDFlowInfo& FlowInfo,
+                                    int outlet_node);
+
+
+    /// @brief This uses newton-raphson iteration to get the erosion rate in unknown pixels
+    ///  that reproduced a known nuclide concentration
+    /// @param Nuclide_conc the concentration (in atoms/g) of the nuclide
+    /// @param Nuclide a string with the nuclide name. At the moment the options are:
+    ///   Be10
+    ///   Al26
+    ///  These are case sensitive
+    /// @param Muon_scaling a string that gives the muon scaling scheme.
+    ///  options are Schaller, Braucher and Granger, and newCRONUS
+    /// @param Production_raster A raster of the production scaling (uses Lal/Stone scheme)
+    /// @param TopoShield A raster of the topographic shielding. Varies from 0 to 1.
+    /// @param SelfShield A raster of self shielding in g/cm^2 (the effective thickenss of the layer removed) 
+    /// @param SnowShield A raster of snow shielding in g/cm^2 (the effective depth of the snow) 
+    /// @param FlowInfo A flow info object
+    /// @param outlet_node node index of outlet node. 
+    /// @return an effective erosion rate from the outlet pixel at production rates of that pixel
+    /// @author SMM
+    /// @date 09/08/2019
+    float get_erate_guess(float Nuclide_conc, string Nuclide,string Muon_scaling, 
+                                      LSDRaster& Production_raster,
+                                      LSDRaster& TopoShield, 
+                                      LSDRaster& SelfShield,
+                                      LSDRaster& SnowShield,
+                                      LSDFlowInfo& FlowInfo,
+                                      int outlet_node);
+
+
+    /// @brief This creates an erate raster that has a fixed erate everywhere except where
+    ///  there is a known erate (calculated, for example, using a nested cosmo sample)
+    /// @param eff_erate The e4ffective erate that is used in places where there are no "known" erates (in g/cm^2/yr)
+    /// @param known_eff_erosion_rate A raster of the effective erosion rate (in g/cm^2/yr) where it is known
+    ///  nodata elsewhere
+    /// @param outlet_node node index of outlet node. 
+    /// @return The raster with effective erates
+    /// @author SMM
+    /// @date 09/08/2019
+    LSDRaster make_eff_erate_raster_from_known_erate_and_float_erate(float eff_erate, 
+                                    LSDRaster& known_erate_raster,
+                                    int outlet_node,
+                                    LSDFlowInfo& FlowInfo);                                   
   protected:
 
 

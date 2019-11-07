@@ -177,9 +177,14 @@ class LSDRaster
       float cellsize, float ndv, Array2D<float> data, map<string,string> temp_GRS)
   { create(nrows, ncols, xmin, ymin, cellsize, ndv, data, temp_GRS); }
 
+  /// @brief Create an LSDRaster from an LSDIndexRaster object
+  /// @return LSDRaster
+  /// @param IntLSDRaster an LSDIndexRaster object
+  /// @author SMM
+  /// @date 30/07/19
+  LSDRaster(LSDIndexRaster& IntLSDRaster)   { create(IntLSDRaster); }
 
   // Get functions
-
   /// @return Number of rows as an integer.
   int get_NRows() const        { return NRows; }
   /// @return Number of columns as an integer.
@@ -2424,6 +2429,7 @@ protected:
               double cellsize, int ndv, Array2D<double> data);
   void create(int ncols, int nrows, float xmin, float ymin,
               float cellsize, float ndv, Array2D<float> data, map<string,string> GRS);
+  void create(LSDIndexRaster& IntLSDRaster);
 
 };
 

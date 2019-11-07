@@ -66,6 +66,7 @@
 #include "TNT/tnt.h"
 #include "TNT/jama_lu.h"
 #include "LSDStatsTools.hpp"
+
 using namespace std;
 using namespace TNT;
 using namespace JAMA;
@@ -5646,6 +5647,28 @@ vector<float> Unique(vector<float> InputVector){
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Given a vector of ints, return a new vector which only contains values that occur more than once.
+// The returned vector will contain one of each duplicate value. If there are no duplicates, an empty
+// vector will be returned.
+//
+// SWDG - 23/5/19
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<int> duplicates(vector<int> data){
+
+  vector<int> unique_data = Unique(data);
+  vector<int> duplicates = data;
+
+  for (int u = 0; u < int(unique_data.size()); ++u){
+
+    vector<int>::iterator position = find(duplicates.begin(), duplicates.end(), unique_data[u]);
+    if (position != duplicates.end())
+        duplicates.erase(position);
+
+  }
+  return duplicates;
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // Simple linear spacing algorithm to return a vector of evenly spaced floats
 // between a min and max range (inclusive). Equivalent to np.linspace() in python
 // and linspace in Matlab.
@@ -5772,7 +5795,7 @@ float clockwise_angle_between_vector_and_north(float x1, float y1, float x2, flo
 float clockwise_angle_between_two_vectors(float x0, float y0, float x1, float y1, float x2, float y2)
 {
   float pi = 3.14159265;
-  float angle, new_angle;
+  float angle;
 
   float vector1_x = x1-x0;
   float vector1_y = y1-y0;
@@ -5789,7 +5812,7 @@ float clockwise_angle_between_two_vectors(float x0, float y0, float x1, float y1
   // counter clockwise, subtract from 2*pi (360 degrees)
   if (angle < 0)
   {
-    new_angle = (2*pi)+angle;
+    angle = (2*pi)+angle;
   }
 
   return angle;
@@ -8499,6 +8522,46 @@ vector<double> TV1D_denoise_v2(vector<double> input,  double lambda) {
   return output;
 }
 
+/* -------------------------------------------------------------
+    Fast approximation of the exp() function to replace math.h
+    Is claimed to have a max relative error <= 2e-3 when x is
+    in the range -87 to +88
 
+    Modified from an implementation found on StackOverflow:
+    https://stackoverflow.com/questions/10552280/fast-exp-calculation-possible-to-improve-accuracy-without-losing-too-much-perfo
+
+    an explanation of the computation can be found here:
+    https://stackoverflow.com/questions/47025373/fastest-implementation-of-exponential-function-using-sse
+
+    "The basic idea is to transform the computation of the standard
+    exponential function into computation of a power of 2:
+      expf (x) = exp2f (x / logf (2.0f)) = exp2f (x * 1.44269504).
+
+    We split t = x * 1.44269504 into an integer i and a fraction f,
+    such that t = i + f and 0 <= f <= 1.
+
+    We can now compute 2f with a polynomial approximation,
+    then scale the result by 2i by adding i to the exponent field
+    of the single-precision floating-point result."
+
+    Added by MDH, July 2019
+----------------------------------------------------------------*/
+float FastExp(float x)
+{
+    volatile union
+    {
+        float f;
+        unsigned int i;
+    } cvt;
+
+   /* exp(x) = 2^i * 2^f; i = floor (log2(e) * x), 0 <= f <= 1 */
+   float t = x * 1.442695041f;
+   float fi = floorf(t);
+   float f = t - fi;
+   int i = (int)fi;
+   cvt.f = (0.3371894346f * f + 0.657636276f) * f + 1.00172476f; /* compute 2^f */
+   cvt.i += (i << 23);                                          /* scale by 2^i */
+   return cvt.f;
+}
 
 #endif
