@@ -1604,7 +1604,7 @@ void least_squares_linear_regression(vector<float> x_data,vector<float> y_data, 
 // orthogonal linear regression
 // 01/04/2017 SMM No foolin
 // This comes from davegiles.blogspot.co.uk/2014/11/orthogonal-regression-first-steps.html
-// NOTE: THis is more generally called Total Least Squares
+// NOTE: This is more generally called Total Least Squares
 //  There is a solution using matrices that is probably compuationally faster
 //  Might want to implement that in the future if this is slow
 //  Note R^2 comes from the simple least squares
@@ -1630,12 +1630,33 @@ vector<float> orthogonal_linear_regression( vector<float>& x_data, vector<float>
   //SS_yy = SS_yy/(n_nodes-1);
   //SS_xy = SS_xy/(n_nodes-1);
 
-  gradient = (SS_yy-SS_xx+sqrt( (SS_yy-SS_xx)*(SS_yy-SS_xx)+ 4*SS_xy*SS_xy ))/(2*SS_xy);
+  float sqrt_term = (SS_yy-SS_xx)*(SS_yy-SS_xx)+ 4*SS_xy*SS_xy;
+
+  // Some logic for flat lines
+  if (SS_xx == 0)
+  {
+    cout << "This is vertical" << endl;
+    gradient = 99999999;
+    R_squared = 1;
+  }
+  else if (SS_yy == 0)
+  {
+    cout << "This is horizontal" << endl;
+    gradient = 0;
+    R_squared = 1;
+  }
+  else
+  {
+    gradient = (SS_yy-SS_xx+sqrt( (SS_yy-SS_xx)*(SS_yy-SS_xx)+ 4*SS_xy*SS_xy ))/(2*SS_xy);
+    R_squared = SS_xy*SS_xy/(SS_xx*SS_yy);
+  }
+  
+
   intercept = y_mean - gradient*x_mean;
 
   means[0] = x_mean;
   means[1]= y_mean;
-  R_squared = SS_xy*SS_xy/(SS_xx*SS_yy);
+  
   return means;
 
 }

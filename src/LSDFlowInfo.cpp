@@ -1336,13 +1336,13 @@ LSDRaster LSDFlowInfo::find_nodes_not_influenced_by_edge_draining_to_nodelist(ve
         }
       }
 
-      if (not donor_in_node_list)
+      if (donor_in_node_list == false)
       {
         bool is_influenced = is_upstream_influenced_by_nodata(this_d_node, topography);
 
         // If this donor is not influenced by nodata anywhere upstream, add all the pixels 
         // draining to this node to the data. 
-        if (not is_influenced)
+        if (is_influenced == false)
         {
           vector<int> influenced_nodes = get_upslope_nodes_include_outlet(this_d_node);
           int n_in_basin = int(influenced_nodes.size());

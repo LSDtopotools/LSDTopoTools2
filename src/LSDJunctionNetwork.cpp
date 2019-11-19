@@ -1266,6 +1266,268 @@ map<int, vector<float> > LSDJunctionNetwork::calculate_junction_angles(vector<in
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This gets the junction angles
+// It is a more complete version of the junction angle code
+// The vector of floats actually contains a number of elements
+// The int map has:
+// [0] Stream order junction 1
+// [1] Stream order junction 2
+// [2] Stream order receiver junction
+//
+// The float map has
+// [0] drainage area junction 1
+// [1] drainage area junction 2
+// [2] drainage area receiver junction
+// [3] junction angle J1-J2
+// [4] junction angle J1-R
+// [5] junction angle J2-R
+// [6] R^2 J1 segment
+// [7] R^2 J2 segment
+// [8] R^2 R segment
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDJunctionNetwork::calculate_junction_angles_complete(vector<int> JunctionList,
+                                                            LSDFlowInfo& FlowInfo,
+                                                            map<int , vector<int> >& JA_int_info,
+                                                            map<int, vector<float>>& JA_float_info )
+{
+  map<int, vector<float> > JA_float_map;
+  map<int, vector<int> > JA_int_map;
+  vector<float> temp_float_junctioninfo;
+  vector<int> temp_int_junctioninfo;
+  vector<float> nine_element_float(15,0);
+  vector<int> four_element_int(4,0);
+
+  int NJuncs = int(JunctionList.size());
+  if (NJuncs == 0)
+  {
+    NJuncs = get_NJunctions();
+    cout << "You gave me an empty junction list, I am getting angles for all junctions." << endl;
+    vector<int> JL;
+    for(int i = 0; i<NJunctions; i++)
+    {
+      JL.push_back(i);
+    }
+    JunctionList = JL;
+  }
+
+  // now go through each junction getting the angles
+  //vector<float> JunctionAngles;
+  vector<int> donors;
+  float this_angle_D1_D2, this_angle_D1_R, this_angle_D2_R;
+  bool is_baselevel;
+  bool channel_points_downstream = true;  // this is needed to get the correct
+                                          // orientation of the channels
+  int end_node, start_node1, start_node2;
+  int junction_order, donor1_order, donor2_order;
+  int receiver_node, receiver_order;
+
+
+  // vectors for holding the channel locations
+  vector<float> x1, x2, y1, y2, xr, yr;
+
+
+  // Some floats for holding vector information
+  vector<float> D1_vec, D2_vec, R_vec;  // These are the vebor elements of the two donors and receivers.
+                                        // They have an origin at 0,0, and the end point is at these coordinates.
+  float intercept,gradient;
+  float D1_R2, D2_R2, R_R2;
+
+  // The hold drainage areas
+  float DA1, DA2, DAR;
+
+  float D1_bearing, D2_bearing, R_bearing;
+  float D1_rotated_bearing, D2_rotated_bearing;
+  float junction_sum;
+
+  int this_junc;
+
+  // loop through junctions
+  for(int junc = 0; junc < NJuncs; junc++ )
+  {
+
+    this_junc = JunctionList[junc];
+    //cout << endl << "==================" << endl << "Junction is: " << this_junc << endl;
+
+    // check to see if the junction exists
+    if (this_junc >= NJunctions)
+    {
+      cout << "FATAL ERROR LSDJunctionNetwork::calculate_junction_angles" << endl;
+      cout << "You have called a junction that doesn't exist." << endl;
+      exit(EXIT_FAILURE);
+    }
+
+    // check if it is a baselevel node
+    int ReceiverJN = get_Receiver_of_Junction(this_junc);
+    is_baselevel = (this_junc == ReceiverJN) ? true : false;
+
+    // if not a baselevel see if it has donors
+    if (is_baselevel)
+    {
+      //cout << "This is a baselevel junction." << endl;
+      //JunctionAngles.push_back(NoDataValue);
+    }
+    else
+    {
+      // check the junction to see if it has two or more donors
+      donors = get_donor_nodes(this_junc);
+
+      // it has donors
+      // It MUST have 2 donors. Junctions with 3  or more donors are rejected.
+      if( int(donors.size()) == 2)
+      {
+
+        // reset the temp vectors
+        temp_float_junctioninfo = nine_element_float;
+        temp_int_junctioninfo = four_element_int;
+
+        //cout << "The donor junctions are: " << donors[0] << ", " << donors[1] << endl;
+        // now get the two segments.
+        // The ending node is the current junction, the starting nodes are the
+        // two donor junctions.
+        end_node = get_Node_of_Junction(this_junc);
+        start_node1 = get_Node_of_Junction(donors[0]);
+        start_node2 = get_Node_of_Junction(donors[1]);
+        receiver_node = get_Node_of_Junction(ReceiverJN);
+
+        // extract the channel information
+        LSDIndexChannel c1(start_node1, end_node,FlowInfo);
+        LSDIndexChannel c2(start_node2, end_node,FlowInfo);
+        LSDIndexChannel rchan(end_node, receiver_node,FlowInfo);
+
+        // now get the locations of the nodes in the channels in x,y coordinates
+        c1.get_coordinates_of_channel_nodes(x1, y1);
+        c2.get_coordinates_of_channel_nodes(x2, y2);
+        rchan.get_coordinates_of_channel_nodes(xr, yr);
+
+        // now, for the angles, the channel segments need to both be pointing at the sam
+        // "end node", which is the junction in question. Meaning that we
+        // need to reverse the xr and yr vectors
+        reverse(xr.begin(), xr.end());
+        reverse(yr.begin(), yr.end());
+
+
+        // Now make sure the links have at least 3 nodes
+        int min_size = 500;
+        if (int(x1.size()) < min_size)
+        {
+          min_size = int(x1.size());
+        }
+        if (int(x2.size()) < min_size)
+        {
+          min_size = int(x2.size());
+        }
+        if (int(xr.size()) < min_size)
+        {
+          min_size = int(xr.size());
+        }
+
+        if (min_size > 8)
+        {
+          junction_order = get_StreamOrder_of_Junction(FlowInfo,this_junc);
+          donor1_order = get_StreamOrder_of_Junction(FlowInfo,donors[0]);
+          donor2_order = get_StreamOrder_of_Junction(FlowInfo,donors[1]);
+          receiver_order = get_StreamOrder_of_Junction(FlowInfo,ReceiverJN);
+
+          // now calculate the angle
+          // Get the R2 from the vectors. This is a bit stupid since it gets recalculated within
+          // the angle code and thrown away, but I am trying to get the code written quickly and the
+          // junction angle code is fast
+          // The vecotr in the first line for each vector just gets discarded
+          //cout << "This junction is: "  << this_junc << endl;
+          D1_vec =  orthogonal_linear_regression( x1, y1, intercept, gradient, D1_R2);
+          D1_vec =  get_directional_vector_coords_from_dataset(x1, y1, channel_points_downstream);
+          D1_bearing = clockwise_angle_between_vector_and_north(0, 0, D1_vec[0], D1_vec[1]);
+
+          D2_vec =  orthogonal_linear_regression( x2, y2, intercept, gradient, D2_R2);
+          D2_vec =  get_directional_vector_coords_from_dataset(x2, y2, channel_points_downstream);
+          D2_bearing = clockwise_angle_between_vector_and_north(0, 0, D2_vec[0], D2_vec[1]);
+
+          R_vec =  orthogonal_linear_regression( xr, yr, intercept, gradient, R_R2);
+          R_vec =  get_directional_vector_coords_from_dataset(xr, yr, channel_points_downstream);
+          R_bearing = clockwise_angle_between_vector_and_north(0, 0, R_vec[0], R_vec[1]);
+
+          // Now get the angles between junctions
+          // We rotate all the bearings so that R is facing north
+          D1_rotated_bearing = D1_bearing-R_bearing;
+          if (D1_rotated_bearing < 0)
+          {
+            D1_rotated_bearing = D1_rotated_bearing+(2*M_PI);
+          }
+
+          D2_rotated_bearing = D2_bearing-R_bearing;
+          if (D2_rotated_bearing < 0)
+          {
+            D2_rotated_bearing = D2_rotated_bearing+(2*M_PI);
+          }
+
+          // now figure out which one is bigger and calcualte the angles based on that
+          if (D2_rotated_bearing > D1_rotated_bearing)
+          {
+            this_angle_D2_R = (2*M_PI)-D2_rotated_bearing;
+            this_angle_D1_R = D1_rotated_bearing;
+            this_angle_D1_D2 = D2_rotated_bearing-D1_rotated_bearing;
+          }
+          else
+          {
+            this_angle_D1_R = (2*M_PI)-D1_rotated_bearing;
+            this_angle_D2_R = D2_rotated_bearing;
+            this_angle_D1_D2 = D1_rotated_bearing-D2_rotated_bearing;
+          }
+
+          junction_sum = this_angle_D1_R+this_angle_D2_R+this_angle_D1_D2;
+
+          // This attempts to remove junctions screwed up by nans in the bearing calculation.
+          if (junction_sum < 2*M_PI+0.001  &&  junction_sum > 2*M_PI-0.001)
+          {
+            // The JunctionVector  in LSDJunctionNetwork is a vector of the
+            // node indices indexed by the junction number
+            DA1 = FlowInfo.get_DrainageArea_square_m( start_node1);
+            DA2 = FlowInfo.get_DrainageArea_square_m( start_node2 );
+            DAR = FlowInfo.get_DrainageArea_square_m( end_node);
+
+            temp_int_junctioninfo[0] = junction_order;
+            temp_int_junctioninfo[1] = donor1_order;
+            temp_int_junctioninfo[2] = donor2_order;
+            temp_int_junctioninfo[3] = receiver_order;
+
+            temp_float_junctioninfo[0] = DA1;
+            temp_float_junctioninfo[1] = DA2;
+            temp_float_junctioninfo[2] = DAR;
+            temp_float_junctioninfo[3] = this_angle_D1_D2;
+            temp_float_junctioninfo[4] = this_angle_D1_R;
+            temp_float_junctioninfo[5] = this_angle_D2_R;
+            temp_float_junctioninfo[6] = D1_R2;
+            temp_float_junctioninfo[7] = D2_R2;
+            temp_float_junctioninfo[8] = R_R2;
+            temp_float_junctioninfo[9] = D1_bearing;
+            temp_float_junctioninfo[10] = D2_bearing;
+            temp_float_junctioninfo[11] = R_bearing;
+            //temp_float_junctioninfo[12] = D2_vec[1];
+            //temp_float_junctioninfo[13] = R_vec[0];
+            //temp_float_junctioninfo[14] = R_vec[1];
+
+            JA_int_map[this_junc] = temp_int_junctioninfo;
+            JA_float_map[this_junc] = temp_float_junctioninfo;
+          }
+        }
+
+      }
+      else
+      {
+        //cout << "This junction doesn't have 2 donors; it must be a source." << endl;
+        //JunctionAngles.push_back(NoDataValue);
+      }
+    }
+  }
+
+  JA_int_info = JA_int_map;
+  JA_float_info = JA_float_map;
+}
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This function gets the mean and standard error of every junction angle
 // upslope of a given junction
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -1501,6 +1763,62 @@ void LSDJunctionNetwork::print_junction_angles_to_csv(vector<int> JunctionList,
 }
 
 
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This prints junction angles to a csv file
+// Uses the complete junction angle code so much more extensive statistics
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDJunctionNetwork::print_complete_junction_angles_to_csv(vector<int> JunctionList,
+                                                       LSDFlowInfo& FlowInfo,
+                                                       string csv_name)
+{
+  ofstream csv_out;
+  csv_out.open(csv_name.c_str());
+  csv_out.precision(9);
+
+
+  // get the junction information
+  map<int, vector<int> > JuncInfo_int;
+  map<int, vector<float> > JuncInfo_float;
+  calculate_junction_angles_complete(JunctionList, FlowInfo, JuncInfo_int,JuncInfo_float);
+  map<int, vector<float> >::iterator iter;
+  vector<float> this_JI_float;
+  vector<int> this_JI_int;
+  int this_junc;
+  int this_node,curr_row,curr_col;
+  double latitude, longitude;
+
+  csv_out << "latitude,longitude,junction_number,";
+  csv_out << "junction_stream_order,donor1_stream_order,donor2_stream_order,receiver_stream_order,";
+  csv_out << "donor1_drainage_area,donor2_draiange_area,this_junction_drainage_area,";
+  csv_out << "donors_junction_angle,donor1_receiver_junction_angle,donor2_receiver_junction_angle,";
+  csv_out << "donor1_R2_on_channel,donor2_R2_on_channel,receiver_R2_on_channel,";
+  csv_out << "D1_bearing,D2_bearing,R_bearing" << endl;
+  for(iter = JuncInfo_float.begin(); iter != JuncInfo_float.end(); ++iter)
+  {
+    this_junc = iter->first;
+    this_JI_float = iter->second;
+    this_JI_int = JuncInfo_int[this_junc];
+
+    // get the row and column of the junction from the junction node
+    this_node = JunctionVector[this_junc];
+    LSDCoordinateConverterLLandUTM Converter;
+    FlowInfo.retrieve_current_row_and_col(this_node,curr_row,curr_col);
+    get_lat_and_long_locations(curr_row, curr_col, latitude,longitude, Converter);
+
+    // print to the csv file
+    csv_out << latitude <<"," << longitude <<"," << this_junc <<","
+            << this_JI_int[0] << "," << this_JI_int[1] << "," << this_JI_int[2] << "," << this_JI_int[3] << ","
+            << this_JI_float[0] << "," << this_JI_float[1]  << "," << this_JI_float[2] << ","
+            << deg(this_JI_float[3]) << "," << deg(this_JI_float[4])  << "," << deg(this_JI_float[5]) << ","
+            << this_JI_float[6] << "," << this_JI_float[7]  << "," << this_JI_float[8] << ","
+            << deg(this_JI_float[9]) << "," << deg(this_JI_float[10])  << "," << deg(this_JI_float[11]) <<endl;
+  }
+
+  csv_out.close();
+}
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -6036,7 +6354,7 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV(LSDFlowInfo& flowinfo, string 
   WriteData.open(FileName.c_str());
 
   WriteData.precision(8);
-  WriteData << "latitude,longitude,Junction Index,Stream Order,NI" << endl;
+  WriteData << "latitude,longitude,Junction Index,Stream Order,NI,receiver_NI" << endl;
 
   // the x and y locations
   double latitude,longitude;
@@ -6046,7 +6364,7 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV(LSDFlowInfo& flowinfo, string 
 
 
   // now get the number of channel nodes
-  int this_NI;
+  int this_NI, receiver_NI;
   int row,col;
   int NNodes = int(NIvec.size());
   //cout << "The number of nodes is: " << NNodes << endl;
@@ -6055,8 +6373,9 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV(LSDFlowInfo& flowinfo, string 
     this_NI = NIvec[node];
     flowinfo.retrieve_current_row_and_col(this_NI,row,col);
     get_lat_and_long_locations(row, col, latitude, longitude, Converter);
+    flowinfo.retrieve_receiver_information(this_NI, receiver_NI);
 
-    WriteData << latitude << "," << longitude << "," << JIvec[node] << "," << SOvec[node] << "," << NIvec[node] << endl;
+    WriteData << latitude << "," << longitude << "," << JIvec[node] << "," << SOvec[node] << "," << NIvec[node] << "," << receiver_NI << endl;
 
   }
 
@@ -6085,7 +6404,7 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV_nolatlon(LSDFlowInfo& flowinfo
   WriteData.open(FileName.c_str());
 
   WriteData.precision(8);
-  WriteData << "X,Y,Junction Index,Stream Order,NI,elevation" << endl;
+  WriteData << "X,Y,Junction Index,Stream Order,NI,elevation,receiver_NI" << endl;
 
   // the x and y locations
   double X,Y;
@@ -6093,7 +6412,7 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV_nolatlon(LSDFlowInfo& flowinfo
 
 
   // now get the number of channel nodes
-  int this_NI;
+  int this_NI, receiver_NI;
   int row,col;
   int NNodes = int(NIvec.size());
   float this_elev;
@@ -6102,9 +6421,10 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV_nolatlon(LSDFlowInfo& flowinfo
   {
     this_NI = NIvec[node];
     flowinfo.retrieve_current_row_and_col(this_NI,row,col);
+    flowinfo.retrieve_receiver_information(this_NI, receiver_NI);
     this_elev = elevation.get_data_element(row,col);
     flowinfo.get_x_and_y_locations(row,col,X,Y);
-    WriteData << X << "," << Y << "," << JIvec[node] << "," << SOvec[node] << "," << NIvec[node] << "," << this_elev << endl;
+    WriteData << X << "," << Y << "," << JIvec[node] << "," << SOvec[node] << "," << NIvec[node] << "," << this_elev << "," << receiver_NI << endl;
 
   }
 

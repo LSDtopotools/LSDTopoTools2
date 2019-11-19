@@ -1001,7 +1001,7 @@ vector<int> LSDSpatialCSVReader::get_nodeindex_vector()
   is_id = is_column_in_csv(nistr3);
   cout << "Okay, done checking columns." << endl;
  
-  if (not is_nodeindex && not is_node && not is_id)
+  if ( is_nodeindex == false &&  is_node == false &&  is_id == false)
   {
     cout << "I could not find a nodeindex column. Returning and empty map." << endl;
   }
@@ -1065,14 +1065,14 @@ map<int,float> LSDSpatialCSVReader::get_nodeindex_map_float(string column_name)
   cout << "The column name is: " << column_name << endl;
   bool is_data_column = is_column_in_csv(column_name);
 
-  if (not is_data_column)
+  if (is_data_column == false)
   {
     cout << "I can't find your data column" << endl;
   }
   else
   {  
     cout << "I found your data column." << endl;
-    if (not is_nodeindex && not is_node && not is_id)
+    if (is_nodeindex == false && is_node == false && is_id == false)
     {
       cout << "I could not find a nodeindex column. Returning and empty map." << endl;
     }

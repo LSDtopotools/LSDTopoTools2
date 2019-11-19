@@ -254,6 +254,22 @@ class LSDJunctionNetwork
   /// @date 21/04/2017
   map<int, vector<float> > calculate_junction_angles(vector<int> JunctionList, LSDFlowInfo& FlowInfo);
 
+  /// @brief This is a more complete function for junction angles
+  ///  It overwirtes two maps, containing all sorts of information about
+  ///   the junction angles. 
+  /// @param JunctionList a list of junctions
+  /// @param FlowInfo an LSDFlowInfo object
+  /// @param JA_int_info A map where the key is the junction number 
+  ///    and the vector is a series of integer data about that juction
+  /// @param JA_float_info A map where the key is the junction number 
+  ///    and the vector is a series of float data about that juction
+  /// @author SMM
+  /// @date 17/11/2019
+  void calculate_junction_angles_complete(vector<int> JunctionList, 
+                                          LSDFlowInfo& FlowInfo,
+                                          map<int , vector<int> >& JA_int_info,
+                                          map<int, vector<float>>& JA_float_info );
+
   /// @brief This function gets the mean and standard error of every junction angle
   ///   upslope of a given junction
   /// @param target_junction The target junction
@@ -310,6 +326,17 @@ class LSDJunctionNetwork
   /// @author SMM
   /// @date 23/04/2017
   void print_junction_angles_to_csv(vector<int> JunctionList, LSDFlowInfo& FlowInfo,
+                                                       string csv_name);
+
+  /// @brief This prints the junction angles to a csv file
+  ///  It uses the much more complete junction angle code 
+  /// @param JunctionList The list of junctions to analyze. If this is an empty vector,
+  ///  the code analyses all junctions in the DEM
+  /// @param FlowInfo The LSDFlowInfo object
+  /// @param csv_name The name of the file. Needs full path and csv extension
+  /// @author SMM
+  /// @date 17/11/2019
+  void print_complete_junction_angles_to_csv(vector<int> JunctionList, LSDFlowInfo& FlowInfo,
                                                        string csv_name);
 
   /// @brief This gets the junction number of a given node.
