@@ -465,6 +465,15 @@ class LSDChiTools
     /// @date 13/04/2018
     vector<float> test_collinearity_by_basin_disorder_with_uncert(LSDFlowInfo& FlowInfo, 
                                         int basin_key);
+    /// @brief This computes a the disorder metric of Hergarten et al 2016 by basin.
+    /// It uses a permutation algorithm to find all combinations of tributary channels
+    /// and computes the disorder statistic of each of these. Each value is associated to the river it is using as main trunk for each combination, te reain an idea of spatial distribution.
+    /// @param FlowInfo an LSDFlowInfo object
+    /// @param basin_key The key into the basin you want to test all collinearity of.
+    /// @author SMM - B.G
+    /// @date 13/11/2019
+    map< vector<int>, vector<float> > test_collinearity_by_basin_disorder_with_uncert_retain_key(LSDFlowInfo& FlowInfo,
+                                                 int baselevel_key);
 
     /// @brief This wraps the collinearity tester, looping through different m over n
     ///  values and calculating goodness of fit statistics.
@@ -1506,6 +1515,12 @@ class LSDChiTools
     vector<int> get_vectors_of_node();
 
     vector<int> get_ordered_baselevel(){return ordered_baselevel_nodes;}
+
+
+    ///@brief Return current maps of source keys and basin key
+    ///@author B.G.
+    ///@date 21/11/2019
+    vector<map<int,int> > get_current_map_basin_source_key(){return {this->source_keys_map,this->baselevel_keys_map};}
 
 
 
