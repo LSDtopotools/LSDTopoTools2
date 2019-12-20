@@ -6823,7 +6823,7 @@ float LSDChiTools::test_collinearity_by_basin_disorder(LSDFlowInfo& FlowInfo,
   int n_nodes_this_basin = int(chi_sorted.size());
   float chi_max = chi_sorted[n_nodes_this_basin-1];
   float chi_min = chi_sorted[0];
-  cout << "My first guess of minimum chi is: " << chi_min;
+  cout << "My first guess of minimum chi is: " << chi_min << endl;
 
   for(int i = 0; i<n_nodes_this_basin-1; i++)
   {
@@ -7006,7 +7006,7 @@ vector<float> LSDChiTools::test_collinearity_by_basin_disorder_with_uncert(LSDFl
       int n_nodes_this_basin = int(chi_sorted.size());
       float chi_max = chi_sorted[n_nodes_this_basin-1];
       float chi_min = chi_sorted[0];
-      cout << "My first guess of minimum chi is: " << chi_min;
+      cout << "My first guess of minimum chi is: " << chi_min << endl;
       for(int i = 0; i<n_nodes_this_basin-1; i++)
       {
         this_delta_chi = fabs(chi_sorted[i+1]-chi_sorted[i]);
@@ -7202,7 +7202,7 @@ map< vector<int>, vector<float> > LSDChiTools::test_collinearity_by_basin_disord
       int n_nodes_this_basin = int(chi_sorted.size());
       float chi_max = chi_sorted[n_nodes_this_basin-1];
       float chi_min = chi_sorted[0];
-      cout << "My first guess of minimum chi is: " << chi_min;
+      cout << "My first guess of minimum chi is: " << chi_min << endl;
       for(int i = 0; i<n_nodes_this_basin-1; i++)
       {
         this_delta_chi = fabs(chi_sorted[i+1]-chi_sorted[i]);
