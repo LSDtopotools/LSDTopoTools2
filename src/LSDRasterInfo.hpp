@@ -105,6 +105,11 @@ class LSDRasterInfo
     /// @date 13/11/2014
     bool check_if_point_is_in_raster(float X_coordinate,float Y_coordinate);
 
+    /// @brief Prints the raster information to screen
+    /// @author SMM
+    /// @date 19/11/2019
+    void print_raster_information();
+
     // Get functions
     /// @return Number of rows as an integer.
     int get_NRows() const        { return NRows; }
@@ -138,6 +143,8 @@ class LSDRasterInfo
     /// @author SMM
     /// @date 01/01/12
     void read_header(string filename, string extension);
+
+
 
     ///Number of rows.
     int NRows;

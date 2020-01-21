@@ -25,6 +25,7 @@
 #include <cmath>
 #include "TNT/tnt.h"
 #include "LSDRaster.hpp"
+#include "LSDRasterInfo.hpp"
 #include "LSDFlowInfo.hpp"
 #include "LSDIndexRaster.hpp"
 #include "LSDCosmoRaster.hpp"
@@ -1005,12 +1006,44 @@ LSDRaster LSDCosmoRaster::calculate_accumulated_CRN_concentration(LSDRaster& CRN
   // The accumulated concentration is then the nucludes divided by the mass (of quartz)
   // In this version we don't have variable quartz concentrations. 
 
+  //LSDRasterInfo ERI(eff_erosion_rate);
+  //ERI.print_raster_information();
+
+  //LSDRasterInfo CRI(CRN_conc);
+  //CRI.print_raster_information();  
+
   cout << "Let me accumulate some CRN." << endl;
   LSDRaster AtomsFlux = CRN_conc.MapAlgebra_multiply(eff_erosion_rate);
-  LSDRaster AccumCRN =  FlowInfo.upslope_variable_accumulator_v2(AtomsFlux);
-  LSDRaster Accum_eros=  FlowInfo.upslope_variable_accumulator_v2(eff_erosion_rate);
+  cout << "Got atoms flux..." << endl;
+
+  //LSDRasterInfo AFRI(AtomsFlux);
+  //AFRI.print_raster_information();  
+  
+  
+  LSDRaster AccumCRN =  FlowInfo.upslope_variable_accumulator_v3(AtomsFlux);
+  cout << "got accumulated CRN..." << endl;
+  
+  // This writes the concentration raster   
+  //cout << "Writing a raster" << endl;                                
+  //AccumCRN.write_raster("./yoyoma_v1","bil");
+
+  //LSDRaster AccumCRN2 =  FlowInfo.upslope_variable_accumulator_v3(AtomsFlux);
+  //AccumCRN2.write_raster("./yoyoma_v2","bil");
+  //cout << "got accumulated CRN v2..." << endl;
+
+  //LSDRasterInfo AccumCRN_RI(AccumCRN);
+  //AccumCRN_RI.print_raster_information();  
+
+
+  LSDRaster Accum_eros=  FlowInfo.upslope_variable_accumulator_v3(eff_erosion_rate);
+  cout << "got accumulated erosion...";
+
+  //LSDRasterInfo Accum_eros_RI(Accum_eros);  
+  //Accum_eros_RI.print_raster_information();
+   
 
   LSDRaster AccumConc = AccumCRN.MapAlgebra_divide(Accum_eros);
+  cout << "got the accumulated concentration." << endl;
 
   return AccumConc;
 
@@ -1037,8 +1070,8 @@ LSDRaster LSDCosmoRaster::calculate_accumulated_CRN_concentration(LSDRaster& CRN
   LSDRaster QuartzErosion = quartz_concentration.MapAlgebra_multiply(eff_erosion_rate);
 
   cout << "Let me accumulate some CRN." << endl;
-  LSDRaster AccumCRN =  FlowInfo.upslope_variable_accumulator_v2(AtomsFlux);
-  LSDRaster Accum_eros=  FlowInfo.upslope_variable_accumulator_v2(QuartzErosion);
+  LSDRaster AccumCRN =  FlowInfo.upslope_variable_accumulator_v3(AtomsFlux);
+  LSDRaster Accum_eros=  FlowInfo.upslope_variable_accumulator_v3(QuartzErosion);
 
   LSDRaster AccumConc = AccumCRN.MapAlgebra_divide(Accum_eros);
 
@@ -1206,8 +1239,7 @@ float LSDCosmoRaster::calculate_accumulated_CRN_concentration(LSDRaster& CRN_con
 //===================================================================
 // Newton-raphson routines for getting the correct erosion rate
 // Will be overloaded to have a number of different scenarios
-//===================================================================
-                                           
+//===================================================================                                          
 float LSDCosmoRaster::calculate_eff_erate_from_conc(float Nuclide_conc,
                                     string Nuclide,string Muon_scaling, 
                                     LSDRaster& known_eff_erosion_rate,
@@ -1271,7 +1303,6 @@ float LSDCosmoRaster::calculate_eff_erate_from_conc(float Nuclide_conc,
   LSDRasterMaker MakeItYeah(Production_raster);
   LSDRaster eff_erosion_raster;    
 
-
   // Now lets loop 
   LSDRaster cosmo_conc_raster;
   float closest_guess = eff_erate_guess;
@@ -1332,8 +1363,8 @@ float LSDCosmoRaster::calculate_eff_erate_from_conc(float Nuclide_conc,
       closest_guess = eff_e_new;  
     }
 
-    //cout << "Conc diff is: " << N_this_step - N_displace << endl;
-    //cout << "Diff from target conc is: " << f_x << endl;
+    cout << "Conc diff is: " << N_this_step - N_displace << endl;
+    cout << "Diff from target conc is: " << f_x << endl;
     //cout << "f_x displace is: " << f_x_displace << endl;
 
     N_derivative = (f_x_displace-f_x)/eff_e_displace;

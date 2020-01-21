@@ -687,9 +687,16 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @date 29/08/2017
   float fluvial_calculate_K_for_steady_state_relief(float U, float desired_relief);
 
+  /// @brief This smooths the model DEM and returns this smoothed surface as a raster
+  /// @param central_pixel_weighting A float that give the weighting of the central pixel. 
+  ///   The higher this number, the less smoothing. 2 is probably a good starting value. 
+  /// @author SMM
+  /// @date 16/12/2019
+  LSDRaster basic_smooth(float central_pixel_weighting);
+
   /// @brief This checks for rivers (using a drainage area threshold) and then any remaining pixels
   ///  are popped to a critical slope. Creates a river network with striaght slopes in between
-  /// @brief Very rudimentary: only uses slopes in the D8 direction so the slopes will 
+  /// @detail Very rudimentary: only uses slopes in the D8 direction so the slopes will 
   ///  not be very accurate if the polyfit slope code is run. It should be considered a maximum relief
   /// @param critical_slope the critical gradient for each D8 connection between pixels
   /// @param contributing_pixel_threshold the threshold in pixles for a channel to form
@@ -1093,6 +1100,13 @@ class LSDRasterModel: public LSDRasterSpectral
 
   /// set the float print interval
   void set_next_printing_time ( float next_float_dt_print )    { next_printing_time = next_float_dt_print; }
+
+  /// @brief Update the raster data. WARNING this does not check the geometry of the raster
+  /// @param Raster Another raster. It needs to be the same dimensions as the original raster
+  /// @author SMM
+  /// @date 16/12/2019
+  void set_raster_data(LSDRaster& Raster);
+
 
 
   /// @brief this sets the K mode

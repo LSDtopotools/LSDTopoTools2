@@ -416,6 +416,7 @@ class LSDFlowInfo
   vector <int> get_SVector() const { return SVector; }
   /// @return FlowDirection values as a 2D Array.
   Array2D<int> get_FlowDirection() const { return FlowDirection; }
+  int get_index_SVector(int node){return SVectorIndex[node];}
 
   ///@brief Recursive add_to_stack routine, from Braun and Willett (2012)
   ///equations 12 and 13.
@@ -685,6 +686,16 @@ class LSDFlowInfo
   ///@date 17/04/2019
   LSDRaster upslope_variable_accumulator_v2(LSDRaster& accum_raster);
   LSDRaster upslope_variable_accumulator_v2(LSDRaster& accum_raster, bool accum_current_node);
+
+  ///@brief This function accumulates some variable from an LSDRaster
+  ///The most probably use is to accumulate precipitation in order
+  ///to get a discharge raster
+  ///@detail Uses the stack vector to get the accumulation
+  ///@param A raster that contains the variable to be accumulated (e.g., precipitation)
+  ///@return A raster containing the accumulated variable
+  ///@author SMM
+  ///@date 19/11/2019
+  LSDRaster upslope_variable_accumulator_v3(LSDRaster& accum_raster);
 
   ///@brief This function tests whether one node is upstream of another node
   ///@param current_node

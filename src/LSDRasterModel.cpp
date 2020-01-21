@@ -289,6 +289,12 @@ LSDRaster LSDRasterModel::return_as_raster()
   return NewRaster;
 }
 
+void LSDRasterModel::set_raster_data(LSDRaster& Raster)
+{
+  Array2D<float> temp_data = Raster.get_RasterData();
+  RasterData = temp_data.copy(); 
+}
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This adds a path to the run name and the report name
@@ -5022,6 +5028,111 @@ LSDRaster LSDRasterModel::basic_valley_fill_critical_slope(float critical_slope,
   return output_raster;
 }
 
+
+LSDRaster LSDRasterModel::basic_smooth(float central_pixel_weighting)
+{
+
+  // at the moment the boundary type can only be 0 and this is a periodic
+  // boundary type at the E and W boundaries.
+
+  Array2D<float> new_data(NRows,NCols,NoDataValue);
+  float total_weighting;
+  float total_sum;
+  int rp1, rm1,cp1, cm1;
+  int boundary_type = 0;    // This later allows the code to be flexible in terms of the boundary type. 
+                            // Currently only periodic boundaries are on offer. 
+
+
+  for(int row = 0; row<NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      total_weighting = 0;
+      total_sum = 0;
+
+      rp1 = row+1;
+      rm1 = row-1;
+      cp1 = col+1;
+      cm1 = col-1;
+
+      // implement boundary conditions.
+      if(boundary_type == 0)
+      {
+        if (rp1 == NRows)
+        {
+          rp1 = rm1;
+        }
+        if (rm1 == -1)
+        {
+          rm1 = rp1;
+        }
+        if (cp1 == NCols)
+        {
+          cp1 = 0;
+        }
+        if(cm1 == -1)
+        {
+          cm1 = NCols-1;
+        }
+      }
+      else
+      {
+        if (rp1 == NRows)
+        {
+          rp1 = rm1;
+        }
+        if (rm1 == -1)
+        {
+          rm1 = rp1;
+        }
+        if (cp1 == NCols)
+        {
+          cp1 = 0;
+        }
+        if(cm1 == -1)
+        {
+          cm1 = NCols-1;
+        }
+      }
+
+      if( RasterData[row][col] != NoDataValue)
+      {
+        total_weighting += central_pixel_weighting;
+        total_sum += central_pixel_weighting*RasterData[row][col];
+
+        // now go through all the other directions.
+        if (RasterData[row][cp1] != NoDataValue)
+        {
+          total_weighting +=1;
+          total_sum += RasterData[row][cp1];
+        }
+        if (RasterData[row][cm1] != NoDataValue)
+        {
+          total_weighting +=1;
+          total_sum += RasterData[row][cm1];
+        }
+        if (RasterData[rp1][col] != NoDataValue)
+        {
+          total_weighting +=1;
+          total_sum += RasterData[rp1][col];
+        }
+        if (RasterData[rm1][col] != NoDataValue)
+        {
+          total_weighting +=1;
+          total_sum += RasterData[rm1][col];
+        }
+      }
+      // Now update the array
+
+      new_data[row][col] = total_sum/total_weighting;
+    }
+  }
+
+  
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, new_data, GeoReferencingStrings);  
+  return temp;
+}
 
 
 

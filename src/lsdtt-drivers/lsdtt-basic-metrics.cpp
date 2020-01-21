@@ -72,11 +72,11 @@ int main (int nNumberofArgs,char *argv[])
   cout << "|| simple landscape metrics.                           ||" << endl;
   cout << "|| This program was developed by Simon M. Mudd         ||" << endl;
   cout << "||  at the University of Edinburgh                     ||" << endl;
-  cout << "=========================================================" << endl;   
-  cout << "|| If you use these routines please cite:              ||" << endl;   
+  cout << "=========================================================" << endl;
+  cout << "|| If you use these routines please cite:              ||" << endl;
   cout << "|| https://www.doi.org/10.5281/zenodo.2560223          ||" << endl;
-  cout << "|| If you use the roughness routine please cite:       ||" << endl;   
-  cout << "|| https://www.doi.org/10.5194/esurf-3-483-2015        ||" << endl;  
+  cout << "|| If you use the roughness routine please cite:       ||" << endl;
+  cout << "|| https://www.doi.org/10.5194/esurf-3-483-2015        ||" << endl;
   cout << "=========================================================" << endl;
   cout << "|| Documentation can be found at:                      ||" << endl;
   cout << "|| https://lsdtopotools.github.io/LSDTT_documentation/ ||" << endl;
@@ -110,16 +110,22 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["remove_seas"] = true; // elevations above minimum and maximum will be changed to nodata
   string_default_map["CHeads_file"] = "NULL";
   bool_default_map["only_check_parameters"] = false;
-  
+
   // Various ways of trimming your raster
   bool_default_map["remove_nodes_influenced_by_edge"] = false;
   bool_default_map["isolate_pixels_draining_to_fixed_channel"] = false;
-  string_default_map["fixed_channel_csv_name"] = "single_channel_nodes"; 
+  string_default_map["fixed_channel_csv_name"] = "single_channel_nodes";
 
-  
+
   // raster trimming, to take care of rasters that have a bunch of nodata at the edges
   bool_default_map["print_trimmed_raster"] = false;
   int_default_map["trimming_buffer_pixels"] = 0;
+
+  // Calculate the basic relief within a window in a raster
+  bool_default_map["print_relief_raster"] = false;
+  float_default_map["relief_window"] = 200;
+  int_default_map["relief_window_kernel_type"] = 1;
+
 
   // the most basic raster printing
   bool_default_map["write_hillshade"] = false;
@@ -128,8 +134,8 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["print_fill_raster"] = false;
 
   // This converts all csv files to geojson (for easier loading in a GIS)
-  bool_default_map["convert_csv_to_geojson"] = false;    
-  
+  bool_default_map["convert_csv_to_geojson"] = false;
+
   // Slope calculations
   float_default_map["surface_fitting_radius"] = 30;
   bool_default_map["print_smoothed_elevation"]= false;
@@ -145,16 +151,16 @@ int main (int nNumberofArgs,char *argv[])
 
   // Window size estimation
   bool_default_map["calculate_window_size"] = false;
-  
+
   // Roughness calculations
   float_default_map["REI_critical_slope"] = 1.0;
   float_default_map["REI_window_radius"] = 10;
   bool_default_map["print_REI_raster"] = false;
-  
+
   bool_default_map["print_roughness_rasters"] = false;
   float_default_map["roughness_radius"] = 3;
-  
-  
+
+
 
   // filling and drainage area
   bool_default_map["print_dinf_drainage_area_raster"] = false;
@@ -167,7 +173,7 @@ int main (int nNumberofArgs,char *argv[])
   // Extracting a single channel
   bool_default_map["extract_single_channel"] = false;
   bool_default_map["use_dinf_for_single_channel"] = false;
-  string_default_map["channel_source_fname"] = "singe_channel_source";
+  string_default_map["channel_source_fname"] = "single_channel_source";
 
 
   // Basic channel network
@@ -176,7 +182,7 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["print_channels_to_csv"] = false;
   bool_default_map["print_junction_index_raster"] = false;
   bool_default_map["print_junctions_to_csv"] = false;
-  
+
   // Basin-based channel extraction
   bool_default_map["find_basins"] = false;
   int_default_map["minimum_basin_size_pixels"] = 50000;
@@ -185,12 +191,12 @@ int main (int nNumberofArgs,char *argv[])
   string_default_map["BaselevelJunctions_file"] = "NULL";
   bool_default_map["extend_channel_to_node_before_receiver_junction"] = true;
   bool_default_map["print_basin_raster"] = false;
-  
+
   // Some chi coordinate settings
   float_default_map["A_0"] = 1.0;
   float_default_map["m_over_n"] = 0.5;
   bool_default_map["print_chi_data_maps"] = false;
-  
+
   if (bool_default_map["print_chi_data_maps"] == true)
   {
     cout << "You want the chi data maps, so I am setting the basin finding to true." << endl;
@@ -199,7 +205,7 @@ int main (int nNumberofArgs,char *argv[])
 
   // The wiener filter
   bool_default_map["print_wiener_filtered_raster"] = false;
- 
+
   // This burns a raster value to any csv output of chi data
   // Useful for appending geology data to chi profiles
   bool_default_map["burn_raster_to_csv"] = false;
@@ -209,6 +215,9 @@ int main (int nNumberofArgs,char *argv[])
 
   // This is for junction angles
   bool_default_map["print_junction_angles_to_csv"] = false;
+  float_default_map["SA_vertical_interval"] = 10;  // The vertical interval
+                                                   // for slope measurements in the
+                                                   // junction angle printing
 
   // Use the parameter parser to get the maps of the parameters required for the
   // analysis
@@ -274,18 +283,27 @@ int main (int nNumberofArgs,char *argv[])
 
   //============================================================================
   // Raster trimming
-  // This trims the raster to the smallest nodata. 
-  // It only prints the trimmed raster! It will not use it in computation. 
-  // This is because we want to avoid messed up georeferencing. 
+  // This trims the raster to the smallest nodata.
+  // It only prints the trimmed raster! It will not use it in computation.
+  // This is because we want to avoid messed up georeferencing.
   // Print the trimmed raster and then use in raster the next steps
   // of raster processing
-  if(this_bool_map["print_trimmed_raster"]) 
+  if(this_bool_map["print_trimmed_raster"])
   {
     cout << "Let me trim that raster for you." << endl;
     LSDRaster trimmed_raster = topography_raster.RasterTrimmerPadded(this_int_map["trimming_buffer_pixels"]);
     string this_raster_name = OUT_DIR+OUT_ID+"_TRIM";
     trimmed_raster.write_raster(this_raster_name,raster_ext);
-  } 
+  }
+
+
+  if(this_bool_map["print_relief_raster"])
+  {
+    cout << "Calculating the relief raster bit." << endl;
+    LSDRaster relief = topography_raster.calculate_relief(this_float_map["relief_window"], this_int_map["relief_window_kernel_type"]);
+    string this_raster_name = OUT_DIR+OUT_ID+"_BASICRELIEF";
+    relief.write_raster(this_raster_name,raster_ext);
+  }
 
 
   //============================================================================
@@ -297,7 +315,7 @@ int main (int nNumberofArgs,char *argv[])
     cout << "You asked me to burn a raster to a csv." << endl;
     cout << "WARNING: This was written in a hurry and has no bug checking." << endl;
     cout << "If you have the wrong filenames it will crash." << endl;
-    
+
     cout << "First I am going to load the raster." << endl;
     string burn_raster_name;
     bool burn_raster_exists = true;
@@ -311,16 +329,16 @@ int main (int nNumberofArgs,char *argv[])
       burn_raster_exists = false;
       cout << "You don't have a working burn raster." << endl;
     }
-    
+
     if(burn_raster_exists)
     {
       LSDRaster BurnRaster(burn_raster_name,raster_ext);
-      
+
       string header_for_burn_data;
       header_for_burn_data = this_string_map["burn_data_csv_column_header"];
-      
+
       cout << "I am burning the raster into the column header " << header_for_burn_data << endl;
-      
+
       string full_csv_name = DATA_DIR+this_string_map["csv_to_burn_name"];
       cout << "I am burning the raster to the csv file: " << full_csv_name << endl;
       LSDSpatialCSVReader CSVFile(RI,full_csv_name);
@@ -416,14 +434,14 @@ int main (int nNumberofArgs,char *argv[])
     raster_selection[8] = 1;
     doing_polyfit = true;
   }
-  
+
   // We place the surface fitting vector outside because we will need this information
-  // later for the basin statistics. 
+  // later for the basin statistics.
   vector<LSDRaster> surface_fitting;
   if (doing_polyfit)
   {
     cout << "I am running the polyfit function. This could take some time." << endl;
-     
+
     surface_fitting = topography_raster.calculate_polyfit_surface_metrics_directional_gradients(this_float_map["surface_fitting_radius"], raster_selection);
     if(this_bool_map["print_smoothed_elevation"])
     {
@@ -434,7 +452,7 @@ int main (int nNumberofArgs,char *argv[])
     if(this_bool_map["print_slope"])
     {
       cout << "Let me print the slope raster for you."  << endl;
-      string this_raster_name = OUT_DIR+OUT_ID+"_SLOPE"; 
+      string this_raster_name = OUT_DIR+OUT_ID+"_SLOPE";
       surface_fitting[1].write_raster(this_raster_name,raster_ext);
     }
     if(this_bool_map["print_aspect"])
@@ -480,7 +498,7 @@ int main (int nNumberofArgs,char *argv[])
       string this_raster_name2 = OUT_DIR+OUT_ID+"_DDY";
       surface_fitting[8].write_raster(this_raster_name1,raster_ext);
       surface_fitting[9].write_raster(this_raster_name2,raster_ext);
-    } 
+    }
   }
   else
   {
@@ -495,7 +513,7 @@ int main (int nNumberofArgs,char *argv[])
     vector<int> raster_selection(9, 0);  // This controls which surface fitting metrics to compute
     raster_selection[3] = 1;    // Turns on the curvature
 
-    //array of window sizes to test 
+    //array of window sizes to test
     //this is a little arbritrary but reflects the sizes used by Roering et al. 2010
     int WindowSizes[] = {1, 2, 3, 4, 5, 7, 8, 10,15,20,25,50,70,90,100};
 
@@ -515,14 +533,14 @@ int main (int nNumberofArgs,char *argv[])
 
     //write headers
     WriteData << "Length_scale,Curv_mean,Curv_stddev,Curv_iqr" << endl;
-    
+
     for (int w = 0; w < 15; ++w){
-      
+
       cout << "Processing surface " << w+1 << " of " << "15" << endl;
-                                              
+
       vector<LSDRaster> Surfaces = topography_raster.calculate_polyfit_surface_metrics(WindowSizes[w], raster_selection);
-      LSDRaster curvature = Surfaces[3];   
-    
+      LSDRaster curvature = Surfaces[3];
+
       //reset values for next run
       Curv_mean = 0;
       Curv_stddev = 0;
@@ -531,31 +549,31 @@ int main (int nNumberofArgs,char *argv[])
       Curv_LowerQuartile = 0;
       Curv_MaxValue = 0;
       Curv_iqr = 0;
-      Curv_vec.clear();  
-    
-      //go through the landscape and get every curvature value into a 1D vector    
+      Curv_vec.clear();
+
+      //go through the landscape and get every curvature value into a 1D vector
       for (int i = 0; i < int(curvature.get_NRows()); ++i){
         for (int j = 0; j < int(curvature.get_NCols()); ++j){
           if (curvature.get_data_element(i,j) != curvature.get_NoDataValue()){
             Curv_vec.push_back(curvature.get_data_element(i,j));
           }
         }
-      }  
-    
+      }
+
       //calculate the std dev and iqr (this comes from LSDStatsTools)
       get_distribution_stats(Curv_vec, Curv_mean, Curv_median, Curv_UpperQuartile, Curv_LowerQuartile, Curv_MaxValue);
       Curv_stddev = get_standard_deviation(Curv_vec, Curv_mean);
       Curv_iqr = Curv_UpperQuartile - Curv_LowerQuartile;
 
-      //write the values to the output file  
-      WriteData << WindowSizes[w] << "," << Curv_mean << "," << Curv_stddev << "," << Curv_iqr << endl; 
-      
+      //write the values to the output file
+      WriteData << WindowSizes[w] << "," << Curv_mean << "," << Curv_stddev << "," << Curv_iqr << endl;
+
       }
-                                            
+
     WriteData.close();
 
   }
-  
+
   //============================================================================
   // Print the roughness rasters
   //============================================================================
@@ -566,7 +584,7 @@ int main (int nNumberofArgs,char *argv[])
     string this_raster_name = OUT_DIR+OUT_ID+"_REI";
     REI_raster.write_raster(this_raster_name,raster_ext);
   }
-  
+
   if(this_bool_map["print_roughness_rasters"])
   {
     cout << "I am printing the roughness rasters S1, S2, and S3. " << endl;
@@ -588,7 +606,7 @@ int main (int nNumberofArgs,char *argv[])
   //============================================================================
   if (this_bool_map["print_wiener_filtered_raster"])
   {
-  
+
     cout << "I am running a filter to print to raster." << endl;
     cout << "This uses spectral analysis and is memory intensive. If you are working on a system with limited memory, " << endl;
     cout << "you may get a segmentation fault here!" << endl;
@@ -606,8 +624,8 @@ int main (int nNumberofArgs,char *argv[])
   //
   // EVERTHING BELOW THIS POINT NEEDS A FILL RASTER AND FLOW ROUTING
   // THIS IS WHERE MEMORY CONSUMPTION BECOMES A PROBLEM
-  // The LSDFlowInfo object is ~10-20x as big as the original DEM so 
-  // if the DEM is really big or you are working on a computer 
+  // The LSDFlowInfo object is ~10-20x as big as the original DEM so
+  // if the DEM is really big or you are working on a computer
   // with limited memory you might get segmentation faults after this point
   //
   //============================================================================
@@ -654,7 +672,7 @@ int main (int nNumberofArgs,char *argv[])
         filled_topography = topography_raster.fill(this_float_map["min_slope_for_fill"]);
       }
     }
-  
+
     if (this_bool_map["print_fill_raster"])
     {
       cout << "Let me print the fill raster for you."  << endl;
@@ -679,7 +697,7 @@ int main (int nNumberofArgs,char *argv[])
 
     if(this_bool_map["isolate_pixels_draining_to_fixed_channel"])
     {
-      // first read the 
+      // first read the
       // Get the latitude and longitude
       cout << "I am reading points from the file: "+ this_string_map["fixed_channel_csv_name"] << endl;
       LSDSpatialCSVReader source_points_data( RI, (DATA_DIR+this_string_map["fixed_channel_csv_name"]) );
@@ -690,7 +708,7 @@ int main (int nNumberofArgs,char *argv[])
       LSDRaster NodesRemovedRaster = FlowInfo.find_nodes_not_influenced_by_edge_draining_to_nodelist(nodes_from_channel,filled_topography);
       string remove_raster_name = OUT_DIR+OUT_ID+"_IsolateFixedChannel";
       NodesRemovedRaster.write_raster(remove_raster_name,raster_ext);
-        
+
     }
 
     //=================================================================
@@ -704,12 +722,12 @@ int main (int nNumberofArgs,char *argv[])
       LSDRaster DA2 = DA1.D_inf_ConvertFlowToArea();
       DA2.write_raster(DA_raster_name,raster_ext);
     }
-  
+
     if (this_bool_map["print_d8_drainage_area_raster"] ||
         this_bool_map["find_basins"])
     {
       LSDRaster DA_d8 = FlowInfo.write_DrainageArea_to_LSDRaster();
-      
+
       if (this_bool_map["print_d8_drainage_area_raster"])
       {
         cout << "I am writing d8 drainage area to raster." << endl;
@@ -717,7 +735,7 @@ int main (int nNumberofArgs,char *argv[])
         DA_d8.write_raster(DA_raster_name,raster_ext);
       }
     }
-    
+
     if (this_bool_map["print_QuinnMD_drainage_area_raster"])
     {
       cout << "I am writing Quinn drainage area to raster." << endl;
@@ -725,7 +743,7 @@ int main (int nNumberofArgs,char *argv[])
       LSDRaster DA3 = filled_topography.QuinnMDFlow();
       DA3.write_raster(DA_raster_name,raster_ext);
     }
-    
+
     if (this_bool_map["print_FreemanMD_drainage_area_raster"])
     {
       cout << "I am writing Freeman drainage area to raster." << endl;
@@ -750,7 +768,7 @@ int main (int nNumberofArgs,char *argv[])
     {
       cout << "I need to calculate the flow distance now." << endl;
       FD = FlowInfo.distance_from_outlet();
-      
+
       if(this_bool_map["print_distance_from_outlet"])
       {
         cout << "I am writing a distance from outlet raster." << endl;
@@ -763,7 +781,7 @@ int main (int nNumberofArgs,char *argv[])
     if (this_bool_map["extract_single_channel"])
     {
       // Get the latitude and longitude
-      
+
       LSDRaster DA;
       if (this_bool_map["use_dinf_for_single_channel"])
       {
@@ -772,12 +790,12 @@ int main (int nNumberofArgs,char *argv[])
       }
       else
       {
-        DA = FlowInfo.write_DrainageArea_to_LSDRaster();  
+        DA = FlowInfo.write_DrainageArea_to_LSDRaster();
       }
 
       cout << "I am reading points from the file: "+ this_string_map["channel_source_fname"] << endl;
       LSDSpatialCSVReader source_points_data( RI, (DATA_DIR+this_string_map["channel_source_fname"]) );
-      
+
       // Get the local coordinates
       vector<float> fUTM_easting,fUTM_northing;
       source_points_data.get_x_and_y_from_latlong(fUTM_easting,fUTM_northing);
@@ -785,8 +803,8 @@ int main (int nNumberofArgs,char *argv[])
 
       if ( int(fUTM_easting.size()) != 0)
       {
-        
-        
+
+
         X = fUTM_easting[0];
         Y = fUTM_northing[0];
 
@@ -799,12 +817,12 @@ int main (int nNumberofArgs,char *argv[])
         cout << "Your node list has " << node_list.size() << "nodes" << endl;
 
         string fname = "single_channel";
-        FlowInfo.print_vector_of_nodeindices_to_csv_file_with_latlong(node_list,DATA_DIR, fname, 
+        FlowInfo.print_vector_of_nodeindices_to_csv_file_with_latlong(node_list,DATA_DIR, fname,
                                                       filled_topography, FD, DA);
 
       }
       else
-      { 
+      {
         cout << "You are trying to make a channel but I cannot find the source." << endl;
       }
     }
@@ -814,7 +832,7 @@ int main (int nNumberofArgs,char *argv[])
     if (this_bool_map["print_channels_to_csv"]
         || this_bool_map["print_junctions_to_csv"]
         || this_bool_map["print_sources_to_csv"]
-        || this_bool_map["find_basins"] 
+        || this_bool_map["find_basins"]
         || this_bool_map["print_chi_data_maps"]
         || this_bool_map["print_junction_angles_to_csv"])
     {
@@ -832,7 +850,7 @@ int main (int nNumberofArgs,char *argv[])
         cout << "The channel head file is null. " << endl;
         cout << "Getting sources from a threshold of "<< this_int_map["threshold_contributing_pixels"] << " pixels." <<endl;
         sources = FlowInfo.get_sources_index_threshold(FlowAcc, this_int_map["threshold_contributing_pixels"]);
-    
+
         cout << "The number of sources is: " << sources.size() << endl;
       }
       else
@@ -852,7 +870,7 @@ int main (int nNumberofArgs,char *argv[])
         string channel_csv_name = OUT_DIR+OUT_ID+"_CN";
         JunctionNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
         cout << "I've printed the channel network. " << endl;
-    
+
         // convert to geojson if that is what the user wants
         // It is read more easily by GIS software but has bigger file size
         if ( this_bool_map["convert_csv_to_geojson"])
@@ -863,14 +881,14 @@ int main (int nNumberofArgs,char *argv[])
           thiscsv.print_data_to_geojson(gjson_name);
         }
       }
-    
+
       // print junctions
       if( this_bool_map["print_junctions_to_csv"])
       {
         cout << "I am writing the junctions to csv." << endl;
         string channel_csv_name = OUT_DIR+OUT_ID+"_JN.csv";
         JunctionNetwork.print_junctions_to_csv(FlowInfo, channel_csv_name);
-    
+
         if ( this_bool_map["convert_csv_to_geojson"])
         {
           string gjson_name = OUT_DIR+OUT_ID+"_JN.geojson";
@@ -878,14 +896,17 @@ int main (int nNumberofArgs,char *argv[])
           thiscsv.print_data_to_geojson(gjson_name);
         }
       }
-      
+
       // print the junction angles
       if( this_bool_map["print_junction_angles_to_csv"])
       {
-        cout << "I am testing the junction angle code." << endl;
-        string JAngles_csv_name = OUT_DIR+OUT_ID+"_JAngles.csv";
+        // Calculate flow distance
+        LSDRaster FlowDistance = FlowInfo.distance_from_outlet();
+
+        cout << "I am testing the junction angle code with elevations." << endl;
+        string JAngles_csv_name = OUT_DIR+OUT_ID+"_FULL_JAngles.csv";
         vector<int> JunctionList;
-        JunctionNetwork.print_junction_angles_to_csv(JunctionList, FlowInfo, JAngles_csv_name);
+        JunctionNetwork.print_complete_junction_angles_to_csv(JunctionList, FlowInfo, filled_topography, FlowDistance, this_float_map["SA_vertical_interval"], JAngles_csv_name);
 
         if ( this_bool_map["convert_csv_to_geojson"])
         {
@@ -894,18 +915,18 @@ int main (int nNumberofArgs,char *argv[])
           thiscsv.print_data_to_geojson(gjson_name);
         }
       }
-      
-    
+
+
       // Print sources
       if( this_bool_map["print_sources_to_csv"])
       {
         string sources_csv_name = OUT_DIR+OUT_ID+"_ATsources.csv";
-    
+
         //write channel_heads to a csv file
         FlowInfo.print_vector_of_nodeindices_to_csv_file_with_latlong(sources, sources_csv_name);
         string sources_csv_name_2 = OUT_DIR+OUT_ID+"_ATsources_rowcol.csv";
         FlowInfo.print_vector_of_nodeindices_to_csv_file(sources, sources_csv_name_2);
-    
+
         if ( this_bool_map["convert_csv_to_geojson"])
         {
           string gjson_name = OUT_DIR+OUT_ID+"_ATsources.geojson";
@@ -913,7 +934,7 @@ int main (int nNumberofArgs,char *argv[])
           thiscsv.print_data_to_geojson(gjson_name);
         }
       }   // End print sources logic
-      
+
       // Now we check if we are going to deal with basins
       if(this_bool_map["find_basins"] ||
          this_bool_map["print_chi_data_maps"] ||
@@ -922,7 +943,7 @@ int main (int nNumberofArgs,char *argv[])
         cout << "I am now going to extract some basins for you." << endl;
         vector<int> BaseLevelJunctions;
         vector<int> BaseLevelJunctions_Initial;
-        
+
         // deal with the baselevel junctions file
         string BaselevelJunctions_file;
         string test_BaselevelJunctions_file = LSDPP.get_BaselevelJunctions_file();
@@ -952,8 +973,8 @@ int main (int nNumberofArgs,char *argv[])
         // now check to see if there is a full path
         cout << endl << endl << "I need to check your baselevel junctions file, to see if it is in the correct path. " << endl;
         BaselevelJunctions_file = LSDPP.check_for_path_and_add_read_path_if_required(BaselevelJunctions_file);
-        
-        // Now we try to get the basins using 
+
+        // Now we try to get the basins using
         //Check to see if a list of junctions for extraction exists
         if (BaselevelJunctions_file == "NULL" || BaselevelJunctions_file == "Null" || BaselevelJunctions_file == "null" || BaselevelJunctions_file.empty() == true)
         {
@@ -968,11 +989,11 @@ int main (int nNumberofArgs,char *argv[])
         {
           cout << "I am attempting to read base level junctions from a base level junction list." << endl;
           cout << "If this is not a simple text file that only contains integers there will be problems!" << endl;
-      
+
           //specify junctions to work on from a list file
           //string JunctionsFile = DATA_DIR+BaselevelJunctions_file;
           cout << "The junctions file is: " << BaselevelJunctions_file << endl;
-      
+
           vector<int> JunctionsList;
           ifstream infile(BaselevelJunctions_file.c_str());
           if (infile)
@@ -986,27 +1007,27 @@ int main (int nNumberofArgs,char *argv[])
             cout << "Fatal Error: Junctions File " << BaselevelJunctions_file << " does not exist" << endl;
             exit(EXIT_FAILURE);
           }
-      
+
           // Now make sure none of the basins drain to the edge
           cout << "I am pruning junctions that are influenced by the edge of the DEM!" << endl;
           cout << "This is necessary because basins draining to the edge will have incorrect chi values." << endl;
           BaseLevelJunctions = JunctionNetwork.Prune_Junctions_Edge_Ignore_Outlet_Reach(BaseLevelJunctions_Initial, FlowInfo, filled_topography);
-          
+
           cout << "The remaining baselevel junctions are: " << endl;
           for (int i = 0; i<int(BaseLevelJunctions.size()); i++)
           {
             cout << BaseLevelJunctions[i] << endl;
           }
-          
+
         }    // end logic for reading from junctions list
-        
+
         // Now check for largest basin, if that is what you want.
         if (this_bool_map["only_take_largest_basin"])
         {
           cout << "I am only going to take the largest basin." << endl;
           BaseLevelJunctions = JunctionNetwork.Prune_Junctions_Largest(BaseLevelJunctions, FlowInfo, FlowAcc);
         }
-      
+
         // Correct number of base level junctions
         int N_BaseLevelJuncs = BaseLevelJunctions.size();
         cout << "The number of basins I will analyse is: " << N_BaseLevelJuncs << endl;
@@ -1015,12 +1036,12 @@ int main (int nNumberofArgs,char *argv[])
           cout << "I am stopping here since I don't have any basins to analyse." << endl;
           exit(EXIT_FAILURE);
         }
-        else 
+        else
         {
           cout << "The baselevel junction numbers are: " << endl;
           for(int i = 0; i< N_BaseLevelJuncs; i++)
           {
-            cout << BaseLevelJunctions[i] << ", ";  
+            cout << BaseLevelJunctions[i] << ", ";
           }
           cout << endl;
         }
@@ -1099,10 +1120,10 @@ int main (int nNumberofArgs,char *argv[])
           cout << "    extend_channel_to_node_before_receiver_junction" << endl;
           cout << "  to false." << endl;
           cout << "=====================================================" << endl << endl;
-    
+
           JunctionNetwork.get_overlapping_channels_to_downstream_outlets(FlowInfo, BaseLevelJunctions, FD,
                                         source_nodes,outlet_nodes,baselevel_node_of_each_basin,n_nodes_to_visit);
-    
+
         }
         else
         {
@@ -1114,11 +1135,11 @@ int main (int nNumberofArgs,char *argv[])
           cout << "    extend_channel_to_node_before_receiver_junction" << endl;
           cout << "  to true." << endl;
           cout << "=====================================================" << endl << endl;
-    
+
           JunctionNetwork.get_overlapping_channels(FlowInfo, BaseLevelJunctions, FD,
                                         source_nodes,outlet_nodes,baselevel_node_of_each_basin,n_nodes_to_visit);
         }
-        
+
         cout << "I've got the overlapping channels. The baselevel junctions are now: " << endl;
         for (int i = 0; i<int(BaseLevelJunctions.size()); i++)
         {
@@ -1129,7 +1150,7 @@ int main (int nNumberofArgs,char *argv[])
         {
           cout << baselevel_node_of_each_basin[i] << endl;
         }
-        
+
 
         // Get the chi coordinate if needed
         LSDRaster chi_coordinate;
@@ -1138,9 +1159,9 @@ int main (int nNumberofArgs,char *argv[])
         {
           cout << "I am calculating the chi coordinate." << endl;
           chi_coordinate = FlowInfo.get_upslope_chi_from_all_baselevel_nodes(this_float_map["m_over_n"],this_float_map["A_0"],this_int_map["threshold_contributing_pixels"]);
-        
+
         }
-        
+
         //======================================================================
         // Print a basin raster if you want it.
         if(this_bool_map["print_basin_raster"])
@@ -1169,11 +1190,11 @@ int main (int nNumberofArgs,char *argv[])
           ChiTool_chi_checker.chi_map_automator_chi_only(FlowInfo, source_nodes, outlet_nodes, baselevel_node_of_each_basin,
                                   filled_topography, FD,
                                   DA_for_chi, chi_coordinate);
-      
-      
+
+
           string chi_data_maps_string = OUT_DIR+OUT_ID+"_chi_data_map.csv";
           ChiTool_chi_checker.print_chi_data_map_to_csv(FlowInfo, chi_data_maps_string);
-      
+
           if ( this_bool_map["convert_csv_to_geojson"])
           {
             string gjson_name = OUT_DIR+OUT_ID+"_chi_data_map.geojson";

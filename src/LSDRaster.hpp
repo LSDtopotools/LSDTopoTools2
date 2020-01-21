@@ -487,6 +487,10 @@ class LSDRaster
   void get_row_and_col_of_a_point(double X_coordinate,double Y_coordinate,int& row, int& col);
 
 
+  void snap_to_row_col_with_greatest_value_in_window(int input_row, int input_col, int&out_row, int& out_col, int n_pixels);
+
+
+
   /// @brief This function returns a vector with the X adn Y minimum and max
   ///   values
   /// @return XYMinMax a vector with four elements

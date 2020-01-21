@@ -268,8 +268,28 @@ class LSDJunctionNetwork
   void calculate_junction_angles_complete(vector<int> JunctionList, 
                                           LSDFlowInfo& FlowInfo,
                                           map<int , vector<int> >& JA_int_info,
-                                          map<int, vector<float>>& JA_float_info );
+                                          map<int, vector<float> >& JA_float_info );
 
+
+  /// @brief This is a more complete function for junction angles
+  ///  It overwirtes two maps, containing all sorts of information about
+  ///   the junction angles. 
+  ///  This is an overloaded version that gives some slope and flow distance information
+  /// @param JunctionList a list of junctions
+  /// @param FlowInfo an LSDFlowInfo object
+  /// @param JA_int_info A map where the key is the junction number 
+  ///    and the vector is a series of integer data about that juction
+  /// @param JA_float_info A map where the key is the junction number 
+  ///    and the vector is a series of float data about that juction
+  /// @author SMM
+  /// @date 17/11/2019
+  void calculate_junction_angles_complete(vector<int> JunctionList, 
+                                          LSDFlowInfo& FlowInfo, LSDRaster& Elevation,
+                                          LSDRaster& FlowDistance, float vertical_interval,
+                                          map<int , vector<int> >& JA_int_info,
+                                          map<int, vector<float> >& JA_float_info );
+
+                                                            
   /// @brief This function gets the mean and standard error of every junction angle
   ///   upslope of a given junction
   /// @param target_junction The target junction
@@ -338,6 +358,23 @@ class LSDJunctionNetwork
   /// @date 17/11/2019
   void print_complete_junction_angles_to_csv(vector<int> JunctionList, LSDFlowInfo& FlowInfo,
                                                        string csv_name);
+
+  /// @brief This prints the junction angles to a csv file
+  ///  It uses the much more complete junction angle code. In addition it give slope and elevation
+  ///  data for the junctions
+  /// @param JunctionList The list of junctions to analyze. If this is an empty vector,
+  ///  the code analyses all junctions in the DEM
+  /// @param FlowInfo The LSDFlowInfo object
+  /// @param Elevations An elevation raster
+  /// @param FlowDistance A flow distance raster
+  /// @param vertical_interval: the vertical interval around which you want the slope measured
+  /// @param csv_name The name of the file. Needs full path and csv extension
+  /// @author SMM
+  /// @date 07/12/2019
+  void print_complete_junction_angles_to_csv(vector<int> JunctionList,
+                                             LSDFlowInfo& FlowInfo, LSDRaster& Elevations, 
+                                             LSDRaster& FlowDistance, float vertical_interval,
+                                             string csv_name);
 
   /// @brief This gets the junction number of a given node.
   /// @param Node
@@ -1569,6 +1606,55 @@ vector<int> GetChannelHeadsChiMethodFromValleys(vector<int> ValleyNodes,
                 int search_radius_nodes, int threshold_stream_order,
                 LSDFlowInfo& FlowInfo, vector<int>& valid_cosmo_points,
                 vector<int>& snapped_node_indices);
+
+  ///@brief This function extract basins from list of nodes and overwrite given sources,
+  /// baselevel_nodes, outlet_nodes and baselevel junctions.
+  /// Be careful, the nodes have to be the EXACT outlet location for the basin. This
+  /// intend to be used as a low-level function to extract watersheds AFTER preselecting nodes from other criterias.
+  ///@param  input_nodes: node indices of the actual outlet location
+  ///@param  sources: source nodes for the river: WILL BE TRIMMED TO THE SOURCES WITHIN THE BASINS
+  ///@param  baselevel_nodes: WILL BE OVERWRITTEN with the new base_level nodes
+  ///@param  baselevel_junctions: WILL BE OVERWRITTEN with the new baselevel_junctions nodes
+  ///@param  outlet_nodes: WILL BE OVERWRITTEN with the new outlet_nodes nodes
+  ///@param  FlowInfo: A fully-grown and weaned FlowInfo object
+  ///@author B.G.
+  ///@date 09/12/2019
+  void select_basin_from_nodes(vector<int>& input_nodes, vector<int>& sources, vector<int>& baselevel_nodes,vector<int>& baselevel_junctions,vector<int>& outlet_nodes,LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, bool check_edges);
+
+  ///@brief This function extract basins from list of nodes and overwrite given sources,
+  /// baselevel_nodes, outlet_nodes and baselevel junctions.
+  /// It snaps the inputted node to the largest drainage area in a pixel radius.
+  ///@param  input_nodes: node indices of the actual outlet location
+  ///@param  sources: source nodes for the river: WILL BE TRIMMED TO THE SOURCES WITHIN THE BASINS
+  ///@param  baselevel_nodes: WILL BE OVERWRITTEN with the new base_level nodes
+  ///@param  baselevel_junctions: WILL BE OVERWRITTEN with the new baselevel_junctions nodes
+  ///@param  outlet_nodes: WILL BE OVERWRITTEN with the new outlet_nodes nodes
+  ///@param  FlowInfo: A fully-grown and weaned FlowInfo object
+  ///@param  DrainageArea: DA or Discharge raster to tell the code where to snap
+  ///@param  n_pixels: N pixels to look for
+  ///@author B.G.
+  ///@date 09/12/2019
+  void basin_from_node_snap_to_largest_surrounding_DA(vector<int>& input_nodes, vector<int>& sources, vector<int>& baselevel_nodes, 
+  vector<int>& baselevel_junctions,vector<int>& outlet_nodes, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& DrainageArea,
+  int n_pixels, bool check_edges);
+
+  vector<int> basin_from_node_minimum_DA(vector<int>& sources, vector<int>& baselevel_nodes, 
+  vector<int>& baselevel_junctions,vector<int>& outlet_nodes, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& DrainageArea,
+  double min_DA, bool check_edges);
+
+  std::vector<int> basin_from_node_minimum_DA_draining_to_list_of_nodes(vector<int>& input_nodes, vector<int>& sources, vector<int>& baselevel_nodes, 
+  vector<int>& baselevel_junctions,vector<int>& outlet_nodes, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& DrainageArea,
+  double min_DA);
+
+  std::vector<int> basin_from_node_all_minimum_DA_for_one_watershed(int outlet_node_of_the_watershed, vector<int>& sources, vector<int>& baselevel_nodes, 
+vector<int>& baselevel_junctions,vector<int>& outlet_nodes, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& DrainageArea,
+double min_DA, double max_DA);
+
+  vector<int> basin_from_node_range_DA(vector<int>& sources, vector<int>& baselevel_nodes,
+  vector<int>& baselevel_junctions,vector<int>& outlet_nodes, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& DrainageArea,
+  double min_DA, double max_DA, bool check_edges);
+
+  vector<bool> check_nodata_influence(LSDFlowInfo& FlowInfo, LSDRaster& testrast);
 
   /// @brief This functions takes a junction number and then follwos the receiver
   /// junctions until it hits a baselevel junction.

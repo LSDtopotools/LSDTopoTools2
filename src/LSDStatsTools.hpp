@@ -469,6 +469,14 @@ void matlab_float_reorder(std::vector<float> & unordered, std::vector<size_t> co
 void matlab_float_sort_descending(vector<float>& unsorted, vector<float>& sorted, vector<size_t>& index_map);
 void matlab_int_sort(vector<int>& unsorted, vector<int>& sorted, vector<size_t>& index_map); // added 27/11/13 SWDG
 void matlab_int_reorder(std::vector<int> & unordered, std::vector<size_t> const & index_map, std::vector<int> & ordered);
+void matlab_double_reorder_no_resize(std::vector<double> & unordered, std::vector<size_t> const & index_map, std::vector<double> & ordered);
+void matlab_double_sort_no_resize(vector<double>& unsorted, vector<double>& sorted, vector<size_t>& index_map);
+void matlab_float_reorder_no_resize(std::vector<float> & unordered, std::vector<size_t> const & index_map, std::vector<float> & ordered);
+void matlab_float_sort_no_resize(vector<float>& unsorted, vector<float>& sorted, vector<size_t>& index_map);
+void matlab_int_sort_no_resize(vector<int>& unsorted, vector<int>& sorted, vector<size_t>& index_map);
+void matlab_float_sort_descending_no_resize(vector<float>& unsorted, vector<float>& sorted, vector<size_t>& index_map);
+void matlab_int_reorder_no_resize(std::vector<int> & unordered, std::vector<size_t> const & index_map, std::vector<int> & ordered);
+
 
 double get_median(vector<double> y_data);
 

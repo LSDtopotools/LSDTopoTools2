@@ -2023,7 +2023,7 @@ void LSDRaster::get_row_and_col_of_a_point(float X_coordinate,float Y_coordinate
 
   // Get row and column of point
   int col_point = int(X_coordinate_shifted_origin/DataResolution);
-  int row_point = (NRows - 1) - int(round(Y_coordinate_shifted_origin/DataResolution)-0.5);
+  int row_point = (NRows - 1) - int(ceil(Y_coordinate_shifted_origin/DataResolution)-0.5);
 
   //cout << "Getting row and col, " << row_point << " " << col_point << endl;
 
@@ -2051,7 +2051,7 @@ void LSDRaster::get_row_and_col_of_a_point(double X_coordinate,double Y_coordina
 
   // Get row and column of point
   int col_point = int(X_coordinate_shifted_origin/DataResolution);
-  int row_point = (NRows - 1) - int(round(Y_coordinate_shifted_origin/DataResolution));
+  int row_point = (NRows - 1) - int(ceil(Y_coordinate_shifted_origin/DataResolution));
 
   //cout << "Getting row and col, " << row_point << " " << col_point << endl;
 
@@ -2066,6 +2066,36 @@ void LSDRaster::get_row_and_col_of_a_point(double X_coordinate,double Y_coordina
 
   row = this_row;
   col = this_col;
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Snap to point with greatest value within a given window size
+// useful to snap to the largest drainage area for instance.
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRaster::snap_to_row_col_with_greatest_value_in_window(int input_row, int input_col, int& out_row, int& out_col, int n_pixels)
+{
+  int np = round(n_pixels/2);
+
+  float current_value = RasterData[input_row][input_col];
+  out_row = input_row;
+  out_col = input_col;
+  for(int i = input_row - np; i<= input_row + np; i++)
+  {
+    for(int j = input_col - np; j<= input_col + np; j++)
+    {
+      if(i<0 || i>=NRows || j<0 || j>=NCols)
+        continue;
+
+      if(RasterData[i][j] > current_value)
+      {
+        out_row = i;
+        out_col = j;
+        current_value = RasterData[i][j];
+      }
+
+    }
+  }
 }
 
 

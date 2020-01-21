@@ -122,6 +122,7 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["write_hillshade"] = false;
   bool_default_map["print_raster_without_seas"] = false;
   bool_default_map["print_fill_raster"] = false;
+  bool_default_map["print_channels_to_csv"] = false;
   
   // This converts all csv files to geojson (for easier loading in a GIS)
   bool_default_map["convert_csv_to_geojson"] = false;  
@@ -153,8 +154,7 @@ int main (int nNumberofArgs,char *argv[])
   // To convert to mm/kyr you multiply by 10^7/(density in kg/m^3)
   // 0.01 g/cm^2/yr is ~ 37 mm/kyr
   // 0.1 g/cm^2/yr is ~ 370 mm/kyr or 0.37 mm/yr
-  bool_default_map["make_production_raster"] = false;
-  bool_default_map["make_all_shielding_and_scaling_rasters"] = false;
+  //bool_default_map["make_all_shielding_and_scaling_rasters"] = false;
   bool_default_map["single_erosion_rate"] = false;
   float_default_map["effective_erosion_rate"] = 0.01;
   float_default_map["self_shield_eff_thickness"] = 0;
@@ -537,7 +537,7 @@ int main (int nNumberofArgs,char *argv[])
       cout << "Let me load a production raster. " << endl;
       cout << "At the moment there is no error checking so if you don't have this raster the program will fail. " << endl;
       string Prod_fname = DATA_DIR+DEM_ID+this_string_map["production_raster_suffix"];
-      cout << "The production raster filename is: " << Prod_fname;
+      cout << "The production raster filename is: " << Prod_fname << endl;
       LSDRasterInfo PRI(Prod_fname,raster_ext);
       LSDRaster LoadProductionRaster(DATA_DIR+DEM_ID+this_string_map["production_raster_suffix"], raster_ext);
       ProductionRaster = LoadProductionRaster;
@@ -702,20 +702,23 @@ int main (int nNumberofArgs,char *argv[])
 
       // Some testing
       // This will be used to make some secondary rasters
-      MakeItYeah.set_to_constant_value(0.5);
-      LSDRaster AreaPixelRaster =  MakeItYeah.return_as_raster();
+      //MakeItYeah.set_to_constant_value(0.5);
+      //LSDRaster AreaPixelRaster =  MakeItYeah.return_as_raster();
 
       // Need to test this function
-      LSDIndexRaster IntContrib = FlowInfo.write_NContributingNodes_to_LSDIndexRaster();
-      LSDRaster Contrib(IntContrib);
+      //LSDIndexRaster IntContrib = FlowInfo.write_NContributingNodes_to_LSDIndexRaster();
+      //LSDRaster Contrib(IntContrib);
 
       // PLACEHOLDER
-      float minimum_val = 0.001;
-      float maximum_val = 0.005;
-      MakeItYeah.random_values(minimum_val,maximum_val);
-      LSDRaster Random_erosion =  MakeItYeah.return_as_raster();  
+      //float minimum_val = 0.001;
+      //float maximum_val = 0.005;
+      //MakeItYeah.random_values(minimum_val,maximum_val);
+      //LSDRaster Random_erosion =  MakeItYeah.return_as_raster();  
 
+      cout << endl << endl << "=================================" << endl;
+      cout << "This is currently in testing phase. I am trying to accumulate the cosogenic concentration." << endl;
       LSDRaster AccConc = ThisCosmoRaster.calculate_accumulated_CRN_concentration(CRN_conc, ErosionRaster,FlowInfo);   
+      cout << "Done with accumulating the concentration." << endl;
 
       // This writes the accumulation raster
       this_raster_name = OUT_DIR+OUT_ID+"_AccConc";                                      
@@ -741,6 +744,25 @@ int main (int nNumberofArgs,char *argv[])
       // now get the junction network
       LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
 
+      // Print channels and junctions if you want them.
+      if( this_bool_map["print_channels_to_csv"])
+      {
+        cout << "I am going to print the channel network." << endl;
+        string channel_csv_name = OUT_DIR+OUT_ID+"_CN";
+        ChanNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
+        cout << "I've printed the channel network. " << endl;
+    
+        // convert to geojson if that is what the user wants
+        // It is read more easily by GIS software but has bigger file size
+        if ( this_bool_map["convert_csv_to_geojson"])
+        {
+          cout << "Let me convert that data to json." << endl;
+          string gjson_name = OUT_DIR+OUT_ID+"_CN.geojson";
+          LSDSpatialCSVReader thiscsv(OUT_DIR+OUT_ID+"_CN.csv");
+          thiscsv.print_data_to_geojson(gjson_name);
+        }
+      }
+
       // Now get the lat long points
       // First get the lat-long
       int UTM_zone;
@@ -759,24 +781,46 @@ int main (int nNumberofArgs,char *argv[])
       // Get the local coordinates
       vector<float> fUTM_easting,fUTM_northing;
       CRN_points_data.get_x_and_y_from_latlong(fUTM_easting,fUTM_northing);
+      cout << "The x and y data are: " << endl;
+      for (int i = 0; i< int(fUTM_easting.size()); i++)
+      {
+        cout << fUTM_easting[i] << "," << fUTM_northing[i] << endl;
+      }
       
-      int search_radius_nodes = 5;
+      int search_radius_nodes = 8;
       int threshold_stream_order = 3;
       vector<int> valid_cosmo_points;
       vector<int> snapped_node_indices;
       vector<int> snapped_junction_indices;
 
       // Now get the snapped points 
-      // The snapped points are in a vector called snapped_node_indices   
+      // The snapped points are in a vector called snapped_node_indices  
+      cout << "I'm snapping some points" << endl; 
       ChanNetwork.snap_point_locations_to_nearest_channel_node_index(fUTM_easting, fUTM_northing, 
             search_radius_nodes, threshold_stream_order, FlowInfo, 
-            valid_cosmo_points, snapped_node_indices);      
+            valid_cosmo_points, snapped_node_indices);
+      cout << "The number of snapped points is: " <<   valid_cosmo_points.size() << endl;   
+
+      // Now get accumulated cosmo for testing
+      auto t1 = std::chrono::high_resolution_clock::now();   
+      LSDRaster CRN_conc = ThisCosmoRaster.calculate_CRN_concentration_raster(Nuclide, Muon_scaling, ErosionRaster,
+                                            ProductionRaster, TopoShield, 
+                                            SelfShield, SnowShield, 
+                                            is_production_uncertainty_plus_on,
+                                            is_production_uncertainty_minus_on);
+      auto t2 = std::chrono::high_resolution_clock::now();
+      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
+      cout << "Full concentration calculation took: " << duration << endl;
+
+      t1 = std::chrono::high_resolution_clock::now();   
+      LSDRaster AccConc = ThisCosmoRaster.calculate_accumulated_CRN_concentration(CRN_conc, ErosionRaster,FlowInfo);   
+      t2 = std::chrono::high_resolution_clock::now();
+      duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
+      cout << "Accumulation calculation took: " << duration << endl;       
 
 
       if(this_bool_map["calculate_accumulated_CRN_concentration_from_points"])
       {
-
-
 
         // now loop through the valid node indices:
         int n_nodes = int(snapped_node_indices.size());
@@ -784,7 +828,7 @@ int main (int nNumberofArgs,char *argv[])
         {
           cout << "Found the node " << snapped_node_indices[node] << endl;
 
-          auto t1 = std::chrono::high_resolution_clock::now();   
+          t1 = std::chrono::high_resolution_clock::now();   
           LSDRaster CRNConc_node = ThisCosmoRaster.calculate_CRN_concentration_raster(Nuclide, Muon_scaling, ErosionRaster,
                                             ProductionRaster, TopoShield, 
                                             SelfShield, SnowShield, 
@@ -792,10 +836,8 @@ int main (int nNumberofArgs,char *argv[])
                                             is_production_uncertainty_plus_on,
                                             is_production_uncertainty_minus_on);
 
-
-
-          auto t2 = std::chrono::high_resolution_clock::now();
-          auto duration = std::chrono::duration_cast<std::chrono::seconds>( t2 - t1 ).count();
+          t2 = std::chrono::high_resolution_clock::now();
+          duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
           cout << "Basin concentration calculation took: " << duration << endl;
 
           // This writes the concentration raster 
@@ -809,6 +851,11 @@ int main (int nNumberofArgs,char *argv[])
 
           cout << endl << endl << "===========================" << endl;
           cout << "Accumulated concentration is: " << This_accumulated_cosmo << " atoms/g" <<endl;
+
+          int row,col;
+          FlowInfo.retrieve_current_row_and_col(snapped_node_indices[node],row,col);
+          cout << "And same accumulation from the raster I previously calculated: " <<  AccConc.get_data_element(row,col);
+          cout << "========================" << endl << endl;
 
         }
       }
@@ -833,6 +880,8 @@ int main (int nNumberofArgs,char *argv[])
                                             SelfShield, SnowShield, 
                                             NoDataRaster,FlowInfo,
                                             snapped_node_indices[sample]);
+
+          cout << "The erosion rate is: " << This_erate << endl;
         }
       }
 

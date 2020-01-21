@@ -1161,7 +1161,7 @@ LSDRaster LSDFlowInfo::remove_nodes_influneced_by_edge(LSDRaster& topography)
   int move_row,move_col;
 
   vector<int> edge_node_list;
-  
+
   // get a list of nodes influenced by edge
   for (int node = 0; node< n_nodes; node++)
   {
@@ -1181,50 +1181,50 @@ LSDRaster LSDFlowInfo::remove_nodes_influneced_by_edge(LSDRaster& topography)
       move_col = col+1;
       if (topography.get_data_element(move_row,move_col) == NoDataValue)
       {
-        border_nodata = true;  
+        border_nodata = true;
       }
       move_row = row+1;
       move_col = col;
       if (topography.get_data_element(move_row,move_col) == NoDataValue)
       {
-        border_nodata = true;  
-      }      
+        border_nodata = true;
+      }
       move_row = row+1;
       move_col = col-1;
       if (topography.get_data_element(move_row,move_col) == NoDataValue)
       {
-        border_nodata = true;  
-      } 
+        border_nodata = true;
+      }
       move_row = row;
       move_col = col+1;
       if (topography.get_data_element(move_row,move_col) == NoDataValue)
       {
-        border_nodata = true;  
-      } 
+        border_nodata = true;
+      }
       move_row = row;
       move_col = col-1;
       if (topography.get_data_element(move_row,move_col) == NoDataValue)
       {
-        border_nodata = true;  
-      } 
+        border_nodata = true;
+      }
       move_row = row-1;
       move_col = col+1;
       if (topography.get_data_element(move_row,move_col) == NoDataValue)
       {
-        border_nodata = true;  
-      } 
+        border_nodata = true;
+      }
       move_row = row-1;
       move_col = col;
       if (topography.get_data_element(move_row,move_col) == NoDataValue)
       {
-        border_nodata = true;  
-      } 
+        border_nodata = true;
+      }
       move_row = row-1;
       move_col = col-1;
       if (topography.get_data_element(move_row,move_col) == NoDataValue)
       {
-        border_nodata = true;  
-      } 
+        border_nodata = true;
+      }
 
 
       // if any of these pixels borders nodata then you add to the list
@@ -1244,12 +1244,12 @@ LSDRaster LSDFlowInfo::remove_nodes_influneced_by_edge(LSDRaster& topography)
   for (int node = 0; node< n_nodata_nodes; node++)
   {
 
-    current_node = edge_node_list[node];    
+    current_node = edge_node_list[node];
     retrieve_receiver_information(current_node,receiver_node);
     retrieve_current_row_and_col(current_node,row,col);
     new_topography.set_data_element(row,col,NoDataValue);
 
-    // This does a trace downslope of the node, setting nodatavalues all the way down. 
+    // This does a trace downslope of the node, setting nodatavalues all the way down.
     while (receiver_node != current_node)
     {  // need to do edge checking
 
@@ -1257,20 +1257,20 @@ LSDRaster LSDFlowInfo::remove_nodes_influneced_by_edge(LSDRaster& topography)
       retrieve_receiver_information(current_node,receiver_node);
       retrieve_current_row_and_col(current_node,row,col);
       new_topography.set_data_element(row,col,NoDataValue);
-      
+
     }
 
   }
 
   return new_topography;
-  
+
 }
 
 
 LSDRaster LSDFlowInfo::find_nodes_not_influenced_by_edge_draining_to_nodelist(vector<int> node_list,LSDRaster& topography)
 {
-  
-  
+
+
   int raster_NRows, raster_NCols;
   float raster_XMin, raster_YMin, raster_DataRes, raster_NoDataValue;
   int current_node, row,col;
@@ -1290,7 +1290,7 @@ LSDRaster LSDFlowInfo::find_nodes_not_influenced_by_edge_draining_to_nodelist(ve
   {
     cout << "Warning!!, LSDFlowInfo::find_nodes_not_influenced_by_edge_draining_to_nodelist\n"
       << "Accumulation raster does not match dimensions of original raster\n"
-      << "The resampling need to be done before that step! I will now crash... \n" 
+      << "The resampling need to be done before that step! I will now crash... \n"
       << "I have heard that lsdtopytools does that for you automatically now!" << endl;
     exit(EXIT_FAILURE);
   }
@@ -1298,20 +1298,20 @@ LSDRaster LSDFlowInfo::find_nodes_not_influenced_by_edge_draining_to_nodelist(ve
   // create the data array
   Array2D<float> new_topography_data(NRows,NCols,raster_NoDataValue);
 
-  
-  // The node list is loaded from another function. This can be a channel network or a 
+
+  // The node list is loaded from another function. This can be a channel network or a
   // main stream channel. That channel can be generated using the LSDFlowInfo method LSDFlowInfo::get_flow_path
   int n_nodes = int(node_list.size());
   cout << "I am trying to isolate nodes draining to a fixed channel that are not influenced by nodata." << endl;
   cout << "I am programmed in a rather rudimentary, brute force way. It may take some time. " << endl;
-  cout << "I need to process " << n_nodes << " nodes." << endl;  
+  cout << "I need to process " << n_nodes << " nodes." << endl;
   for(int node = 0; node < n_nodes; node++)
   {
     if (node % 500 == 0)
     {
       cout << "Node " << node << " of " << n_nodes << endl;
     }
-    
+
     // first get the current node
     retrieve_current_row_and_col(node_list[node],row,col);
     new_topography_data[row][col] = topography.get_data_element(row,col);
@@ -1319,14 +1319,14 @@ LSDRaster LSDFlowInfo::find_nodes_not_influenced_by_edge_draining_to_nodelist(ve
     // now get the donors
     vector<int> donors = retrieve_donors_to_node(  node_list[node]);
 
-    // Loop through all the donors to this particular node. We will look through the donors to 
-    // find upslope influence of nodata. 
+    // Loop through all the donors to this particular node. We will look through the donors to
+    // find upslope influence of nodata.
     int n_donors = int(donors.size());
     for (int donor = 0; donor<n_donors; donor++)
     {
       int this_d_node = donors[donor];
 
-      // check to see if the donor is in the fixed channel. If it is, get rid of it. 
+      // check to see if the donor is in the fixed channel. If it is, get rid of it.
       bool donor_in_node_list = false;
       for (int nl = 0; nl<n_nodes; nl++)
       {
@@ -1340,15 +1340,15 @@ LSDRaster LSDFlowInfo::find_nodes_not_influenced_by_edge_draining_to_nodelist(ve
       {
         bool is_influenced = is_upstream_influenced_by_nodata(this_d_node, topography);
 
-        // If this donor is not influenced by nodata anywhere upstream, add all the pixels 
-        // draining to this node to the data. 
+        // If this donor is not influenced by nodata anywhere upstream, add all the pixels
+        // draining to this node to the data.
         if (is_influenced == false)
         {
           vector<int> influenced_nodes = get_upslope_nodes_include_outlet(this_d_node);
           int n_in_basin = int(influenced_nodes.size());
           for (int in = 0; in < n_in_basin; in++)
           {
-            current_node = influenced_nodes[in];  
+            current_node = influenced_nodes[in];
             retrieve_current_row_and_col(current_node,row,col);
             new_topography_data[row][col] = topography.get_data_element(row,col);
           }
@@ -1360,7 +1360,7 @@ LSDRaster LSDFlowInfo::find_nodes_not_influenced_by_edge_draining_to_nodelist(ve
 
   LSDRaster temp_topo(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,new_topography_data,GeoReferencingStrings);
   return temp_topo;
-  
+
 }
 
 
@@ -2738,7 +2738,7 @@ LSDIndexRaster LSDFlowInfo::calculate_n_pixels_contributing_from_upslope()
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //
-// This function calcualtes the contributing pixels
+// This function calculates the contributing pixels
 // it can be converted to contributing area by multiplying by the
 // DataResolution^2
 //
@@ -2758,22 +2758,22 @@ void LSDFlowInfo::calculate_upslope_reference_indices()
 
   // loop through the s vector, adding pixels to receiver nodes
   for(int node = NDataNodes-1; node>=0; node--)
-    {
-      donor_node = SVector[node];
-      receiver_node = ReceiverVector[ donor_node ];
-
-      // every node is visited once and only once so we can map the
-      // unique positions of the nodes to the SVector
-      SVectorIndex[donor_node] = node;
-
-      // add the upslope area (note no action is taken
-      // for base level nodes since they donate to themselves and
-      // we must avoid float counting
-      if (donor_node != receiver_node)
   {
-    vectorized_area[ receiver_node ] +=  vectorized_area[ donor_node ];
-  }
+    donor_node = SVector[node];
+    receiver_node = ReceiverVector[ donor_node ];
+
+    // every node is visited once and only once so we can map the
+    // unique positions of the nodes to the SVector
+    SVectorIndex[donor_node] = node;
+
+    // add the upslope area (note no action is taken
+    // for base level nodes since they donate to themselves and
+    // we must avoid float counting
+    if (donor_node != receiver_node)
+    {
+      vectorized_area[ receiver_node ] +=  vectorized_area[ donor_node ];
     }
+  }
 
   NContributingNodes = vectorized_area;
 }
@@ -2955,7 +2955,7 @@ LSDRaster LSDFlowInfo::upslope_variable_accumulator(LSDRaster& accum_raster)
   cout << "You are using the old and slow upslope accumulator. " << endl;
   cout << "You should probably use upslope_variable_accumulator_v2" << endl;
   cout << "This version does not accumulate at the base level nodes" << endl;
-  
+
   int raster_NRows, raster_NCols;
   float raster_XMin, raster_YMin, raster_DataRes;
 
@@ -3023,7 +3023,7 @@ LSDRaster LSDFlowInfo::upslope_variable_accumulator_v2(LSDRaster& accum_raster)
 //
 //  v2, I am trying to optimise it and remove the dependencies of having the exact same dimensions!
 //
-// SMM update 30/07/2019 Making sure this reflects nodata and getting rid of the 
+// SMM update 30/07/2019 Making sure this reflects nodata and getting rid of the
 //  topography raster
 //
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -3048,30 +3048,9 @@ LSDRaster LSDFlowInfo::upslope_variable_accumulator_v2(LSDRaster& accum_raster, 
   {
     cout << "Warning!!, LSDFlowInfo::upslope_area_accumulator\n"
       << "Accumulation raster does not match dimensions of original raster\n"
-      << "The resampling need to be done before that step! I will now crash... \n" 
+      << "The resampling need to be done before that step! I will now crash... \n"
       << "I have heard that lsdtopytools does that for you automatically now!" << endl;
     exit(EXIT_FAILURE);
-  // THIS IS NOT WORKING!
-  // Also, there is code for this in both LSDRaster and well as LSDRasterInfo and LSDRasterAggregator
-  // Joke apart I am deprecating that function as it modifies the area of the accumulation and makes it ambiguous
-  //   // Using a simple xy query approach
-  //   LSDRaster new_accum_raster(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, filled_raster.get_RasterData() );
-  //   // (int nrows, int ncols, double xmin, double ymin,
-  //   //         double cellsize, double ndv, Array2D<double> data)
-  //   for(size_t i=0; i< NRows; i++)
-  //   {
-  //     for(size_t j=0; j < NCols; j++)
-  //     {
-  //       float tx,ty,new_val;
-  //       new_accum_raster.get_x_and_y_locations(i,j,tx,ty);
-  //       new_val = accum_raster.get_value_of_point(tx,ty);
-  //       new_accum_raster.set_data_element(i,j,new_val);
-  //     }
-  //   }
-
-  //   accum_raster = new_accum_raster;
-  // // Resampling done!
-
   }
 
   // getting my clean vectors
@@ -3090,9 +3069,10 @@ LSDRaster LSDFlowInfo::upslope_variable_accumulator_v2(LSDRaster& accum_raster, 
       }
     }
   }
+  cout << "Initiated the raster" << endl;
 
   // I will comment that code to make sure that I am not misunderstanding things
-  // I am getting the number of node here
+  // I am getting the number of nodes here
   size_t n_vec = these_vec["inverted_stack_order"].size();
   int tot_n = 0;
   int tot_n_check = 0;
@@ -3117,6 +3097,12 @@ LSDRaster LSDFlowInfo::upslope_variable_accumulator_v2(LSDRaster& accum_raster, 
       row =  these_vec["inverted_rows"][i][j];
       col = these_vec["inverted_cols"][i][j];
 
+      if (row <0 || row > NRows-1 || col < 0 || col > NCols-1)
+      {
+        cout << "Problem in accumulator, I'm about to crash" << endl;
+        cout << "row: " << row << " col: " << col << endl;
+      }
+
       // First getting the accumulation of that particular current node <--- THIS MIGHT BE WHERE THE DIFFEREENCE IS SIMON
       if(accum_current_node)
       {
@@ -3125,7 +3111,7 @@ LSDRaster LSDFlowInfo::upslope_variable_accumulator_v2(LSDRaster& accum_raster, 
       }
       // if my receiving node is not the same (i.e. if I am not a base level), I will transmit that accumulation to the receiving node
       // first getting the receiving node
-      int recnode; 
+      int recnode;
       retrieve_receiver_information(this_node,recnode);
       // Checking if I am not a base level
       if(recnode != this_node)
@@ -3136,7 +3122,7 @@ LSDRaster LSDFlowInfo::upslope_variable_accumulator_v2(LSDRaster& accum_raster, 
         // Adding my accumulated data to that next node
         accumulated_data_array[rrow][rcol] += accumulated_data_array[row][col];
       }
-      
+
       // Going to the next node
     }
     // going to the next basin
@@ -3147,11 +3133,89 @@ LSDRaster LSDFlowInfo::upslope_variable_accumulator_v2(LSDRaster& accum_raster, 
   LSDRaster accumulated_flow(NRows, NCols, XMinimum, YMinimum,
         DataResolution, NoDataValue, accumulated_data_array,GeoReferencingStrings);
   return accumulated_flow;
-    
+
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+//  Accumulate some variable (such a precipitation) from an accumulation raster
+//
+//  v3, trying to simplify the code (SMM, 19/11/2019)
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+LSDRaster LSDFlowInfo::upslope_variable_accumulator_v3(LSDRaster& accum_raster)
+{
+  int raster_NRows, raster_NCols;
+  float raster_XMin, raster_YMin, raster_DataRes, raster_NoDataValue;
+
+  // first check to make sure the raster dimensions match that of the
+  // raster upon which LSDFlowInfo is based
+  raster_NRows =  accum_raster.get_NRows();
+  raster_NCols =  accum_raster.get_NCols();
+  raster_XMin  =  accum_raster.get_XMinimum();
+  raster_YMin  =  accum_raster.get_YMinimum();
+  raster_NoDataValue = accum_raster.get_NoDataValue();
+  raster_DataRes  =  accum_raster.get_DataResolution();
+
+  if (raster_NRows != NRows || raster_NCols != NCols ||
+      raster_XMin != XMinimum || raster_YMin != YMinimum ||
+      raster_DataRes != DataResolution)
+  {
+    cout << "Warning!!, LSDFlowInfo::upslope_area_accumulator\n"
+      << "Accumulation raster does not match dimensions of original raster\n"
+      << "The resampling need to be done before that step! I will now crash... \n"
+      << "I have heard that lsdtopytools does that for you automatically now!" << endl;
+    exit(EXIT_FAILURE);
+  }
+
+  // We first loop through the the nodes, adding the value on that particular pixel
+  int row,col;
+  vector<float> vectorized_area(NDataNodes,raster_NoDataValue);
+  for (int node = 0; node<NDataNodes; node++)
+  {
+    row = RowIndex[node];
+    col = ColIndex[node];
+    vectorized_area[node] = accum_raster.get_data_element(row,col);
+  }
+
+  int receiver_node;
+  int donor_node;
+
+  // loop through the s vector, adding pixels to receiver nodes
+  for(int node = NDataNodes-1; node>=0; node--)
+  {
+    donor_node = SVector[node];
+    receiver_node = ReceiverVector[ donor_node ];
+
+    // add the upslope area (note no action is taken
+    // for base level nodes since they donate to themselves and
+    // we must avoid float counting
+    if (donor_node != receiver_node)
+    {
+      vectorized_area[ receiver_node ] +=  vectorized_area[ donor_node ];
+    }
+  }
+
+  // create the data array
+  Array2D<float> accumulated_data_array(NRows,NCols,raster_NoDataValue);
+  for (int node = 0; node<NDataNodes; node++)
+  {
+    row = RowIndex[node];
+    col = ColIndex[node];
+    accumulated_data_array[row][col] = vectorized_area[node];
+  }
+
+  // create the raster
+  LSDRaster accumulated_flow(NRows, NCols, XMinimum, YMinimum,
+        DataResolution, NoDataValue, accumulated_data_array,GeoReferencingStrings);
+  return accumulated_flow;
+
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -4004,7 +4068,7 @@ int LSDFlowInfo::get_node_index_of_coordinate_point(float X_coordinate, float Y_
 
   // Get row and column of point
   int col_point = int(X_coordinate_shifted_origin/DataResolution);
-  int row_point = (NRows-1) - int(round(Y_coordinate_shifted_origin/DataResolution));
+  int row_point = (NRows-1) - int(ceil(Y_coordinate_shifted_origin/DataResolution));
 
   // Get node of point
   int CurrentNode;
@@ -4399,7 +4463,7 @@ void LSDFlowInfo::D8_Trace(int i, int j, LSDIndexRaster StreamNetwork, float& le
 // This gets a flow path. Like D8 trace, but just get a vector of nodeindices rather than anything
 // more fancy
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-vector<int> LSDFlowInfo::get_flow_path(float x_loc, float y_loc) 
+vector<int> LSDFlowInfo::get_flow_path(float x_loc, float y_loc)
 {
   vector<int> node_list;
   
@@ -4413,7 +4477,7 @@ vector<int> LSDFlowInfo::get_flow_path(float x_loc, float y_loc)
   {
     current_node = get_node_index_of_coordinate_point(x_loc,y_loc);
     node_list.push_back(current_node);
-    
+
     retrieve_receiver_information(current_node,receiver_node);
 
     while (receiver_node != current_node)
@@ -4424,7 +4488,7 @@ vector<int> LSDFlowInfo::get_flow_path(float x_loc, float y_loc)
 
       node_list.push_back(current_node);
     }
-  }  
+  }
   return node_list;
 }
 
@@ -4432,7 +4496,7 @@ vector<int> LSDFlowInfo::get_flow_path(float x_loc, float y_loc)
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Prints a node list
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-void LSDFlowInfo::print_vector_of_nodeindices_to_csv_file_with_latlong(vector<int> node_list,string path, string filename) 
+void LSDFlowInfo::print_vector_of_nodeindices_to_csv_file_with_latlong(vector<int> node_list,string path, string filename)
 {
   // these are for extracting element-wise data from the channel profiles.
   int this_node, row,col;
@@ -4474,12 +4538,12 @@ void LSDFlowInfo::print_vector_of_nodeindices_to_csv_file_with_latlong(vector<in
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Prints a node list, with some extra bells and whistles
-// Basically you get extra data members so that you can print a channel profile 
+// Basically you get extra data members so that you can print a channel profile
 // in excel (so undergraduate friendly)
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-void LSDFlowInfo::print_vector_of_nodeindices_to_csv_file_with_latlong(vector<int> node_list,string path, string filename, 
-                                                                       LSDRaster& Elevation, LSDRaster& FlowDistance, 
-                                                                       LSDRaster& drainage_area) 
+void LSDFlowInfo::print_vector_of_nodeindices_to_csv_file_with_latlong(vector<int> node_list,string path, string filename,
+                                                                       LSDRaster& Elevation, LSDRaster& FlowDistance,
+                                                                       LSDRaster& drainage_area)
 {
   // these are for extracting element-wise data from the channel profiles.
   int this_node, row,col;
@@ -4674,12 +4738,12 @@ void LSDFlowInfo::MoveChannelHeadUp(vector<int> Sources, float MoveDist, LSDRast
 
       //update length
       if (Direction == 1)
-      { 
-        length += DataResolution; 
+      {
+        length += DataResolution;
       }
       else if (Direction == 2)
-      { 
-        length += (DataResolution * root_2); 
+      {
+        length += (DataResolution * root_2);
       }
 
       i = new_i;
@@ -8745,7 +8809,7 @@ int LSDFlowInfo::get_downslope_node_after_fixed_visited_nodes(int source_node,
       }
 
       // see if we have collected enough nodes to visit
-      if (n_visited >= n_nodes_to_visit)
+      if (n_visited >= n_nodes_to_visit && n_nodes_to_visit != -9999)
       {
         Am_I_at_the_bottom_of_the_channel = true;
         bottom_node = receiver_node;
@@ -8755,6 +8819,7 @@ int LSDFlowInfo::get_downslope_node_after_fixed_visited_nodes(int source_node,
   }
   return bottom_node;
 }
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This function gets the flow length between two nodes.
@@ -9080,7 +9145,7 @@ vector< vector<int> > LSDFlowInfo::get_vectors_of_flow(LSDRaster& topo)
   }
 
 
-  return out_vector;  
+  return out_vector;
 }
 
 
@@ -9113,7 +9178,7 @@ bool operator<( const base_level_node_sorter& lhs, const base_level_node_sorter&
 // B.G. 14/04/2019
 map<string, vector< vector<int> > > LSDFlowInfo::get_map_of_vectors()
 {
-  
+
   // I first, I want the base levels again
   priority_queue< base_level_node_sorter, vector<base_level_node_sorter>, less<base_level_node_sorter> > PriorityQueue;
 
@@ -9154,7 +9219,7 @@ map<string, vector< vector<int> > > LSDFlowInfo::get_map_of_vectors()
         int new_val = this_vec[j];
         rev_vec.push_back(new_val);
       }
- 
+
       // reverse(rev_vec.begin(),rev_vec.end());
       inverted_nodes_per_basins.push_back(rev_vec);
       // Now getting the row and col

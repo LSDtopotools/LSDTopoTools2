@@ -2823,8 +2823,10 @@ void combinations (vector<int> v, int start, int n, int k, int maxk, vector<vect
   int i;
   if (int(v.size()) <= maxk)
   {
-    cout << "FATAL ERROR your vector is too small for combinations (LSDStatsTools)" << endl;
-    exit(EXIT_FAILURE);
+    cout << "WARNING your vector is too small for combinations (LSDStatsTools), returning the vector itself" << endl;
+    // exit(EXIT_FAILURE);
+    these_combinations.push_back(v);
+    return;
   }
 
   // k here counts through positions in the maxk-element v.
@@ -5560,6 +5562,111 @@ void matlab_int_reorder(std::vector<int> & unordered, std::vector<size_t> const 
   // sorted
   vector<int> copy = unordered;
   ordered.resize(index_map.size());
+  for(int i = 0; i< int(index_map.size());i++)
+  {
+    ordered[i] = copy[index_map[i]];
+  }
+}
+
+
+//start of no resize version
+// This implementation is O(n), but also uses O(n) extra memory
+void matlab_double_reorder_no_resize(std::vector<double> & unordered, std::vector<size_t> const & index_map, std::vector<double> & ordered)
+{
+  // copy for the reorder according to index_map, because unsorted may also be
+  // sorted
+  vector<double> copy = unordered;
+  // ordered.resize(index_map.size());
+  for(int i = 0; i< int(index_map.size());i++)
+  {
+    ordered[i] = copy[index_map[i]];
+  }
+}
+
+void matlab_double_sort_no_resize(vector<double>& unsorted, vector<double>& sorted, vector<size_t>& index_map)
+{
+  // Original unsorted index map
+  // index_map.resize(unsorted.size());
+  for(size_t i=0;i<unsorted.size();i++)
+  {
+    index_map[i] = i;
+  }
+  // Sort the index map, using unsorted for comparison
+  sort(index_map.begin(), index_map.end(), index_cmp<std::vector<double>& >(unsorted));
+  // sorted.resize(unsorted.size());
+  matlab_double_reorder_no_resize(unsorted,index_map,sorted);
+}
+
+
+// This implementation is O(n), but also uses O(n) extra memory
+void matlab_float_reorder_no_resize(std::vector<float> & unordered, std::vector<size_t> const & index_map, std::vector<float> & ordered)
+{
+  // copy for the reorder according to index_map, because unsorted may also be
+  // sorted
+  vector<float> copy = unordered;
+  // ordered.resize(index_map.size());
+  for(int i = 0; i< int(index_map.size());i++)
+  {
+    ordered[i] = copy[index_map[i]];
+  }
+}
+
+
+
+void matlab_float_sort_no_resize(vector<float>& unsorted, vector<float>& sorted, vector<size_t>& index_map)
+{
+  // Original unsorted index map
+  // index_map.resize(unsorted.size());
+  // std::cout << "A" << endl;
+  for(size_t i=0;i<unsorted.size();i++)
+  {
+    index_map[i] = i;
+  }
+  // std::cout << "B" << endl;
+  // Sort the index map, using unsorted for comparison
+  sort(index_map.begin(), index_map.end(), index_cmp<std::vector<float>& >(unsorted));
+  // std::cout << "C" << endl;
+  // sorted.resize(unsorted.size());
+  matlab_float_reorder_no_resize(unsorted,index_map,sorted);
+  // std::cout << "D" << endl;
+}
+
+void matlab_int_sort_no_resize(vector<int>& unsorted, vector<int>& sorted, vector<size_t>& index_map)
+{
+  // Original unsorted index map
+  // index_map.resize(unsorted.size());
+  for(size_t i=0;i<unsorted.size();i++)
+  {
+    index_map[i] = i;
+  }
+  // Sort the index map, using unsorted for comparison
+  sort(index_map.begin(), index_map.end(), index_cmp<std::vector<int>& >(unsorted));
+  // sorted.resize(unsorted.size());
+  matlab_int_reorder_no_resize(unsorted,index_map,sorted);
+}
+
+void matlab_float_sort_descending_no_resize(vector<float>& unsorted, vector<float>& sorted, vector<size_t>& index_map)
+{
+  // Original unsorted index map
+  // index_map.resize(unsorted.size());
+  for(size_t i=0;i<unsorted.size();i++)
+  {
+    index_map[i] = i;
+  }
+  // Sort the index map, using unsorted for comparison
+  // uses reverse iterators to sort descending - SWDG 16/4/13
+  sort(index_map.rbegin(), index_map.rend(), index_cmp<std::vector<float>& >(unsorted));
+  // sorted.resize(unsorted.size());
+  matlab_float_reorder_no_resize(unsorted,index_map,sorted);
+}
+
+// This implementation is O(n), but also uses O(n) extra memory
+void matlab_int_reorder_no_resize(std::vector<int> & unordered, std::vector<size_t> const & index_map, std::vector<int> & ordered)
+{
+  // copy for the reorder according to index_map, because unsorted may also be
+  // sorted
+  vector<int> copy = unordered;
+  // ordered.resize(index_map.size());
   for(int i = 0; i< int(index_map.size());i++)
   {
     ordered[i] = copy[index_map[i]];

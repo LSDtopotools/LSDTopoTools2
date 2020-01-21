@@ -627,4 +627,16 @@ bool LSDRasterInfo::check_if_point_is_in_raster(float X_coordinate,float Y_coord
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 
+void LSDRasterInfo::print_raster_information()
+{
+  cout << "NRows: " << NRows << endl;
+  cout << "NCols: "  << NCols << endl;
+  cout << "XMinimum: "  << XMinimum << endl;
+  cout << "YMinimum: "  << YMinimum << endl;
+  cout << "DataResolution: " << DataResolution << endl;
+  cout << "NoDataValue: " << NoDataValue << endl;
+  cout << "ENVI_map_info: " << GeoReferencingStrings["ENVI_map_info"] << endl;
+  cout << "ENVI_coordinate_system: " << GeoReferencingStrings["ENVI_coordinate_system"] << endl;
+}
+
 #endif

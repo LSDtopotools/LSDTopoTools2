@@ -91,6 +91,9 @@
 #include "LSDChiNetwork.hpp"
 #include "LSDMostLikelyPartitionsFinder.hpp"
 
+// Testing some timings here
+#include <chrono>
+
 #ifdef _OPENMP 
   #include <thread>
 #endif
@@ -6823,7 +6826,8 @@ float LSDChiTools::test_collinearity_by_basin_disorder(LSDFlowInfo& FlowInfo,
   int n_nodes_this_basin = int(chi_sorted.size());
   float chi_max = chi_sorted[n_nodes_this_basin-1];
   float chi_min = chi_sorted[0];
-  cout << "My first guess of minimum chi is: " << chi_min << endl;
+  // Sorry Simon, the following cout slows down the code when many rivers are tested: terminal output overflow
+  // cout << "My first guess of minimum chi is: " << chi_min << endl;
 
   for(int i = 0; i<n_nodes_this_basin-1; i++)
   {
@@ -7006,7 +7010,202 @@ vector<float> LSDChiTools::test_collinearity_by_basin_disorder_with_uncert(LSDFl
       int n_nodes_this_basin = int(chi_sorted.size());
       float chi_max = chi_sorted[n_nodes_this_basin-1];
       float chi_min = chi_sorted[0];
-      cout << "My first guess of minimum chi is: " << chi_min << endl;
+      // Sorry Simon, the following cout slows down the code when many rivers are tested: terminal output overflow
+      // cout << "My first guess of minimum chi is: " << chi_min << endl;
+      for(int i = 0; i<n_nodes_this_basin-1; i++)
+      {
+        this_delta_chi = fabs(chi_sorted[i+1]-chi_sorted[i]);
+        sum_delta_chi+=this_delta_chi;
+        if(chi_sorted[i] > chi_max)
+        {
+          chi_max = chi_sorted[i];
+        }
+        if(chi_sorted[i] < chi_min)
+        {
+          chi_min = chi_sorted[i];
+        }
+      }
+      if(chi_sorted[n_nodes_this_basin-1] > chi_max)
+      {
+        chi_max = chi_sorted[n_nodes_this_basin-1];
+      }
+      float chi_range = chi_max-chi_min;
+        
+      float disorder_stat = (sum_delta_chi - chi_range)/chi_range;
+      disorder_stat_vec.push_back(disorder_stat);
+    }
+  }
+
+
+  // for debugging
+  bool print_results = false;
+  if(print_results)
+  {
+    cout << "Disorder stats for all the combinations are: " << endl;
+    for(int i = 0; i< int(disorder_stat_vec.size()); i++)
+    {
+      cout << disorder_stat_vec[i] << " ";
+    }
+    cout << endl;
+    cout << "I'm returning the disorder stat vector." << endl;
+  }
+  
+
+  return disorder_stat_vec;
+
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function reproduce the bug from the disorder metric linked to chi_min
+// Used to assess the extent of the bug and make sure it is sorted
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<float> LSDChiTools::TEST_FUNCTION_OLD_DISORDER_DO_NOT_USE(LSDFlowInfo& FlowInfo,
+                                                 int baselevel_key)
+{
+  vector<float> disorder_stat_vec;
+  
+  //cout << "Testing the segment collinearity for basin key " << baselevel_key << endl;
+  // get some information about the number of basins
+  int n_basins = int(ordered_baselevel_nodes.size());
+  if (baselevel_key >= n_basins)
+  {
+    cout << "Fatal error LSDChiTools::test_all_segment_collinearity_by_basin_disorder" << endl;
+    cout << "You have selected a basin that doesn't exist!" << endl;
+    exit(EXIT_FAILURE);
+  }
+
+  // this map will hold references to the sources. There are two of them
+  // because the first has the sources as the keys and the second has the
+  // combination index as the keys. 
+  map<int,int> sources_are_keys;
+  map<int,int> comboindex_are_keys;
+  
+  vector<float> this_basin_chi;
+  vector<float> this_basin_elevation;
+  vector<int> this_basin_source;
+  int n_nodes = int(node_sequence.size());
+  int this_node;
+  int comboindex = 0;     // this is used to store an index into the combinations
+  for (int n = 0; n< n_nodes; n++)
+  {
+    this_node = node_sequence[n];
+
+    if (baselevel_keys_map[this_node] == baselevel_key)
+    {
+
+      this_basin_chi.push_back(chi_data_map[this_node]);
+      this_basin_elevation.push_back(elev_data_map[this_node]);
+      this_basin_source.push_back(source_keys_map[this_node]);
+      
+      // if the key doesn't exist, add a source key counter
+      if ( sources_are_keys.find( source_keys_map[this_node] ) == sources_are_keys.end() )
+      {
+        sources_are_keys[ source_keys_map[this_node] ] = comboindex;
+        comboindex++;
+      }
+    }
+  }
+  
+  // now do the second map by inverting the first map
+  for(map<int,int>::iterator iter =sources_are_keys.begin(); iter != sources_are_keys.end(); ++iter)
+  {
+    int k =  iter->first;
+    int v = iter->second;
+    comboindex_are_keys[v] = k;
+  }
+  
+  int n_sources = int(comboindex_are_keys.size());
+  //cout << "The number of channels are: " << n_sources << endl;
+  //cout << "The source node is: " << comboindex_are_keys[0] << endl;
+  
+  
+  // get the combinations
+  //cout << "Let me get some combinations for you." << endl;
+  int n_elements = n_sources-1;
+  int n_in_each_combo = 3;
+  
+  if (n_sources < n_in_each_combo)
+  {
+    cout << "Not enough channels in this basin! I am returning a nodata vector." << endl;
+    disorder_stat_vec.push_back(-9999);
+  }
+  else
+  {
+    // this gets the combinations
+    bool zero_indexed = false;
+    vector< vector<int> > combo_vecvec = combinations(n_elements, n_in_each_combo, zero_indexed);
+    
+    bool print_combinations = false;
+    if(print_combinations)
+    {
+      for (int i = 0; i< int(combo_vecvec.size()); i++)
+      {
+        for (int j = 0; j< int(combo_vecvec[i].size()); j++)
+        {
+          cout << combo_vecvec[i][j] << " ";
+        }
+        cout << endl;
+      }
+    }
+    int n_combinations = int(combo_vecvec.size());
+  
+    // now you enter the combinations loop
+    //int n_data_points = int(this_basin_source.size());
+    //cout << "Checking the combinations" << endl;
+    for (int combo = 0; combo<n_combinations; combo++)
+    {
+      vector<int> these_combos = combo_vecvec[combo];
+      vector<int> these_combo_sources;
+      
+      // add the trunk channel source
+      these_combo_sources.push_back(comboindex_are_keys[0]); 
+      //cout << 0 <<":" << comboindex_are_keys[0] << " ";
+      
+      for (int source_key = 0 ; source_key < int(these_combos.size()); source_key++)
+      {
+        these_combo_sources.push_back( comboindex_are_keys[ these_combos[source_key] ] );
+        //cout << these_combos[source_key] <<":" << comboindex_are_keys[ these_combos[source_key] ] << " ";
+      }
+      //cout << endl;
+      
+      
+      // now we sample and sort these vectors
+      vector<float> chi_combo;
+      vector<float> elev_combo;
+      vector<float> source_combo;
+      
+      for(int node = 0; node< int(this_basin_chi.size()); node++)
+      {
+        if(find(these_combo_sources.begin(), these_combo_sources.end(), this_basin_source[node]) != these_combo_sources.end()) 
+        {
+          chi_combo.push_back(this_basin_chi[node]);
+          elev_combo.push_back(this_basin_elevation[node]);
+        }
+      }
+        
+      // now you have the elevation and chi for this combination, sort them
+      // initiate the sorted vectors
+      vector<float> chi_sorted;
+      vector<float> elev_sorted;
+      vector<size_t> index_map;    
+  
+      // sort the vectors
+      matlab_float_sort(elev_combo, elev_sorted, index_map);
+      matlab_float_reorder(chi_combo, index_map, chi_sorted);
+        
+      // now calculate disorder
+      float this_delta_chi = 0;
+      float sum_delta_chi = 0;
+      
+      int n_nodes_this_basin = int(chi_sorted.size());
+      float corrected_chi_max = chi_sorted[n_nodes_this_basin-1];
+      float corrected_chi_min = chi_sorted[0];
+      float chi_min = 10000;
+      float chi_max = 0;
+      if(chi_min != corrected_chi_min)  
+        cout << "BUGDETECTED:: CHI MIN=" << corrected_chi_min <<  " BUT CHI_MIN_USED="  << chi_min << endl;
+
       for(int i = 0; i<n_nodes_this_basin-1; i++)
       {
         this_delta_chi = fabs(chi_sorted[i+1]-chi_sorted[i]);
@@ -7057,6 +7256,465 @@ vector<float> LSDChiTools::test_collinearity_by_basin_disorder_with_uncert(LSDFl
 // segment, It saves the source keys involved in each combination to get an idea of spatial distributions - B.G 2019
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 map< vector<int>, vector<float> > LSDChiTools::test_collinearity_by_basin_disorder_with_uncert_retain_key(LSDFlowInfo& FlowInfo,
+                                                 int baselevel_key)
+{
+  vector<float> disorder_stat_vec;
+  vector<vector<int> > disorder_stat_vec_associated_SK;
+  map< vector<int>, vector<float> > output;
+
+
+  
+  //cout << "Testing the segment collinearity for basin key " << baselevel_key << endl;
+  // get some information about the number of basins
+  int n_basins = int(ordered_baselevel_nodes.size());
+  if (baselevel_key >= n_basins)
+  {
+    cout << "Fatal error LSDChiTools::test_all_segment_collinearity_by_basin_disorder" <<endl;
+    cout << "You have selected a basin that doesn't exist!" << endl;
+    exit(EXIT_FAILURE);
+  }
+
+  // this map will hold references to the sources. There are two of them
+  // because the first has the sources as the keys and the second has the
+  // combination index as the keys. 
+  map<int,int> sources_are_keys;
+  map<int,int> comboindex_are_keys;
+  
+  vector<float> this_basin_chi;
+  vector<float> this_basin_elevation;
+  vector<int> this_basin_source;
+  int n_nodes = int(node_sequence.size());
+  int this_node;
+  int comboindex = 0;     // this is used to store an index into the combinations
+  for (int n = 0; n< n_nodes; n++)
+  {
+    this_node = node_sequence[n];
+
+    if (baselevel_keys_map[this_node] == baselevel_key)
+    {
+
+      this_basin_chi.push_back(chi_data_map[this_node]);
+      this_basin_elevation.push_back(elev_data_map[this_node]);
+      this_basin_source.push_back(source_keys_map[this_node]);
+      
+      // if the key doesn't exist, add a source key counter
+      if ( sources_are_keys.find( source_keys_map[this_node] ) == sources_are_keys.end() )
+      {
+        sources_are_keys[ source_keys_map[this_node] ] = comboindex;
+        comboindex++;
+      }
+    }
+  }
+  
+  // now do the second map by inverting the first map
+  for(map<int,int>::iterator iter =sources_are_keys.begin(); iter != sources_are_keys.end(); ++iter)
+  {
+    int k =  iter->first;
+    int v = iter->second;
+    comboindex_are_keys[v] = k;
+  }
+  
+  int n_sources = int(comboindex_are_keys.size());
+  //cout << "The number of channels are: " << n_sources << endl;
+  //cout << "The source node is: " << comboindex_are_keys[0] << endl;
+  
+  
+  // get the combinations
+  //cout << "Let me get some combinations for you." << endl;
+  int n_elements = n_sources-1;
+  int n_in_each_combo = 3;
+  
+  if (n_sources < n_in_each_combo)
+  {
+    cout << "Not enough channels in this basin! I am returning a nodata vector." << endl;
+    disorder_stat_vec.push_back(-9999);
+    disorder_stat_vec_associated_SK.push_back({-9999});
+  }
+  else
+  {
+    // this gets the combinations
+    bool zero_indexed = false;
+    vector< vector<int> > combo_vecvec = combinations(n_elements, n_in_each_combo, zero_indexed);
+    
+    bool print_combinations = false;
+    if(print_combinations)
+    {
+      for (int i = 0; i< int(combo_vecvec.size()); i++)
+      {
+        for (int j = 0; j< int(combo_vecvec[i].size()); j++)
+        {
+          cout << combo_vecvec[i][j] << " ";
+        }
+        cout << endl;
+      }
+    }
+    int n_combinations = int(combo_vecvec.size());
+    
+    // now you enter the combinations loop
+    //int n_data_points = int(this_basin_source.size());
+    //cout << "Checking the combinations" << endl;
+    for (int combo = 0; combo<n_combinations; combo++)
+    {
+      vector<int> these_combos = combo_vecvec[combo];
+      vector<int> these_combo_sources;
+      
+      // add the trunk channel source
+      these_combo_sources.push_back(comboindex_are_keys[0]); 
+      
+      for (int source_key = 0 ; source_key < int(these_combos.size()); source_key++)
+      {
+        these_combo_sources.push_back( comboindex_are_keys[ these_combos[source_key] ] );
+      }
+      disorder_stat_vec_associated_SK.push_back(these_combo_sources);
+            
+      
+      // now we sample and sort these vectors
+      vector<float> chi_combo;
+      vector<float> elev_combo;
+      vector<float> source_combo;
+      
+      for(int node = 0; node< int(this_basin_chi.size()); node++)
+      {
+        if(find(these_combo_sources.begin(), these_combo_sources.end(), this_basin_source[node]) != these_combo_sources.end()) 
+        {
+          chi_combo.push_back(this_basin_chi[node]);
+          elev_combo.push_back(this_basin_elevation[node]);
+        }
+      }
+
+
+        
+      // now you have the elevation and chi for this combination, sort them
+      // initiate the sorted vectors
+      vector<float> chi_sorted;
+      vector<float> elev_sorted;
+      vector<size_t> index_map; 
+ 
+      // sort the vectors
+      matlab_float_sort(elev_combo, elev_sorted, index_map);
+      matlab_float_reorder(chi_combo, index_map, chi_sorted);
+
+
+      // now calculate disorder
+      float this_delta_chi = 0;
+      float sum_delta_chi = 0;
+      
+      int n_nodes_this_basin = int(chi_sorted.size());
+      float chi_max = chi_sorted[n_nodes_this_basin-1];
+      float chi_min = chi_sorted[0];
+      // Sorry Simon, the following cout slows down the code when many rivers are tested: terminal output overflow
+      // cout << "My first guess of minimum chi is: " << chi_min << endl;
+      for(int i = 0; i<n_nodes_this_basin-1; i++)
+      {
+        this_delta_chi = fabs(chi_sorted[i+1]-chi_sorted[i]);
+        sum_delta_chi += this_delta_chi;
+        if(chi_sorted[i] > chi_max)
+        {
+          chi_max = chi_sorted[i];
+        }
+        if(chi_sorted[i] < chi_min)
+        {
+          chi_min = chi_sorted[i];
+        }
+      }
+      if(chi_sorted[n_nodes_this_basin-1] > chi_max)
+      {
+        chi_max = chi_sorted[n_nodes_this_basin-1];
+      }
+      float chi_range = chi_max-chi_min;
+        
+      float disorder_stat = (sum_delta_chi - chi_range)/chi_range;
+      disorder_stat_vec.push_back(disorder_stat);
+      // std::cout << "distat is " << chi_sorted.size()  << std::endl;
+    }
+  }
+
+
+
+  // for debugging
+  bool print_results = false;
+  if(print_results)
+  {
+    cout << "Disorder stats for all the combinations are: " << endl;
+    for(int i = 0; i< int(disorder_stat_vec.size()); i++)
+    {
+      cout << disorder_stat_vec[i] << " ";
+    }
+    cout << endl;
+    cout << "I'm returning the disorder stat vector." << endl;
+  }
+  
+  for(size_t i=0; i<disorder_stat_vec_associated_SK.size();i++)
+  {
+    if(output.find( disorder_stat_vec_associated_SK[i] ) == output.end())
+    {
+      output[ disorder_stat_vec_associated_SK[i] ] = {disorder_stat_vec[i]};
+    }
+    else
+    {
+      output[ disorder_stat_vec_associated_SK[i] ].push_back(disorder_stat_vec[i]);
+    }
+  }
+
+  return output;
+
+}
+
+void LSDChiTools::precombine_sources_for_disorder_with_uncert_opti(LSDFlowInfo& FlowInfo,int baselevel_key, 
+  map<int,int>& sources_are_keys, map<int,int>& comboindex_are_keys, vector<vector<int> >& combo_vecvec, vector<int>& nodes_in_basin
+  , vector<int>& this_basin_source)
+{
+
+  // get some information about the number of basins
+  int n_basins = int(ordered_baselevel_nodes.size());
+  if (baselevel_key >= n_basins)
+  {
+    cout << "Fatal error LSDChiTools::test_all_segment_collinearity_by_basin_disorder" <<endl;
+    cout << "You have selected a basin that doesn't exist!" << endl;
+    exit(EXIT_FAILURE);
+  }
+
+  int n_nodes = int(node_sequence.size());
+  int this_node;
+  int comboindex = 0;     // this is used to store an index into the combinations
+  for (int n = 0; n< n_nodes; n++)
+  {
+    this_node = node_sequence[n];
+    this_basin_source.push_back(source_keys_map[this_node]); 
+
+    if (baselevel_keys_map[this_node] == baselevel_key)
+    {
+      nodes_in_basin.push_back(this_node);
+      // if the key doesn't exist, add a source key counter
+      if ( sources_are_keys.find( source_keys_map[this_node] ) == sources_are_keys.end() )
+      {
+        sources_are_keys[ source_keys_map[this_node] ] = comboindex;     
+        comboindex++;
+      }
+    }
+  }
+  
+  // now do the second map by inverting the first map
+  for(map<int,int>::iterator iter =sources_are_keys.begin(); iter != sources_are_keys.end(); ++iter)
+  {
+    int k =  iter->first;
+    int v = iter->second;
+    comboindex_are_keys[v] = k;
+  }
+  
+  int n_sources = int(comboindex_are_keys.size());
+  //cout << "The number of channels are: " << n_sources << endl;
+  //cout << "The source node is: " << comboindex_are_keys[0] << endl;
+  
+  
+  // get the combinations
+  //cout << "Let me get some combinations for you." << endl;
+  int n_elements = n_sources-1;
+  int n_in_each_combo = 3;
+  vector< vector<int> > temp_combo_vecvec;
+  
+  if (n_sources < n_in_each_combo)
+  {
+    cout << "Not enough channels in this basin! I am aborting, the rest of your code might break." << endl;
+    return;
+  }
+  else
+  {
+    // this gets the combinations
+    bool zero_indexed = false;
+    temp_combo_vecvec = combinations(n_elements, n_in_each_combo, zero_indexed);
+  }
+
+
+  combo_vecvec = temp_combo_vecvec;
+ // Done
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function test the collinearity of all segments compared to a reference
+// segment, It saves the source keys involved in each combination to get an idea of spatial distributions - B.G 2019
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<float> LSDChiTools::opti_collinearity_by_basin_disorder_with_uncert_retain_key(LSDFlowInfo& FlowInfo,
+          int baselevel_key, map<int,int>& sources_are_keys, map<int,int>& comboindex_are_keys, vector<float>& this_basin_chi,
+          vector<float>& this_basin_elevation, vector<int>& this_basin_source, vector<int>& this_basin_river_node, vector< vector<int> >& combo_vecvec, vector<int>& n_pix_comb)
+{
+
+  // get the number of combinations
+  int n_combinations = int(combo_vecvec.size());
+
+  
+  // Initilising the output and global related vectors
+  vector<float> disorder_stat_vec(combo_vecvec.size()); 
+  
+  
+  // Checking that the requested basin does exists
+  int n_basins = int(ordered_baselevel_nodes.size());
+  if (baselevel_key >= n_basins)
+  {
+    cout << "Fatal error LSDChiTools::test_all_segment_collinearity_by_basin_disorder" <<endl;
+    cout << "You have selected a basin that doesn't exist!" << endl;
+    exit(EXIT_FAILURE);
+  }
+  
+  // Getting number of node to check some boundaries
+  int n_nodes = int(node_sequence.size());
+  // Getting the number of source keys involved  
+  int n_sources = int(comboindex_are_keys.size());
+
+  // get the combinations
+  //cout << "Let me get some combinations for you." << endl;
+  int n_elements = n_sources-1;
+  int n_in_each_combo = 3;
+  
+
+
+
+  // Preprocessing river size here, not forcing it not avoid reprocessing
+  this->generate_river_size(false);
+
+  // I am adapting the function from another one, During this process I keep so artifacts of the original structure that I may forget to remove. Ignore and forgive. YOLO.
+  if(true)
+  {
+    size_t id_disorders = 0;
+    
+
+    // Going through the combination of all sources
+    for (int combo = 0; combo<n_combinations; combo++)
+    {
+
+
+      // THis hosts the current combination of sources
+      vector<int> these_combos = combo_vecvec[combo];
+      // temp vector to add the next one
+      vector<int> these_combo_sources;
+      
+      // add the trunk channel source
+      these_combo_sources.push_back(comboindex_are_keys[0]); 
+      
+      // std::cout << "bk:" <<baselevel_key <<" ||";
+
+      // THis gets the combination right into        
+      for (int source_key = 0 ; source_key < int(these_combos.size()); source_key++)
+      {
+        these_combo_sources.push_back( comboindex_are_keys[ these_combos[source_key] ] );
+      }
+
+
+      
+
+      // begin = std::chrono::steady_clock::now();
+
+      // predefining the size of the vectors
+      size_t this_size = 0;
+      for (int source_key = 0 ; source_key < int(these_combo_sources.size()); source_key++)
+      {
+        this_size += size_t(source_key_to_size[these_combo_sources[source_key]]);
+      }
+
+
+      // now we sample and sort these vectors
+      vector<float> chi_combo(this_size);
+      vector<float> elev_combo(this_size);
+
+      // Getting the current number of pixels for normalisation
+      n_pix_comb[id_disorders] = int(this_size);
+
+      
+      // THE BIG CHANGE FROM PREVIOUS ALGORITHMS IS THAT IT TAKES ALREADY SORTED CHI_COMBOS AND ELEV_COMBOS VECTORS
+      // THEREFORE THERE IS NO NEED TO RESORT THEM AND IT SAVES A LOT OF TIME
+      size_t ti = 0;
+      for(int node = 0; node< int(this_basin_chi.size()); node++)
+      {
+        if(find(these_combo_sources.begin(), these_combo_sources.end(), this_basin_source[node]) != these_combo_sources.end()) 
+        {
+          chi_combo[ti] = this_basin_chi[node];
+          elev_combo[ti] = this_basin_elevation[node];
+          ti++;
+        }
+      }
+
+
+      // now you have the elevation and chi for this combination, sort them
+      // initiate the sorted vectors as references to the other ones for comparison purposes with previous algorithms
+      vector<float>& chi_sorted = chi_combo;
+      vector<float>& elev_sorted = elev_combo;
+
+      // now calculate disorder
+      float this_delta_chi = 0;
+      float sum_delta_chi = 0;
+      
+      int n_nodes_this_basin = int(chi_sorted.size());
+      float chi_max = chi_sorted[n_nodes_this_basin-1];
+      float chi_min = chi_sorted[0];
+      // Sorry Simon, the following cout slows down the code when many rivers are tested: terminal output overflow
+      // cout << "My first guess of minimum chi is: " << chi_min << endl;
+      for(int i = 0; i<n_nodes_this_basin-1; i++)
+      {
+        this_delta_chi = fabs(chi_sorted[i+1]-chi_sorted[i]);
+        sum_delta_chi+=this_delta_chi;
+        if(chi_sorted[i] > chi_max)
+        {
+          chi_max = chi_sorted[i];
+        }
+        if(chi_sorted[i] < chi_min)
+        {
+          chi_min = chi_sorted[i];
+        }
+      }
+      if(chi_sorted[n_nodes_this_basin-1] > chi_max)
+      {
+        chi_max = chi_sorted[n_nodes_this_basin-1];
+      }
+      float chi_range = chi_max-chi_min;
+        
+      float disorder_stat = (sum_delta_chi - chi_range)/chi_range;
+      disorder_stat_vec[id_disorders] = disorder_stat;
+      id_disorders++;
+      // std::cout << "distat is " << chi_sorted.size()  << std::endl;
+
+    }
+
+
+  }
+  
+  return disorder_stat_vec;
+
+}
+
+
+void LSDChiTools::generate_river_size( bool force)
+{
+  // Checking if this has already been generated or if you want to force regeneration
+  if(source_key_to_size.size()>0 && force == false)
+    return;
+  
+  map<int,int> this_riv_key;
+
+  for(size_t i=0; i<node_sequence.size(); i++)
+  {
+    int this_node = node_sequence[i];
+    // cout << this_node << endl;
+    int SK = source_keys_map[this_node];
+    if(this_riv_key.count(SK) == 0)
+      this_riv_key[SK] = 1;
+    else
+      this_riv_key[SK] = this_riv_key[SK] + 1;
+  }
+
+
+  source_key_to_size = this_riv_key;
+
+  return;
+  // Done
+
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function test the collinearity of all segments compared to a reference
+// segment, It saves the source keys involved in each combination to get an idea of spatial distributions - B.G 2019
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+map< vector<int>, vector<float> > LSDChiTools::TEST_FUNCTION_OLD_DISORDER_DO_NOT_USE_KEY(LSDFlowInfo& FlowInfo,
                                                  int baselevel_key)
 {
   vector<float> disorder_stat_vec;
@@ -7200,9 +7858,15 @@ map< vector<int>, vector<float> > LSDChiTools::test_collinearity_by_basin_disord
       float sum_delta_chi = 0;
       
       int n_nodes_this_basin = int(chi_sorted.size());
-      float chi_max = chi_sorted[n_nodes_this_basin-1];
-      float chi_min = chi_sorted[0];
-      cout << "My first guess of minimum chi is: " << chi_min << endl;
+      float corrected_chi_max = chi_sorted[n_nodes_this_basin-1];
+      float corrected_chi_min = chi_sorted[0];
+      float chi_min = 10000;
+      float chi_max = 0;
+      // if(chi_min != corrected_chi_min)
+      // {
+      //   cout << "BUGDETECTED:: CHI MIN=" << corrected_chi_min <<  " BUT CHI_MIN_USED="  << chi_min << endl;
+      // }
+
       for(int i = 0; i<n_nodes_this_basin-1; i++)
       {
         this_delta_chi = fabs(chi_sorted[i+1]-chi_sorted[i]);
@@ -12064,6 +12728,34 @@ vector<int> LSDChiTools::get_vectors_of_node()
   return output;
 }
 
+void LSDChiTools::update_chi_vector_for_opti_disorder_with_uncert(vector<int>& sorted_nodes, vector<float>& that_chi)
+{
+  for(size_t i=0;i<sorted_nodes.size();i++)
+  {
+    int that_node = sorted_nodes[i];
+    float tthat_chi;
+    if(chi_data_map.count(that_node) == 0)
+      tthat_chi = 0;
+    else
+      tthat_chi = chi_data_map[that_node];
+    that_chi[i] = tthat_chi;
+  }
+}
 
+void LSDChiTools::update_elevation_vector_for_opti_disorder_with_uncert(vector<int>& sorted_nodes, vector<float>& that_elev)
+{
+  for(size_t i=0;i<sorted_nodes.size();i++)
+  {
+    int that_node = sorted_nodes[i];
+    float tthat_elev;
+    if(elev_data_map.count(that_node) == 0)
+      tthat_elev = 0;
+    else
+      tthat_elev = elev_data_map[that_node];
+
+    that_elev[i] = tthat_elev;
+  }
+
+}
 
 #endif
