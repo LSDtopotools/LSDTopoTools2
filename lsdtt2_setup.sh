@@ -8,9 +8,16 @@
 
 # Set up the inital directory
 BASE_DIR=$HOME
-SRC_DIR="$HOME/LSDTopoTools/LSDTopoTools2/src/"
-LSD_DIR="$HOME/LSDTopoTools"
-WRK_DIR="$HOME/LSDTopoTools/LSDTopoTools2"
+
+if [ BASE_DIR=="/root" ]
+  then
+    BASE_DIR=""
+fi
+echo "Base dir is"
+
+SRC_DIR="$BASE_DIR/LSDTopoTools/LSDTopoTools2/src/"
+LSD_DIR="$BASE_DIR/LSDTopoTools"
+WRK_DIR="$BASE_DIR/LSDTopoTools/LSDTopoTools2"
 
 echo "Source dir is: $SRC_DIR"
 echo "LSD dir is: $LSD_DIR"
