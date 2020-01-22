@@ -53,7 +53,7 @@ sh build.sh
 
 # Now update the path
 echo "Now I'll add the LSDTopoTools command line programs to your path."
-export PATH=$HOME/LSDTopoTools/LSDTopoTools2/bin:$PATH
+export PATH=$BASE_DIR/LSDTopoTools/LSDTopoTools2/bin:$PATH
 echo "Your path is now:"
 echo $PATH
 exec /bin/bash
