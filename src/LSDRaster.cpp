@@ -189,6 +189,38 @@ void LSDRaster::create(int nrows, int ncols, float xmin, float ymin,
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// Creates a raster and leave the choice if using the same data or not
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDRaster::create(int nrows, int ncols, float xmin, float ymin,
+            float cellsize, float ndv, Array2D<float>& data, bool copy_data)
+{
+  NRows = nrows;
+  NCols = ncols;
+  XMinimum = xmin;
+  YMinimum = ymin;
+  DataResolution = cellsize;
+  NoDataValue = ndv;
+
+  if(copy_data)
+    RasterData = data.copy();
+  else
+    RasterData = RasterData.ref(data); // this should not copy the data according to the documentation of TNT
+
+  if (RasterData.dim1() != NRows)
+  {
+    cout << "LSDRaster line 89 dimension of data is not the same as stated in NRows!" << endl;
+    exit(EXIT_FAILURE);
+  }
+  if (RasterData.dim2() != NCols)
+  {
+    cout << "LSDRaster line 94 dimension of data is not the same as stated in NRows!" << endl;
+    exit(EXIT_FAILURE);
+  }
+
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // this overloaded function creates a raster filled with no data values,
 // but the data type is double-precision floating point numbers
 // DAV 2015
@@ -274,15 +306,16 @@ void LSDRaster::create(LSDIndexRaster& IntLSDRaster)
   vector<int> list_unique_values;
 
   //Declarations
-  Array2D<int> RasterDataFloat(NRows,NCols,NoDataValue);
+  RasterData  = Array2D<float>(NRows,NCols,NoDataValue);
 
   for (int i=0; i<NRows; ++i)
   {
     for (int j=0; j<NCols; ++j)
     {
-      RasterDataFloat[i][j] = float(RasterDataInt[i][j]);
+      RasterData[i][j] = float(RasterDataInt[i][j]);
     }
   }
+
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -2519,6 +2552,20 @@ LSDRaster LSDRaster::MapAlgebra_subtract(LSDRaster& M_raster)
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRaster::AdjustElevation(float elevation_change)
+{
+  for(int row = 0; row< NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      if (RasterData[row][col] != NoDataValue)
+      {
+        RasterData[row][col] = RasterData[row][col]+elevation_change;
+      }
+    }
+  }  
+}
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -9779,7 +9826,7 @@ LSDRaster LSDRaster::RasterTrimmerPadded(int padding_pixels)
 
   //minimum index value in a column
   int a = 0;
-  int min_col = 100000; //a big number
+  int min_col = 100000000; //a big number
 
   for (int row = 0; row < NRows; ++row){
     a = 0;
@@ -10924,6 +10971,9 @@ LSDRaster LSDRaster::GaussianFilter(float sigma, int kr)
   // This is the default setting
   if(kr==0) kr = int(ceil(3*sigma/DataResolution));  // Set radius of kernel (default if not specified)
   int kw=2*kr+1;                                     // width of kernel
+  
+  cout << "Smoothing, kernal size is: " << kr << endl;
+  
   Array2D<float> filtered = RasterData.copy();
   Array2D<float> gaussian_kernel_weights(kw,kw,0.0);
 
@@ -10935,7 +10985,6 @@ LSDRaster LSDRaster::GaussianFilter(float sigma, int kr)
     {
       x = (j-kr)*DataResolution;
       y = (i-kr)*DataResolution;
-//       gaussian_kernel_weights[i][j]= (1/(2*M_PI*sigma*sigma)) * exp(-(x*x+y*y)/(2*sigma*sigma));
       gaussian_kernel_weights[i][j]= exp(-(x*x+y*y)/(2*sigma*sigma));
     }
   }
@@ -10945,7 +10994,6 @@ LSDRaster LSDRaster::GaussianFilter(float sigma, int kr)
     for(int j=0;j<NCols;++j)
     {
       // Avoid edges
-//       if((i-kr < 0) || (i+kr+1 > NRows) || (j-kr < 0) || (j+kr+1 > NCols) || RasterData[i][j]==NoDataValue)
       if(RasterData[i][j]==NoDataValue)
       {
         filtered[i][j] = NoDataValue;
@@ -10974,8 +11022,7 @@ LSDRaster LSDRaster::GaussianFilter(float sigma, int kr)
       }
     }
   }
-  LSDRaster FilteredRaster(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,filtered);
-//   FilteredRaster.write_raster("test_gauss","flt");
+  LSDRaster FilteredRaster(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,filtered,GeoReferencingStrings);
   return FilteredRaster;
 }
 

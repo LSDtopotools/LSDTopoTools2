@@ -7113,6 +7113,41 @@ string RemoveControlCharactersFromEndOfString(string toRemove)
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--==
+// This function removes control characters from the end of a string
+// These get introduced if you use the DOS format in your parameter file
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--==
+string strip_and_clean_string(string s)
+{
+  const string WHITESPACE = " \n\r\t\f\v";
+
+	size_t start = s.find_first_not_of(WHITESPACE);
+  if (start == std::string::npos)
+  {
+    s = "";
+  }
+  else
+  {
+    s = s.substr(start);
+  }
+  
+	size_t end = s.find_last_not_of(WHITESPACE);
+	if (end == std::string::npos)
+  {
+    s = "";
+  }
+  else
+  {
+    s = s.substr(0, end + 1);
+  }
+
+  string no_cc_s = RemoveControlCharacters(s);
+  return no_cc_s;
+
+}
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--==
 // This function removes control characters
 // These get introduced if you use the DOS format in your parameter file
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--==

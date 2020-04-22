@@ -27,6 +27,7 @@
 #include "LSDIndexRaster.hpp"
 #include "LSDRasterMaker.hpp"
 #include "LSDStatsTools.hpp"
+#include "LSDSpatialCSVReader.hpp"
 using namespace std;
 using namespace TNT;
 
@@ -218,11 +219,59 @@ void LSDRasterMaker::scale_to_new_minimum_and_maximum_value(float new_minimum, f
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 
+////------------------------------------------------------------------------------
+//// impose_channels: this imposes channels onto the landscape
+//// You need to print a channel to csv and then load the data
+////------------------------------------------------------------------------------
+void LSDRasterMaker::impose_channels(LSDSpatialCSVReader& source_points_data)
+{
+
+  string column_name = "elevation(m)";
+
+
+  Array2D<float> zeta=RasterData.copy();
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
+
+  // need to fill the raster to ensure there are no internal base level nodes
+  cout << "I am going to fill" << endl;
+  float slope_for_fill = 0.0001; 
+  cout << "Filling." << endl;
+  LSDRaster filled_topography = temp.fill(slope_for_fill);
+
+  vector <string> bc(4, "b");          // Initialise boundaries to baselevel
+
+
+  cout << "Getting the flow info. This might take some time." << endl;
+  LSDFlowInfo flow(bc, filled_topography);
+  // update the raster
+  zeta = filled_topography.get_RasterData();
+
+  // Get the local node index as well as the elevations
+  vector<int> ni = source_points_data.get_nodeindices_from_lat_long(flow);
+  vector<float> elev = source_points_data.data_column_to_float(column_name);
+  // make the map
+  cout << "I am making an elevation map. This will not work if points in the raster lie outside of the csv channel points." << endl;
+  int row,col;
+  for(int i = 0; i< int(ni.size()); i++)
+  {
+    flow.retrieve_current_row_and_col( ni[i], row, col);
+    zeta[row][col] = elev[i];
+  }
+
+
+  this->RasterData = zeta.copy();
+
+  RasterData = zeta.copy();
+}
+
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This smooths the raster by taking a weighted average of the given pixel
 // and neighboring pixels.
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
 void LSDRasterMaker::smooth(int boundary_type)
 {
   // at the moment the boundary type can only be 0 and this is a periodic
@@ -322,6 +371,7 @@ void LSDRasterMaker::smooth(int boundary_type)
   RasterData = new_data.copy();
 
 }
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // Some functions for making random values in the rasters

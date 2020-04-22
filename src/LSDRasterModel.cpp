@@ -62,6 +62,7 @@
 #include "LSDRasterInfo.hpp"
 #include "LSDCRNParameters.hpp"
 #include "LSDParticleColumn.hpp"
+#include "LSDJunctionNetwork.hpp"
 using namespace std;
 using namespace TNT;
 using namespace JAMA;
@@ -1182,6 +1183,25 @@ void LSDRasterModel::base_level_fall(int uplift_amt)
   RasterData = zeta.copy();
 }
 
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterModel::AdjustElevation(float elevation_change)
+{
+  for(int row = 0; row< NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      if (RasterData[row][col] != NoDataValue)
+      {
+        RasterData[row][col] = RasterData[row][col]+elevation_change;
+      }
+    }
+  } 
+} 
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // this creates a hillslope at steady state for the nonlinear sediment flux law
 // Solution from Roering et al., (EPSL, 2007)
@@ -1828,21 +1848,95 @@ float LSDRasterModel::find_max_boundary(int boundary_number)
 
 ////------------------------------------------------------------------------------
 //// impose_channels: this imposes channels onto the landscape
-//// the row and column of the channels are stored in the c_rows and c_cols vectors
-//// the elevation of the channles are stored in the c_zeta file
+//// You need to print a channel to csv and then load the data
 ////------------------------------------------------------------------------------
-//LSDRasterModel LSDRasterModel::impose_channels(vector<int> c_rows, vector<int> c_cols, vector<float> c_zeta)
-//{
-//  Array2D<float> zeta = RasterData.copy();
-//  int n_channel_nodes = c_rows.size();
-//
-//  for (int i = 0; i<n_channel_nodes; i++)
-//  {
-//    zeta[ c_rows[i] ][ c_cols[i] ] = c_zeta[i];
-//  }
-//  LSDRasterModel Zeta(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta);
-//  return Zeta;
-//}
+void LSDRasterModel::impose_channels(LSDSpatialCSVReader& source_points_data)
+{
+
+  string column_name = "elevation(m)";
+
+
+  Array2D<float> zeta=RasterData.copy();
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
+
+  // need to fill the raster to ensure there are no internal base level nodes
+  cout << "I am going to fill" << endl;
+  float slope_for_fill = 0.0001; 
+  cout << "Filling." << endl;
+  LSDRaster filled_topography = temp.fill(slope_for_fill);
+
+  cout << "Getting the flow info. This might take some time." << endl;
+  LSDFlowInfo flow(boundary_conditions, filled_topography);
+  // update the raster
+  zeta = filled_topography.get_RasterData();
+
+  // Get the local node index as well as the elevations
+  vector<int> ni = source_points_data.get_nodeindices_from_lat_long(flow);
+  vector<float> elev = source_points_data.data_column_to_float(column_name);
+  // make the map
+  cout << "I am making an elevation map. This will not work if points in the raster lie outside of the csv channel points." << endl;
+  int row,col;
+  for(int i = 0; i< int(ni.size()); i++)
+  {
+    flow.retrieve_current_row_and_col( ni[i], row, col);
+    zeta[row][col] = elev[i];
+  }
+
+
+  this->RasterData = zeta.copy();
+
+  RasterData = zeta.copy();
+}
+
+
+////------------------------------------------------------------------------------
+//// impose_channels: this imposes channels onto the landscape
+//// You need to print a channel to csv and then load the data
+////------------------------------------------------------------------------------
+LSDSpatialCSVReader LSDRasterModel::get_channels_for_burning(int contributing_pixels)
+{
+
+  string column_name = "elevation(m)";
+
+  Array2D<float> zeta=RasterData.copy();
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
+
+  // need to fill the raster to ensure there are no internal base level nodes
+  cout << "I am going to fill" << endl;
+  float slope_for_fill = 0.0001; 
+  cout << "Filling." << endl;
+  LSDRaster filled_topography = temp.fill(slope_for_fill);
+
+  cout << "Getting the flow info. This might take some time." << endl;
+  LSDFlowInfo FlowInfo(boundary_conditions, filled_topography);
+
+  // calculate the flow accumulation
+  cout << "\t Calculating flow accumulation (in pixels)..." << endl;
+  LSDIndexRaster FlowAcc = FlowInfo.write_NContributingNodes_to_LSDIndexRaster();
+
+  //get the sources
+  vector<int> sources;
+  sources = FlowInfo.get_sources_index_threshold(FlowAcc, contributing_pixels);
+
+  // now get the junction network
+  LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
+  
+  // print the network
+  string chan_fname = "./temp_channels";
+  string full_chan_fname = "./temp_channels.csv";
+  ChanNetwork.PrintChannelNetworkToCSV_WithElevation(FlowInfo, chan_fname,filled_topography);
+
+  // Now load a csv object
+  LSDRasterInfo RI(temp);
+  LSDSpatialCSVReader source_points_data( RI, full_chan_fname );
+
+  return source_points_data;
+}
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // CALCULATE EROSION RATES
@@ -4420,7 +4514,9 @@ void LSDRasterModel::fluvial_snap_to_steady_state(float U)
 // This snaps to steady based on an input file with elevations and node indicies
 // overloaded from the previous function
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-void LSDRasterModel::fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_values, LSDRaster& U_values, LSDSpatialCSVReader& source_points_data, bool carve_before_fill)
+void LSDRasterModel::fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_values, 
+                                  LSDRaster& U_values, LSDSpatialCSVReader& source_points_data, 
+                                  bool carve_before_fill)
 {
 
   string column_name = "elevation(m)";

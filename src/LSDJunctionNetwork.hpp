@@ -82,6 +82,7 @@ contains a number of analysis tools built around drainage networks.
 #include "TNT/tnt.h"
 #include "LSDFlowInfo.hpp"
 #include "LSDRaster.hpp"
+#include "LSDRasterInfo.hpp"
 #include "LSDIndexChannel.hpp"
 #include "LSDChannel.hpp"
 #include "LSDStatsTools.hpp"
@@ -419,7 +420,7 @@ class LSDJunctionNetwork
   /// @brief This prints a stream network to a csv in WGS84
   /// @detail This function prints a network that is ordered by sources, channels
   ///  have stream orders and junction numbers attached
-  /// param FlowInfo the flow info object which translates node indices to actual points
+  /// @param FlowInfo the flow info object which translates node indices to actual points
   /// @param FileName_prefix The prefix of the file to write, if no path is included it will write to the current directory.
   ///  The csv extension is added automatically.
   /// @author SMM
@@ -427,9 +428,22 @@ class LSDJunctionNetwork
   void PrintChannelNetworkToCSV(LSDFlowInfo& flowinfo, string fname_prefix);
 
   /// @brief This prints a stream network to a csv in XY coordinates
+  /// @param FlowInfo the flow info object which translates node indices to actual points
+  /// @param FileName_prefix The prefix of the file to write, if no path is included it will write to the current directory.
+  ///  The csv extension is added automatically.
+  /// @param elevation The elevation raster
   /// @author BG
   /// @date 28/01/2019
   void PrintChannelNetworkToCSV_nolatlon(LSDFlowInfo& flowinfo, LSDRaster& elevation, string fname_prefix);
+
+  /// @brief This prints a stream network to a csv in WGS84. It includes the elevation data
+  /// @param FlowInfo the flow info object which translates node indices to actual points
+  /// @param FileName_prefix The prefix of the file to write, if no path is included it will write to the current directory.
+  ///  The csv extension is added automatically.
+  /// @param elevation The elevation raster
+  /// @author SMM
+  /// @date 04/03/2020
+  void PrintChannelNetworkToCSV_WithElevation(LSDFlowInfo& flowinfo, string fname_prefix,LSDRaster& elevation);
 
 
   /// @brief This sends the JunctionArray to a LSDIndexRaster.
@@ -1607,6 +1621,22 @@ vector<int> GetChannelHeadsChiMethodFromValleys(vector<int> ValleyNodes,
                 LSDFlowInfo& FlowInfo, vector<int>& valid_cosmo_points,
                 vector<int>& snapped_node_indices);
 
+
+  /// @brief This function takes the name of a csv file that contains
+  ///  latitude and longitude information and then finds the junction
+  ///  numbers upslope. 
+  /// @param csv_filename The name of the file from which the lat-long will be read. 
+  /// @param search_radius_nodes the number of nodes around the point to search
+  ///  for a channel
+  /// @param threshold_stream_order the minimum stream order to which the point
+  ///  will snap
+  /// @param FlowInfo the LSDFlowInfo object
+  /// @author SMM
+  /// @date 23/01/2020
+  vector<int> snap_point_locations_to_upstream_junctions_from_latlong_csv(string csv_filename,
+                int search_radius_nodes, int threshold_stream_order,
+                LSDFlowInfo& FlowInfo, LSDRasterInfo& RI);
+
   ///@brief This function extract basins from list of nodes and overwrite given sources,
   /// baselevel_nodes, outlet_nodes and baselevel junctions.
   /// Be careful, the nodes have to be the EXACT outlet location for the basin. This
@@ -1617,9 +1647,13 @@ vector<int> GetChannelHeadsChiMethodFromValleys(vector<int> ValleyNodes,
   ///@param  baselevel_junctions: WILL BE OVERWRITTEN with the new baselevel_junctions nodes
   ///@param  outlet_nodes: WILL BE OVERWRITTEN with the new outlet_nodes nodes
   ///@param  FlowInfo: A fully-grown and weaned FlowInfo object
+  ///@param  LSDRaster: DistanceFromOutlet, a raster with the distance from oulet
+  ///@param  check_edges: Check the influence of NoData over the basins. WARNING: this is a hard pass and just ignore the basins influence by nodata without finding equivalents.
   ///@author B.G.
   ///@date 09/12/2019
-  void select_basin_from_nodes(vector<int>& input_nodes, vector<int>& sources, vector<int>& baselevel_nodes,vector<int>& baselevel_junctions,vector<int>& outlet_nodes,LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, bool check_edges);
+  void select_basin_from_nodes(vector<int>& input_nodes, vector<int>& sources, vector<int>& baselevel_nodes,
+    vector<int>& baselevel_junctions,vector<int>& outlet_nodes,LSDFlowInfo& FlowInfo, 
+    LSDRaster& DistanceFromOutlet, bool check_edges);
 
   ///@brief This function extract basins from list of nodes and overwrite given sources,
   /// baselevel_nodes, outlet_nodes and baselevel junctions.
@@ -1631,29 +1665,91 @@ vector<int> GetChannelHeadsChiMethodFromValleys(vector<int> ValleyNodes,
   ///@param  outlet_nodes: WILL BE OVERWRITTEN with the new outlet_nodes nodes
   ///@param  FlowInfo: A fully-grown and weaned FlowInfo object
   ///@param  DrainageArea: DA or Discharge raster to tell the code where to snap
-  ///@param  n_pixels: N pixels to look for
+  ///@param  n_pixels: N pixels to look for around the original point
+  ///@param  check_edges: Check the influence of NoData over the basins. WARNING: this is a hard pass and just ignore the basins influence by nodata without finding equivalents.
+  ///@param  LSDRaster: DistanceFromOutlet, a raster with the distance from oulet
   ///@author B.G.
   ///@date 09/12/2019
   void basin_from_node_snap_to_largest_surrounding_DA(vector<int>& input_nodes, vector<int>& sources, vector<int>& baselevel_nodes, 
   vector<int>& baselevel_junctions,vector<int>& outlet_nodes, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& DrainageArea,
   int n_pixels, bool check_edges);
 
+  ///@brief Extract all the basins larger than a certain minimum drainage area in metre square
+  ///@param  sources: source nodes for the river: WILL BE TRIMMED TO THE SOURCES WITHIN THE BASINS
+  ///@param  baselevel_nodes: WILL BE OVERWRITTEN with the new base_level nodes
+  ///@param  baselevel_junctions: WILL BE OVERWRITTEN with the new baselevel_junctions nodes
+  ///@param  outlet_nodes: WILL BE OVERWRITTEN with the new outlet_nodes nodes
+  ///@param  FlowInfo: A fully-grown and weaned FlowInfo object
+  ///@param  DrainageArea: DA or Discharge raster to tell the code where to snap
+  ///@param  LSDRaster: DistanceFromOutlet, a raster with the distance from oulet
+  ///@param  min_DA: the minimum drainage area
+  ///@param  check_edges: Check the influence of NoData over the basins. WARNING: this is a hard pass and just ignore the basins influence by nodata without finding equivalents.
+  ///@return a vector with the selected baselevel nodes
+  ///@author B.G
+  ///@date December 2019
   vector<int> basin_from_node_minimum_DA(vector<int>& sources, vector<int>& baselevel_nodes, 
   vector<int>& baselevel_junctions,vector<int>& outlet_nodes, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& DrainageArea,
   double min_DA, bool check_edges);
 
+
+  ///@brief Takes a list of nodes, for example a river or mountain front, and extract all the basins draining to that line
+  ///@param  input_nodes: node indices of the actual outlet location
+  ///@param  sources: source nodes for the river: WILL BE TRIMMED TO THE SOURCES WITHIN THE BASINS
+  ///@param  baselevel_nodes: WILL BE OVERWRITTEN with the new base_level nodes
+  ///@param  baselevel_junctions: WILL BE OVERWRITTEN with the new baselevel_junctions nodes
+  ///@param  outlet_nodes: WILL BE OVERWRITTEN with the new outlet_nodes nodes
+  ///@param  FlowInfo: A fully-grown and weaned FlowInfo object
+  ///@param  DrainageArea: DA or Discharge raster to tell the code where to snap
+  ///@param  LSDRaster: DistanceFromOutlet, a raster with the distance from oulet
+  ///@param  min_DA: the minimum drainage area
+  ///@return a vector with the selected baselevel nodes
+  ///@author B.G
+  ///@date December 2019
   std::vector<int> basin_from_node_minimum_DA_draining_to_list_of_nodes(vector<int>& input_nodes, vector<int>& sources, vector<int>& baselevel_nodes, 
   vector<int>& baselevel_junctions,vector<int>& outlet_nodes, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& DrainageArea,
   double min_DA);
 
+  ///@brief  Takes an outlet node and extract all the subbasins draing to that mother-basin, whithin a range of size.
+  ///@param  input_nodes: node indices of the actual outlet location
+  ///@param  sources: source nodes for the river: WILL BE TRIMMED TO THE SOURCES WITHIN THE BASINS
+  ///@param  baselevel_nodes: WILL BE OVERWRITTEN with the new base_level nodes
+  ///@param  baselevel_junctions: WILL BE OVERWRITTEN with the new baselevel_junctions nodes
+  ///@param  outlet_nodes: WILL BE OVERWRITTEN with the new outlet_nodes nodes
+  ///@param  FlowInfo: A fully-grown and weaned FlowInfo object
+  ///@param  DrainageArea: DA or Discharge raster to tell the code where to snap
+  ///@param  LSDRaster: DistanceFromOutlet, a raster with the distance from oulet
+  ///@param  min_DA: the minimum drainage area
+  ///@param  max_DA: the maximum drainage area
+  ///@return a vector with the selected baselevel nodes
+  ///@author B.G
+  ///@date December 2019
   std::vector<int> basin_from_node_all_minimum_DA_for_one_watershed(int outlet_node_of_the_watershed, vector<int>& sources, vector<int>& baselevel_nodes, 
 vector<int>& baselevel_junctions,vector<int>& outlet_nodes, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& DrainageArea,
 double min_DA, double max_DA);
 
+  ///@brief  Extract all basins within a range of drainage area.
+  ///@param  input_nodes: node indices of the actual outlet location
+  ///@param  sources: source nodes for the river: WILL BE TRIMMED TO THE SOURCES WITHIN THE BASINS
+  ///@param  baselevel_nodes: WILL BE OVERWRITTEN with the new base_level nodes
+  ///@param  baselevel_junctions: WILL BE OVERWRITTEN with the new baselevel_junctions nodes
+  ///@param  outlet_nodes: WILL BE OVERWRITTEN with the new outlet_nodes nodes
+  ///@param  FlowInfo: A fully-grown and weaned FlowInfo object
+  ///@param  DrainageArea: DA or Discharge raster to tell the code where to snap
+  ///@param  LSDRaster: DistanceFromOutlet, a raster with the distance from oulet
+  ///@param  min_DA: the minimum drainage area
+  ///@param  max_DA: the maximum drainage area
+  ///@param  check_edges: Check the influence of NoData over the basins. WARNING: this is a hard pass and just ignore the basins influence by nodata without finding equivalents.
+  ///@return a vector with the selected baselevel nodes
+  ///@author B.G
+  ///@date December 2019
   vector<int> basin_from_node_range_DA(vector<int>& sources, vector<int>& baselevel_nodes,
   vector<int>& baselevel_junctions,vector<int>& outlet_nodes, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& DrainageArea,
   double min_DA, double max_DA, bool check_edges);
 
+  ///@brief Takes a reference raster and its flowinfo and uses the stack to create a vector of bool telling which baselevel node would be influenced by nodata.
+  ///@brief The index of the vector is the node index
+  ///@param  FlowInfo: A fully-grown and weaned FlowInfo object
+  ///@param  testRaster: a reference raster with the nodata
   vector<bool> check_nodata_influence(LSDFlowInfo& FlowInfo, LSDRaster& testrast);
 
   /// @brief This functions takes a junction number and then follwos the receiver
@@ -1955,6 +2051,16 @@ double min_DA, double max_DA);
                                     vector<int>& outlet_nodes,
                                     vector<int>& baselevel_nodes,
                                     int n_nodes_to_visit);
+
+  ///
+  void get_overlapping_channels_to_downstream_outlets(LSDFlowInfo& FlowInfo,
+                                    vector<int> BaseLevel_Junctions,
+                                    LSDRaster& DistanceFromOutlet,
+                                    vector<int>& source_nodes,
+                                    vector<int>& outlet_nodes,
+                                    vector<int>& baselevel_nodes,
+                                    int n_nodes_to_visit,
+                                    vector<int>& input_nodes);
 
 /// @detail This function gets all the pixels along a line defined by a series of points and finds the pixels greater than a specified stream order.
 /// @param Points PointData object with the points

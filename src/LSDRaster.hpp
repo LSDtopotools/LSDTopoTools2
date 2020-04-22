@@ -152,6 +152,21 @@ class LSDRaster
             float cellsize, float ndv, Array2D<float> data)
       { create(nrows, ncols, xmin, ymin, cellsize, ndv, data); }
 
+  /// @brief Create an LSDRaster from memory.
+  /// @return LSDRaster
+  /// @param nrows An integer of the number of rows.
+  /// @param ncols An integer of the number of columns.
+  /// @param xmin A float of the minimum X coordinate.
+  /// @param ymin A float of the minimum Y coordinate.
+  /// @param cellsize A float of the cellsize.
+  /// @param ndv An integer of the no data value.
+  /// @param data An Array2D of floats in the shape nrows*ncols,
+  ///containing the data to be written.
+  /// @param copy_data: if true, data is copied, if false, data is referenced.
+  LSDRaster(int nrows, int ncols, float xmin, float ymin,
+            float cellsize, float ndv, Array2D<float> data, bool copy_data)
+      { create(nrows, ncols, xmin, ymin, cellsize, ndv, data, copy_data); }
+
   /// @brief Create an LSDRaster from memory, with the elvation
   /// data stored as double precision floats.
   /// @return LSDRaster
@@ -692,6 +707,12 @@ class LSDRaster
   /// @date 27/10/2016
   LSDRaster MapAlgebra_subtract(LSDRaster& M_raster);
 
+
+  /// @brief This changes the elevation of a raster
+  /// @param elevation_adjust The change in elevation
+  /// @author SMM
+  /// @date 30/01/2020
+  void AdjustElevation(float elevation_change);
 
   // Functions for the Diamond Square algorithm
 
@@ -2434,6 +2455,8 @@ protected:
   void create(int ncols, int nrows, float xmin, float ymin,
               float cellsize, float ndv, Array2D<float> data, map<string,string> GRS);
   void create(LSDIndexRaster& IntLSDRaster);
+  void create(int nrows, int ncols, float xmin, float ymin,
+            float cellsize, float ndv, Array2D<float>& data, bool copy_data);
 
 };
 

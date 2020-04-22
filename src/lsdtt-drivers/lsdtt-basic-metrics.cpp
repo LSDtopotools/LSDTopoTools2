@@ -189,6 +189,9 @@ int main (int nNumberofArgs,char *argv[])
   int_default_map["maximum_basin_size_pixels"] = 1000000;
   bool_default_map["only_take_largest_basin"] = false;
   string_default_map["BaselevelJunctions_file"] = "NULL";
+  bool_default_map["get_basins_from_outlets"] = false;
+  int_default_map["search_radius_nodes"] = 8;
+  string_default_map["basin_outlet_csv"] = "NULL";
   bool_default_map["extend_channel_to_node_before_receiver_junction"] = true;
   bool_default_map["print_basin_raster"] = false;
 
@@ -978,12 +981,25 @@ int main (int nNumberofArgs,char *argv[])
         //Check to see if a list of junctions for extraction exists
         if (BaselevelJunctions_file == "NULL" || BaselevelJunctions_file == "Null" || BaselevelJunctions_file == "null" || BaselevelJunctions_file.empty() == true)
         {
-          cout << "To reiterate, there is no base level junction file. I am going to select basins for you using an algorithm. " << endl;
-          cout << "I am going to look for basins in a pixel window that are not influended by nodata." << endl;
-          cout << "I am also going to remove any nested basins." << endl;
-          cout << "The pixel limits are: lower: " << this_int_map["minimum_basin_size_pixels"] << " and upper: " << this_int_map["maximum_basin_size_pixels"] << endl;
-          BaseLevelJunctions = JunctionNetwork.Prune_Junctions_By_Contributing_Pixel_Window_Remove_Nested_And_Nodata(FlowInfo, filled_topography, FlowAcc,
-                                                    this_int_map["minimum_basin_size_pixels"],this_int_map["maximum_basin_size_pixels"]);
+          if(this_bool_map["get_basins_from_outlets"])
+          {
+            cout << "I am going to get basins lat-long coordinates" << endl;
+            string full_BL_LL_name = DATA_DIR+this_string_map["basin_outlet_csv"];
+            cout << "The file is: " << full_BL_LL_name << endl;
+            int search_radius_nodes = this_int_map["search_radius_nodes"];
+            int threshold_stream_order = 3;
+            BaseLevelJunctions = JunctionNetwork.snap_point_locations_to_upstream_junctions_from_latlong_csv(full_BL_LL_name,
+                                                               search_radius_nodes, threshold_stream_order,FlowInfo, RI);
+          }
+          else
+          {
+            cout << "I am going to select basins for you using an algorithm. " << endl;
+            cout << "I am going to look for basins in a pixel window that are not influended by nodata." << endl;
+            cout << "I am also going to remove any nested basins." << endl;
+            cout << "The pixel limits are: lower: " << this_int_map["minimum_basin_size_pixels"] << " and upper: " << this_int_map["maximum_basin_size_pixels"] << endl;
+            BaseLevelJunctions = JunctionNetwork.Prune_Junctions_By_Contributing_Pixel_Window_Remove_Nested_And_Nodata(FlowInfo, filled_topography, FlowAcc,
+                                                      this_int_map["minimum_basin_size_pixels"],this_int_map["maximum_basin_size_pixels"]);
+          }
         }
         else
         {

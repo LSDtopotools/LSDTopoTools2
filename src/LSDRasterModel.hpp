@@ -254,6 +254,12 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @date 18/07/18
   void base_level_fall(int uplift_amt);
 
+  /// @brief This changes the elevation of a raster
+  /// @param elevation_adjust The change in elevation
+  /// @author SMM
+  /// @date 30/01/2020
+  void AdjustElevation(float elevation_change);
+
   /// @brief This initialises a surface with a hillslope
   /// that is the solution to the nonlinear sediment flux equation.
   /// It overwrites RasterData
@@ -386,6 +392,20 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @return the maximum elevation along the boundaty
   float find_max_boundary( int boundary_number );
 
+
+  /// @brief This fixes a channel, derived from source points data
+  ///  onto the model DEM
+  /// @param source_points_data an LSDSpatialCSVReader object. It needs lat and long and elevation columns
+  /// @author SMM
+  /// @date 04/03/2020
+  void impose_channels(LSDSpatialCSVReader& source_points_data);
+
+  /// @brief Takes a model step and gets an LSDSpatialCSVReader object for later use
+  /// @param contributing_pixels for the channel network
+  /// @return source_points_data an LSDSpatialCSVReader object. It needs lat and long and elevation columns
+  /// @author SMM
+  /// @date 04/03/2020
+  LSDSpatialCSVReader  get_channels_for_burning(int contributing_pixels);
 
 
   //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

@@ -22,6 +22,7 @@
 #include <string>
 #include "TNT/tnt.h"
 #include "LSDRaster.hpp"
+#include "LSDSpatialCSVReader.hpp"
 using namespace std;
 using namespace TNT;
 
@@ -114,6 +115,14 @@ class LSDRasterMaker: public LSDRaster
     /// @author SMM
     /// @date 03/09/2017
     void scale_to_new_minimum_and_maximum_value(float new_minimum, float new_maximum);
+
+    /// @brief This fixes a channel, derived from source points data
+    ///  onto the model DEM
+    /// @param source_points_data an LSDSpatialCSVReader object. It needs lat and long and elevation columns
+    /// @author SMM
+    /// @date 04/03/2020
+    void impose_channels(LSDSpatialCSVReader& source_points_data);
+
 
     /// @brief This smooths the raster. At some point in the future I'll
     ///  add more options but at the moment it just uses 4 neighbours and has

@@ -7462,7 +7462,7 @@ map< vector<int>, vector<float> > LSDChiTools::test_collinearity_by_basin_disord
 
 void LSDChiTools::precombine_sources_for_disorder_with_uncert_opti(LSDFlowInfo& FlowInfo,int baselevel_key, 
   map<int,int>& sources_are_keys, map<int,int>& comboindex_are_keys, vector<vector<int> >& combo_vecvec, vector<int>& nodes_in_basin
-  , vector<int>& this_basin_source)
+  , vector<int>& this_basin_source, int n_in_each_combo)
 {
 
   // get some information about the number of basins
@@ -7510,7 +7510,6 @@ void LSDChiTools::precombine_sources_for_disorder_with_uncert_opti(LSDFlowInfo& 
   // get the combinations
   //cout << "Let me get some combinations for you." << endl;
   int n_elements = n_sources-1;
-  int n_in_each_combo = 3;
   vector< vector<int> > temp_combo_vecvec;
   
   if (n_sources < n_in_each_combo)
@@ -7565,11 +7564,8 @@ vector<float> LSDChiTools::opti_collinearity_by_basin_disorder_with_uncert_retai
   // get the combinations
   //cout << "Let me get some combinations for you." << endl;
   int n_elements = n_sources-1;
-  int n_in_each_combo = 3;
+  // int n_in_each_combo = 3;
   
-
-
-
   // Preprocessing river size here, not forcing it not avoid reprocessing
   this->generate_river_size(false);
 

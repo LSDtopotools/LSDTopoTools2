@@ -1555,7 +1555,7 @@ class LSDChiTools
     ///@authors: B.G 
     void precombine_sources_for_disorder_with_uncert_opti(LSDFlowInfo& FlowInfo,int baselevel_key, 
   map<int,int>& sources_are_keys, map<int,int>& comboindex_are_keys, vector<vector<int> >& combo_vecvec, vector<int>& nodes_in_basin
-  ,vector<int>& this_basin_source);
+  ,vector<int>& this_basin_source, int n_in_each_combo);
 
     ///@brief Simple function taking a vector of node ID and calculating chi for each of these 
     void update_chi_vector_for_opti_disorder_with_uncert(vector<int>& sorted_nodes, vector<float>& that_chi);

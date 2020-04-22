@@ -850,6 +850,12 @@ class LSDFlowInfo
   LSDRaster get_upslope_chi_from_multiple_starting_nodes(vector<int>& starting_nodes,
    float m_over_n, float A_0, float area_threshold, LSDRaster& Discharge);
 
+  /// @brief Same than above, but ignore the threshold. Discharge can be any raster custom drainage area/discharge-esc raster
+  /// @author BG/SMM
+  /// @date 16/10/2015
+  LSDRaster get_upslope_chi_from_multiple_starting_nodes_custom(vector<int>& starting_nodes,
+   float m_over_n, float A_0,  LSDRaster& Discharge);
+
   /// @brief This funtion gets all the upslope chi of a starting node (assuming
   ///  chi at starting node is 0) and returns a map
   /// @param starting_nodes an integer containing the node index
@@ -1386,6 +1392,15 @@ void get_nodeindices_from_csv(string csv_filename, vector<int>& NIs, vector<floa
   /// @author BG
   /// @date 01/04/2019
   map<string, vector< vector<int> > > get_map_of_vectors();
+
+
+  ///@brief This return an LSDRaster draining to a specific node, this only fill it with the node ctually in the basin
+  ///@brief And fill the rest with nodata. To be used with test_edge deactivated
+  ///@param int node, the node index of the outlet
+  ///@param LSDRaster the base elevation raster
+  ///@return a LSDRater trimmed to the closest extents
+  LSDRaster get_raster_draining_to_node(int node, LSDRaster& elevation_raster);
+
 
   protected:
 

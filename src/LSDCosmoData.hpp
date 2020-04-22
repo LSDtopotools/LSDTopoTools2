@@ -183,6 +183,12 @@ class LSDCosmoData
     /// @author SMM
     /// @date 03/03/2015
     void check_rasters();
+
+    /// @brief This sets the path to atmospheric data
+    /// @author SMM
+    /// @param the new path to atmostperic data
+    /// @date 22/04/2020
+    void set_path_to_atmospheric_data(string atmos_path);
     
     /// @detail This function takes a DEM and then spawns dems that are clipped
     ///  to the basin boundaries, with padding to incorporate surrounding high
@@ -211,6 +217,15 @@ class LSDCosmoData
     /// @author SMM
     /// @date 15/07/2015
     void RunShielding(string path, string prefix);
+
+    /// @brief This sets topographic shielding for basins listed in the 
+    ///   _CRNRasters.csv file to 1
+    /// @detail Shielding rasters (of 1) are printed to the same folder as the DEM
+    /// @param path This is a string containing the path to the data files (needs / at the end)
+    /// @param prefix the prefix of the data files
+    /// @author SMM
+    /// @date 22/04/2020
+    void RunShielding_Unshielded(string path, string prefix);
 
     /// @brief This function calculates and then returns a production raster
     /// @param Elevation_data a raster holding the elevations

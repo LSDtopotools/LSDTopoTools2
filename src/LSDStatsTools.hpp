@@ -637,6 +637,9 @@ vector<string> ReadCSVHeader(string path, string fname);
 /// @author DAV, but taken out of C++ Cookbook (Stevens, Digins, Turkanis, and Coswell. O'Reilly)
 void split_delimited_string(const string& s, char c, vector<string>& v);
 
+/// Gets rid of leading and trailing whitespace as well as removing control characters
+string strip_and_clean_string(string s);
+
 // THis gets the size of a file
 // SMM 16/10/2015
 int get_file_size(string filename);

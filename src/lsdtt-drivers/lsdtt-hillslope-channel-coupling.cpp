@@ -64,6 +64,7 @@
 #include "../LSDChiNetwork.hpp"
 #include "../LSDRaster.hpp"
 #include "../LSDRasterInfo.hpp"
+#include "../LSDRasterSpectral.hpp"
 #include "../LSDIndexRaster.hpp"
 #include "../LSDFlowInfo.hpp"
 #include "../LSDJunctionNetwork.hpp"
@@ -87,7 +88,9 @@ int main (int nNumberofArgs,char *argv[])
   cout << "||  at the University of Edinburgh                     ||" << endl;    
   cout << "=========================================================" << endl;   
   cout << "|| If you use these routines please cite:              ||" << endl;   
-  cout << "|| *Hurst et al., Paper in press to be updated*        ||" << endl;
+  cout << "|| Hurst et al., 2019, Detection of channel-hillslope  ||" << endl;
+  cout << "|| coupling along a tectonic gradient, EPSL, 522, 30-39||" << endl;
+  cout << "|| , https://doi.org/10.1016/j.epsl.2019.06.018        ||" << endl;
   cout << "=========================================================" << endl;
   cout << "|| Documentation can be found at:                      ||" << endl;
   cout << "|| https://lsdtopotools.github.io/LSDTT_documentation/ ||" << endl;
@@ -116,10 +119,16 @@ int main (int nNumberofArgs,char *argv[])
   float_default_map["minimum_elevation"] = 0.0;
   float_default_map["maximum_elevation"] = 30000;
   float_default_map["min_slope_for_fill"] = 0.0001;
-  float_default_map["WindowRadius"] = 12.0;  // This is for the surface mapping (in metres)
+  float_default_map["surface_fitting_radius"] = 12.0;  // This is for the surface mapping (in metres)
   bool_default_map["raster_is_filled"] = false; // assume base raster is already filled
   bool_default_map["remove_seas"] = false; // elevations above minimum and maximum will be changed to nodata
   bool_default_map["only_check_parameters"] = false;
+
+  // Channel extraction
+  bool_default_map["print_wiener_channels"] = false;  // Note: even if this is true it gets overwritten by source file
+  float_default_map["pruning_drainage_area"] = 1000;
+  int_default_map["threshold_contributing_pixels"] = 1000;
+  int_default_map["connected_components_threshold"] = 100;
 
    //Defining hilltops
 	int_default_map["StreamNetworkPadding"] = 0;
@@ -134,10 +143,12 @@ int main (int nNumberofArgs,char *argv[])
   string_default_map["ChannelSegments_file"] = "NULL";
 	string_default_map["Floodplain_file"] = "NULL";  
   string_default_map["CHeads_file"] = "NULL";
+  bool_default_map["get_basins_from_outlets"] = false;
+  int_default_map["search_radius_nodes"] = 8;
   string_default_map["BaselevelJunctions_file"] = "NULL";
+  string_default_map["basin_outlet_csv"] = "NULL";
 
-  // Selecting basins
-  int_default_map["threshold_contributing_pixels"] = 1000;
+  // Selecting basins 
   int_default_map["minimum_basin_size_pixels"] = 1000;
   bool_default_map["extend_channel_to_node_before_receiver_junction"] = true;
   bool_default_map["test_drainage_boundaries"] = false;
@@ -155,6 +166,7 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["print_channels_to_csv"] = false;
   bool_default_map["print_junction_index_raster"] = false;
   bool_default_map["print_junctions_to_csv"] = false;
+  bool_default_map["print_sources_to_csv"] = false;
 
   bool_default_map["convert_csv_to_geojson"] = false;  // This converts all cv files to geojson (for easier loading in a GIS)
 
@@ -428,7 +440,7 @@ int main (int nNumberofArgs,char *argv[])
   cout << "To fix you can either clip the DEM, reduce the resolution, or buy a more expensive computer." << endl;
   cout << "Note that if you are using docker you can change the settings to give your container more memory." << endl;
 	cout << "\tCalculating surface metrics..." << endl;
-	vector<LSDRaster> Surfaces = filled_topography.calculate_polyfit_surface_metrics(this_float_map["WindowRadius"], RasterSelection);
+	vector<LSDRaster> Surfaces = filled_topography.calculate_polyfit_surface_metrics(this_float_map["surface_fitting_radius"], RasterSelection);
   LSDRaster Aspect = Surfaces[2];
 
 
@@ -460,23 +472,79 @@ int main (int nNumberofArgs,char *argv[])
   vector<int> sources;
   if (CHeads_file == "NULL" || CHeads_file == "Null" || CHeads_file == "null")
   {
+    cout << endl << endl << endl;
     cout << endl << "\t\t==================================" << endl;
-    cout << "\t\tThe channel head file is null. " << endl;
-    cout << "\t\tGetting sources from a threshold of "<< threshold_contributing_pixels << " pixels." <<endl;
-    sources = FlowInfo.get_sources_index_threshold(FlowAcc, threshold_contributing_pixels);
+    cout << "\t\tThe channel head file is NULL. " << endl;
+    cout << "\t\tThis means I will calculate the sources." << endl;
 
-    cout << "\t\tThe number of sources is: " << sources.size() << endl;
+    if (this_bool_map["print_wiener_channels"])
+    {
+      cout << "I am calculating channels using the wiener algorithm (doi:10.1029/2012WR012452)." << endl;
+      cout << "This algorithm was used by Clubb et al. (2016, DOI: 10.1002/2015JF003747) " << endl;
+      cout << "and Grieve et al. (2016, doi:10.5194/esurf-4-627-2016) " << endl;
+      cout << "and combines elements of the Pelletier and Passalacqua et al  methods: " << endl;
+      cout << " doi:10.1029/2012WR012452 and doi:10.1029/2009JF001254" << endl;
 
+      // initiate the spectral raster
+      LSDRasterSpectral Spec_raster(topography_raster);
+
+      string QQ_fname = OUT_DIR+OUT_ID+"__qq.txt";
+
+      cout << "I am am getting the connected components using a weiner QQ filter." << endl;
+      cout << "Area threshold is: " << this_float_map["pruning_drainage_area"] << " window is: " <<  this_float_map["surface_fitting_radius"] << endl;
+
+      LSDIndexRaster connected_components = Spec_raster.IsolateChannelsWienerQQ(this_float_map["pruning_drainage_area"],
+                                                        this_float_map["surface_fitting_radius"], QQ_fname);
+
+      cout << "I am filtering by connected components" << endl;
+      LSDIndexRaster connected_components_filtered = connected_components.filter_by_connected_components(this_int_map["connected_components_threshold"]);
+      LSDIndexRaster CC_raster = connected_components_filtered.ConnectedComponents();
+
+      cout << "I am thinning the network to a skeleton." << endl;
+      LSDIndexRaster skeleton_raster = connected_components_filtered.thin_to_skeleton();
+
+      cout << "I am finding the finding end points" << endl;
+      LSDIndexRaster Ends = skeleton_raster.find_end_points();
+      Ends.remove_downstream_endpoints(CC_raster, Spec_raster);
+
+      //this processes the end points to only keep the upper extent of the channel network
+      cout << "getting channel heads" << endl;
+      sources = FlowInfo.ProcessEndPointsToChannelHeads(Ends);
+
+    }
+    else
+    {
+      cout << "\t\tI'm calculating sources using a threshold area routine." << endl;
+      cout << "\t\tGetting sources from a threshold of "<< threshold_contributing_pixels << " pixels." <<endl;
+      sources = FlowInfo.get_sources_index_threshold(FlowAcc, threshold_contributing_pixels);
+    }
   }
   else
   {
+    cout << endl << endl << endl;
+    cout << endl << "\t\t==================================" << endl;
+    cout << "\t\tI found a channel head filename. " << endl; 
     cout << "\t\tLoading channel heads from the file: " << DATA_DIR+CHeads_file << endl;
+    cout << "\t\tWarning: if you got the filename wrong this won't work." << endl;
     sources = FlowInfo.Ingest_Channel_Heads((DATA_DIR+CHeads_file), "csv",2);
     cout << "\t\tGot sources!" << endl;
   }
 
+  cout << endl << endl << "================================" << endl;
+  cout << "I've now ingested the channel source nodes. Yum yum. Sources are tasty." << endl;
+  cout << "\t\tThe number of sources is: " << sources.size() << endl;
+  if (sources.size() == 0)
+  {
+    cout << endl << endl << endl << "====================" << endl;
+    cout << "FATAL ERROR: there are no sources. " << endl;
+    cout << "The most likeley cause of this is that you tried to load a sources filename " << endl;
+    cout << "That was incorrect. Please check the filename and try again." << endl;
+    cout << "=================================" << endl;
+    exit(0);
+  }
+
   // now get the junction network
-  cout << "\t I am getting the junction network..." << endl;
+  cout << "\t I am now getting the junction network..." << endl;
   LSDJunctionNetwork JunctionNetwork(sources, FlowInfo);
 
 
@@ -488,6 +556,7 @@ int main (int nNumberofArgs,char *argv[])
     JunctionNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
 
     // convert to geojson if that is what the user wants
+    
     // It is read more easily by GIS software but has bigger file size
     if ( this_bool_map["convert_csv_to_geojson"])
     {
@@ -517,7 +586,11 @@ int main (int nNumberofArgs,char *argv[])
   if( this_bool_map["print_sources_to_csv"])
   {
     cout << "\t\tprinting sources to csv..." << endl;
-    string sources_csv_name = OUT_DIR+OUT_ID+"_ATsources.csv";
+    cout << "===================" << endl;
+    cout << "SOURCES!!" << endl;
+    cout << "Sources" << endl;
+    cout << "===================" << endl;
+    string sources_csv_name = OUT_DIR+OUT_ID+"_sources.csv";
 
     //write channel_heads to a csv file
     FlowInfo.print_vector_of_nodeindices_to_csv_file_with_latlong(sources, sources_csv_name);
@@ -581,16 +654,50 @@ int main (int nNumberofArgs,char *argv[])
   vector< int > BaseLevelJunctions;
   vector< int > BaseLevelJunctions_Initial;
   cout << "\tNow I am going to deal with the baselevel junctions. " << endl;
+
+  // deal with the baselevel junctions file
+  string test_BaselevelJunctions_file = LSDPP.get_BaselevelJunctions_file();
+  if(this_string_map["BaselevelJunctions_file"] == "NULL" && test_BaselevelJunctions_file == "NULL")
+  {
+    cout << "No baselevel junctions file found. I am going to use algorithms to extract basins." << endl;
+    BaselevelJunctions_file = "NULL";
+  }
+  else if(this_string_map["BaselevelJunctions_file"] == "NULL" && test_BaselevelJunctions_file != "NULL")
+  {
+    cout << "I am loading a baselevel junctions file." << endl;
+    BaselevelJunctions_file = test_BaselevelJunctions_file;
+  }
+  else if(this_string_map["BaselevelJunctions_file"] != "NULL" && test_BaselevelJunctions_file == "NULL")
+  {
+    cout << "I am loading a baselevel junctions file." << endl;
+    BaselevelJunctions_file = this_string_map["BaselevelJunctions_file"];
+  }
+  else
+  {
+    cout << "WARNING You have defined the baselevel junction file in two ways. " << endl;
+    cout << "This is because the authors of LSDTopoTools created a dumb inheritance problem and can't fix it or it will break legacy code." << endl;
+    cout << "I will use the newer version." << endl;
+    BaselevelJunctions_file = this_string_map["BaselevelJunctions_file"];
+    cout << "The junctions file I am using is: " <<  BaselevelJunctions_file << endl;
+  }
+  // now check to see if there is a full path
+  cout << endl << endl << "I need to check your baselevel junctions file, to see if it is in the correct path. " << endl;
+  BaselevelJunctions_file = LSDPP.check_for_path_and_add_read_path_if_required(BaselevelJunctions_file);
+
+
   cout << "\n\nThe BaselevelJunctions_file is: " << BaselevelJunctions_file << endl;
   if (BaselevelJunctions_file == "NULL" || BaselevelJunctions_file == "Null" || BaselevelJunctions_file == "null" || BaselevelJunctions_file.empty() == true)
   {
     cout << "\tSelecting basins..." << endl;
-    // remove basins drainage from edge if that is what the user wants
-    if (this_bool_map["find_complete_basins_in_window"])
+    if(this_bool_map["get_basins_from_outlets"])
     {
-      cout << "\tFinding basins not influended by nodata and removing nested basins..." << endl;
-      BaseLevelJunctions = JunctionNetwork.Prune_Junctions_By_Contributing_Pixel_Window_Remove_Nested_And_Nodata(FlowInfo, filled_topography, FlowAcc,
-                                              this_int_map["minimum_basin_size_pixels"],this_int_map["maximum_basin_size_pixels"]);
+      cout << "I am going to get basins lat-long coordinates" << endl;
+      string full_BL_LL_name = DATA_DIR+this_string_map["basin_outlet_csv"];
+      cout << "The file is: " << full_BL_LL_name << endl;
+      int search_radius_nodes = this_int_map["search_radius_nodes"];
+      int threshold_stream_order = 3;
+      BaseLevelJunctions = JunctionNetwork.snap_point_locations_to_upstream_junctions_from_latlong_csv(full_BL_LL_name,
+                                                          search_radius_nodes, threshold_stream_order,FlowInfo, RI);
     }
     else
     {
@@ -602,54 +709,36 @@ int main (int nNumberofArgs,char *argv[])
       BaseLevelJunctions = JunctionNetwork.Prune_Junctions_Area(BaseLevelJunctions_Initial,
                                               FlowInfo, FlowAcc, this_int_map["minimum_basin_size_pixels"]);
       cout << "\tNow I have " << BaseLevelJunctions.size() << " baselelvel junctions." << endl;
-
-      if (this_bool_map["find_largest_complete_basins"])
-      {
-        cout << "\tFinding largest basin not influenced by nodata..." << endl;
-        BaseLevelJunctions = JunctionNetwork.Prune_To_Largest_Complete_Basins(BaseLevelJunctions,FlowInfo, filled_topography, FlowAcc);
-      }
-      else
-      {
-        if (this_bool_map["test_drainage_boundaries"])     // now check for edge effects
-        {
-          cout << endl << endl << "\tRemoving basins draining to the edge." << endl;
-          BaseLevelJunctions = JunctionNetwork.Prune_Junctions_Edge_Ignore_Outlet_Reach(BaseLevelJunctions,FlowInfo, filled_topography);
-          //BaseLevelJunctions = JunctionNetwork.Prune_Junctions_Edge(BaseLevelJunctions,FlowInfo);
-        }
-      }
     }
-  }
-  else if (this_bool_map["extract_basins_by_stream_order"])
-  {
-    //Or just use a list of basins?
-  	cout << "\tExtracting baselevel nodes for a strahler stream order of " << this_int_map["stream_order_to_extract_basins"] << "..." << endl;
-  	BaseLevelJunctions = JunctionNetwork.ExtractBasinJunctionOrder(this_int_map["stream_order_to_extract_basins"], FlowInfo);
 
   }
   else
   {
-    //specify junctions to work on from a list file
-    string JunctionsFile = DATA_DIR+DEM_ID+"_junctions.list";
+    cout << "I am attempting to read base level junctions from a base level junction list." << endl;
+    cout << "If this is not a simple text file that only contains integers there will be problems!" << endl;
 
-    cout << "\tReading junctions from a junction list... " << JunctionsFile << endl;
+    //specify junctions to work on from a list file
+    //string JunctionsFile = DATA_DIR+BaselevelJunctions_file;
+    cout << "The junctions file is: " << BaselevelJunctions_file << endl;
 
     vector<int> JunctionsList;
-    ifstream infile(JunctionsFile.c_str());
+    ifstream infile(BaselevelJunctions_file.c_str());
     if (infile)
     {
+      cout << "Junctions File " << BaselevelJunctions_file << " exists" << endl;;
       int n;
       while (infile >> n) BaseLevelJunctions_Initial.push_back(n);
     }
     else
     {
-      cout << "Fatal Error: Junctions File " << JunctionsFile << " does not exist" << endl;
+      cout << "Fatal Error: Junctions File " << BaselevelJunctions_file << " does not exist" << endl;
       exit(EXIT_FAILURE);
     }
-
-    // Now make sure none of the basins drain to the edge
-    cout << "\tPruning junctions that drain to the edge of the DEM..." << endl;
-    BaseLevelJunctions = JunctionNetwork.Prune_Junctions_Edge_Ignore_Outlet_Reach(BaseLevelJunctions_Initial, FlowInfo, filled_topography);
   }
+
+  // Now make sure none of the basins drain to the edge
+  cout << "\tPruning junctions that drain to the edge of the DEM..." << endl;
+  BaseLevelJunctions = JunctionNetwork.Prune_Junctions_Edge_Ignore_Outlet_Reach(BaseLevelJunctions_Initial, FlowInfo, filled_topography);
 
   // Now we get channel segments for use with chi plotting. 
   vector<int> source_nodes;
@@ -940,7 +1029,7 @@ int main (int nNumberofArgs,char *argv[])
   //hillshade
   if (this_bool_map["write_hillshade"])
   {
-    string hillshade_raster_name = OUT_DIR+OUT_ID+"_Hillshade";
+    string hillshade_raster_name = OUT_DIR+OUT_ID+"_HS";
     cout << "Writing hillshade to " << hillshade_raster_name << raster_ext << endl;
     float hs_azimuth = 315;
     float hs_altitude = 45;

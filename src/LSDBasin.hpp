@@ -87,6 +87,9 @@ class LSDBasin
   LSDBasin(int Junction, LSDFlowInfo& FlowInfo, LSDJunctionNetwork& ChanNet)
                 { create(Junction, FlowInfo, ChanNet); }
 
+  LSDBasin(int JunctionNumber, LSDFlowInfo& FlowInfo, LSDJunctionNetwork& ChanNet, int extended_baslevel_nodes_below_junction)
+  {create(JunctionNumber,FlowInfo,ChanNet,extended_baslevel_nodes_below_junction);}
+
 
   /// @return Number of rows as an integer.
   int get_NRows() const        { return NRows; }
@@ -1003,6 +1006,7 @@ vector<int> get_source_node_from_perimeter(vector<int> perimeter, LSDFlowInfo& f
   private:
   void create();
   void create(int Junction, LSDFlowInfo& FlowInfo, LSDJunctionNetwork& ChanNet);
+  void create(int JunctionNumber, LSDFlowInfo& FlowInfo, LSDJunctionNetwork& ChanNet, int extended_baslevel_nodes_below_junction);
 
 };
 
@@ -1611,6 +1615,7 @@ class LSDCosmoBasin: public LSDBasin
                            LSDJunctionNetwork& ChanNet,
                            double N10Be, double delN10Be,
                            double N26Al, double delN26Al);
+
 
 };
 

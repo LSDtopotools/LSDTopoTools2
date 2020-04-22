@@ -60,6 +60,7 @@
 #include "LSDShapeTools.hpp"
 #include "LSDCosmoData.hpp"
 #include "LSDRaster.hpp"
+#include "LSDRasterMaker.hpp"
 #include "LSDFlowInfo.hpp"
 #include "LSDJunctionNetwork.hpp"
 #include "LSDBasin.hpp"
@@ -1192,7 +1193,12 @@ vector<string> LSDCosmoData::get_Self_fnames()
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-
+void LSDCosmoData::set_path_to_atmospheric_data(string new_atmos_path)
+{
+  cout << "I am setting the path to atmospheric data to: " << endl;
+  cout << new_atmos_path;
+  path_to_atmospheric_data = new_atmos_path;
+}
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
@@ -1755,6 +1761,143 @@ void LSDCosmoData::RunShielding(string path, string prefix)
   
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Shielding calculations
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDCosmoData::RunShielding_Unshielded(string path, string prefix)
+{
+  vector<string> dfnames = get_DEM_fnames();
+  vector<string> shield_names;
+  string DEM_Format = "bil";
+
+  //loop over each DEM and generate the shielding raster.
+  int n_DEMs = dfnames.size();
+  for(int i = 0; i<n_DEMs; i++)
+  {
+    
+    cout << "Processing " << i+1 << " of " << n_DEMs << endl;
+    
+    //load the raster
+    LSDRaster ForShield(dfnames[i], DEM_Format);
+
+    // run shielding
+    // This will be used to make some secondary rasters
+    LSDRasterMaker MakeItYeah(ForShield);
+    float shielding_constant = 1.0;
+    MakeItYeah.set_to_constant_value(shielding_constant);
+    LSDRaster Shielded =  MakeItYeah.return_as_raster();   
+    
+    //write the shielding raster to the working directory
+    Shielded.write_raster((dfnames[i]+"_SH"),DEM_Format);
+    shield_names.push_back(dfnames[i]+"_SH");
+  }
+  
+  // now rewrite the parameter file
+  string rasters_name = path+prefix+"_CRNRasters.csv";
+  cout << endl << endl << endl << "---------------------------------" << endl;
+  cout << "Rasters name is: " << rasters_name << endl;
+  
+  
+  // make sure the filename works
+  ifstream ifs(rasters_name.c_str());
+  if( ifs.fail() )
+  {
+    cout << "\nFATAL ERROR: Trying to load csv filenames file, but the file" << rasters_name
+         << "doesn't exist; LINE 348 LSDCosmoData" << endl;
+    exit(EXIT_FAILURE);
+  }
+  
+  string line_from_file;
+  vector<string> lines;
+  vector<string> this_string_vec;
+  vector<string> empty_string_vec;
+  
+  string zero = "0";
+  string comma = ",";
+  
+  // now loop through the rest of the lines, getting the data. 
+  int i = 0;
+  while( getline(ifs, line_from_file))
+  {
+    // reset the string vec
+    this_string_vec = empty_string_vec;
+    
+    // create a stringstream
+    stringstream ss(line_from_file);
+    
+    // read in the elements in the line
+    while( ss.good() )
+    {
+      string substr;
+      getline( ss, substr, ',' );
+      
+      // remove the spaces
+      substr.erase(remove_if(substr.begin(), substr.end(), ::isspace), substr.end());
+      
+      // remove control characters
+      substr.erase(remove_if(substr.begin(), substr.end(), ::iscntrl), substr.end());
+      
+      // add the string to the string vec
+      this_string_vec.push_back( substr );
+    }
+    
+    // a temporary string for holding the line
+    string temp_string;
+    
+    // now check on the size of the string
+    int n_params = this_string_vec.size();
+    
+    // this is logic to update the file depending on how many arguments are already in the line
+    if(n_params ==1 )
+    {
+      temp_string = this_string_vec[0]+comma+zero+comma+zero+comma+shield_names[i];
+    }
+    else if (n_params == 2)
+    {
+      temp_string = this_string_vec[0]+comma+this_string_vec[1]+comma+zero+comma+shield_names[i];
+    }
+    else if (n_params >= 3)
+    {
+      temp_string = this_string_vec[0]+comma+this_string_vec[1]+comma+this_string_vec[2]+comma+shield_names[i];
+    }
+    else
+    {
+      cout << "\nFATAL ERROR: Trying to load csv filenames file, but the file" << rasters_name
+         << "doesn't have the correct number of elements in the line; LINE 1375 LSDCosmoData" << endl;
+      exit(EXIT_FAILURE);    
+    }
+
+    // add the line to the list of lines
+    cout << "line is: " << temp_string << " and shield name is: " << shield_names[i] << endl;
+    lines.push_back(temp_string);
+    i++;
+  }
+  ifs.close();
+  
+  // now write the data
+  string rasters_out_name = path+prefix+"_Shield_CRNRasters.csv";
+  ofstream rasters_out;
+  rasters_out.open(rasters_out_name.c_str());
+  
+  int n_files = int(lines.size());
+  cout << "N_files is: " << n_files << endl;
+  for(int i = 0; i<n_files; i++)
+  {
+    rasters_out << lines[i] << endl;
+  }
+  rasters_out.close();
+  
+  // now spawn a new cosmodata file with the correct prefix
+  string new_prefix = prefix+"_Shield";
+  print_renamed_cosmo_data(path, new_prefix);
+  print_renamed_parameter_data(path, new_prefix);
+  
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This function prints a production raster for a basin
@@ -5764,6 +5907,8 @@ void LSDCosmoData::print_basins_to_for_checking()
   {
     string DEM_fname = dfnames[i];
     string basin_raster_name = DEM_fname+"_AllBasins";
+
+    string basin_info_name = DEM_fname+"_AllBasinsInfo.csv";
     
     // now find valid points
     vector<int> valid_cosmo_points;         // a vector to hold the valid nodes
@@ -5791,9 +5936,9 @@ void LSDCosmoData::print_basins_to_for_checking()
     LSDJunctionNetwork JNetwork(sources, FlowInfo);
     
     // print the stream order raster (to check against points)
-    LSDIndexRaster SO_raster = JNetwork.StreamOrderArray_to_LSDIndexRaster();
-    string SO_filename = DEM_fname+"_SO";
-    SO_raster.write_raster(SO_filename,DEM_bil_extension);
+    //LSDIndexRaster SO_raster = JNetwork.StreamOrderArray_to_LSDIndexRaster();
+    //string SO_filename = DEM_fname+"_SO";
+    //SO_raster.write_raster(SO_filename,DEM_bil_extension);
 
     // Also print a csv of the channel nodes
     string channel_csv_name = DEM_fname+"_CN";
@@ -5824,9 +5969,25 @@ void LSDCosmoData::print_basins_to_for_checking()
     ofstream basin_key_out;
     basin_key_out.open(sample_string_name.c_str());
     basin_key_out << "basin_ID,sample_name,basin_area" << endl;
-    
+
+    // We also do an all basins info file that makes this compatible with LSDMappingTools plotting routines
+    ofstream basin_info_out;
+    basin_info_out.open(basin_info_name.c_str());
+    basin_info_out << "latitude,longitude,outlet_latitude,outlet_longitude,outlet_junction,basin_key,sample_name" << endl;
+
+    // Make sure the full lat-long information is printed
+    basin_info_out.precision(9);
+
+    // decalre converter object
+    LSDCoordinateConverterLLandUTM Converter;
+
     LSDIndexRaster BasinMasterRaster;   // Bow before the BasinMasterRaster
-    
+
+    // These store row and column information for converting the outlet and centroid to
+    // latitude and longitude
+    int centroid_i, centroid_j, outlet_i, outlet_j;
+    double out_lat,out_long, cen_lat, cen_long;
+
     // this holds all the basins. We need this because we need to know the area of the other basins
     // for the nesting. 
     vector<LSDBasin> AllTheBasins;
@@ -5857,8 +6018,24 @@ void LSDCosmoData::print_basins_to_for_checking()
       
       basin_key_out << valid_cosmo_points[samp] << "," << sample_name[valid_cosmo_points[samp]] 
                     << "," << thisBasin.get_Area() << endl;
+
+      // get the centroid and outlet locations
+      centroid_i = thisBasin.get_Centroid_i();
+      centroid_j = thisBasin.get_Centroid_j();
+
+      outlet_i = thisBasin.get_Outlet_i();
+      outlet_j = thisBasin.get_Outlet_j();
+
+      // Find the latitude and longitude of the outlet and centroid
+      filled_raster.get_lat_and_long_locations(centroid_i, centroid_j, cen_lat, cen_long, Converter);
+      filled_raster.get_lat_and_long_locations(outlet_i, outlet_j, out_lat, out_long, Converter);
+
+      basin_info_out << cen_lat << "," << cen_long << "," << out_lat << "," << out_long << "," 
+                     << snapped_junction_indices[samp] << "," << valid_cosmo_points[samp] << "," << sample_name[valid_cosmo_points[samp]] << endl;
+
     }
     basin_key_out.close();
+    basin_info_out.close();
     
     // now loop through everything again getting the raster
     if (n_valid_points > 0)     // this gets the first raster

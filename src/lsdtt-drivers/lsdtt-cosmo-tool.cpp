@@ -9,10 +9,17 @@
 // and predicting cosmogenic concentrations 
 //
 // This program takes two arguments, the path name and the driver name
+// It is an updated version of the CAIRN software package:
+// https://www.earth-surf-dynam.net/4/655/2016/
+//
+// Mudd, S. M., Harel, M.-A., Hurst, M. D., Grieve, S. W. D., and Marrero, S. M.: 
+// The CAIRN method: automated, reproducible calculation of catchment-averaged denudation 
+// rates from cosmogenic nuclide concentrations, Earth Surf. Dynam., 
+// 4, 655–674, https://doi.org/10.5194/esurf-4-655-2016, 2016.
 //
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
-// Copyright (C) 2018 Simon M. Mudd 2018
+// Copyright (C) 2020 Simon M. Mudd 2020
 //
 // Developer can be contacted by simon.m.mudd _at_ ed.ac.uk
 //
@@ -133,14 +140,14 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["spawn_cosmo_basins"] = false;
   int_default_map["spawn_padding_pixels"] = 20;
 
+  bool_default_map["make_shielding_rasters"] = false;
   bool_default_map["calculate_shielding"] = false;
-  bool_default_map["calculate_nested_erosion_rates"] = false;
+  bool_default_map["calculate_erosion_rates"] = false;
   bool_default_map["calculate_soil_erosion_rates"] = false;
   bool_default_map["calculate_nested_erosion_rates"] = false;
   
   bool_default_map["use_spawned_basins"] = false;
   bool_default_map["calculate_using_muons_and_errors"] = true;   
-  bool_default_map["calculate_erosion_rates"] = false;
 
   bool_default_map["print_production_raster"] = false; 
   bool_default_map["print_pressure_raster"] = false; 
@@ -342,7 +349,7 @@ int main (int nNumberofArgs,char *argv[])
   cout << "===============================" << endl;
   if( this_bool_map["check_cosmo_basins"] ||
       this_bool_map["spawn_cosmo_basins"] ||
-      this_bool_map["calculate_shielding"] ||
+      this_bool_map["make_shielding_rasters"] ||
       this_bool_map["calculate_nested_erosion_rates"] ||
       this_bool_map["calculate_soil_erosion_rates"] ||
       this_bool_map["calculate_erosion_rates"])
@@ -381,16 +388,30 @@ int main (int nNumberofArgs,char *argv[])
         CosmoData.BasinSpawnerMaster(DATA_DIR,this_string_map["cosmo_parameter_prefix"],this_int_map["spawn_padding_pixels"]);
       }
 
-      // This is for the of shielding
-      // Again note that if you belive DiBiase 2018 ESURF shielding calculations are not necessary.
-      if(this_bool_map["calculate_shielding"])
+      // This is for making shielding rasters
+      if(this_bool_map["make_shielding_rasters"])
       {
-        cout << "I will calculate shielding for you." << endl;
-        cout << "Note that if you want spawned basins you will need to run the spawning routine first." << endl;
-        cout << "use  spawn_cosmo_basins: true" << endl;
-        cout << "to activate spawning." << endl;
-        CosmoData.RunShielding(DATA_DIR,this_string_map["cosmo_parameter_prefix"]);
-      } 
+        cout << "I am going to make some shielding rasters for you." << endl;
+        // Again note that if you belive DiBiase 2018 ESURF shielding calculations are not necessary.
+        if(this_bool_map["calculate_shielding"])
+        {
+          cout << "I will calculate shielding for you." << endl;
+          cout << "Note that if you want spawned basins you will need to run the spawning routine first." << endl;
+          cout << "use  spawn_cosmo_basins: true" << endl;
+          cout << "to activate spawning." << endl;
+          CosmoData.RunShielding(DATA_DIR,this_string_map["cosmo_parameter_prefix"]);
+        }      
+        else
+        {
+          cout << "I am going to set all topographic shielding to 1." << endl;
+          cout << "This is based on a recent Roman DiBiase ESURF paper that argued shielding doesn't matter." << endl;
+          cout << "Note that if you want spawned basins you will need to run the spawning routine first." << endl;
+          cout << "use  spawn_cosmo_basins: true" << endl;
+          cout << "to activate spawning." << endl;
+          CosmoData.RunShielding_Unshielded(DATA_DIR,this_string_map["cosmo_parameter_prefix"]);
+        }
+      }
+       
 
       if(this_bool_map["calculate_nested_erosion_rates"])
       {
@@ -422,7 +443,7 @@ int main (int nNumberofArgs,char *argv[])
         // the method flag determines what sort of analysis you want to do
         int method_flag; 
 
-        if(this_bool_map["calculate_using_muons_and_errors"])
+        if(not this_bool_map["calculate_using_muons_and_errors"])
         {
           cout << "I am going to calculate basic erosion rates without" << endl;
           cout << "muogenic production or errors. This is just a very" << endl;
