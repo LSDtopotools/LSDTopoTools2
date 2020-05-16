@@ -9,11 +9,11 @@
 # Set up the inital directory
 BASE_DIR=$HOME
 
-if [ BASE_DIR=="/root" ]
+if [ BASE_DIR == "/root" ]
   then
     BASE_DIR=""
 fi
-echo "Base dir is"
+echo "Base dir is: $BASE_DIR"
 
 SRC_DIR="$BASE_DIR/LSDTopoTools/LSDTopoTools2/src/"
 LSD_DIR="$BASE_DIR/LSDTopoTools"
