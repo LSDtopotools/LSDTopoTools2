@@ -697,7 +697,7 @@ class LSDJunctionNetwork
   // some order intersects with a channel of higher order. So the bain includes the
   // basin junction, but also the channel flowing downstream from this basin
   // junction
-  // It starts from the node of the reciever junction, so if one were to extract
+  // It starts from the node of the receiver junction, so if one were to extract
   // the basin from this node one would get a basin that starts one node upstream from
   // the lowest node in this
   /// @brief This generates the longest channel in a basin.
@@ -705,7 +705,7 @@ class LSDJunctionNetwork
   /// @details The basin starts where a channel of some order intersects with a
   /// channel of higher order. So the bain includes the basin junction, but also
   /// the channel flowing downstream from this basin junction. It starts from the
-  /// node of the reciever junction, so if one were to extract the basin from
+  /// node of the receiver junction, so if one were to extract the basin from
   /// this node one would get a basin that starts one node upstream from the lowest node in this.
   /// @param basin_junction
   /// @param FInfo LSDFlowInfo object.
@@ -721,7 +721,7 @@ class LSDJunctionNetwork
   /// @details The basin starts where a channel of some order intersects with a
   /// channel of higher order. So the bain includes the basin junction, but also
   /// the channel flowing downstream from this basin junction. It starts from the
-  /// node of the reciever junction, so if one were to extract the basin from
+  /// node of the receiver junction, so if one were to extract the basin from
   /// this node one would get a basin that starts one node upstream from the lowest node in this.
   /// @param basin_junction
   /// @param FInfo LSDFlowInfo object.
@@ -769,7 +769,7 @@ class LSDJunctionNetwork
   /// @details What it does is goes down the index channel looking at the JunctionIndexArray
   /// to see if there is a junction. If it hits a junction then all the contributing junction
   /// it overwrites two vectors: \n
-  /// tributary_junctions, which lists all junctions whose reciever is the main
+  /// tributary_junctions, which lists all junctions whose receiver is the main
   /// stem and nodes_on_main_stem_of_tributaries, which are the njodes on the
   /// main_stem LSDIndexChannel where the tributaries intersect the main stem
   /// this second vector is used to calcualte the chi values of the downstream node
@@ -1813,8 +1813,8 @@ double min_DA, double max_DA);
   int get_Node_of_Junction(int junction) const;
 
   /// @details Gets the receiver of a junction
-  /// @param junction integer reciever index.
-  /// @return Integer reciever of junction.
+  /// @param junction integer receiver index.
+  /// @return Integer receiver of junction.
   /// @author SMM
   /// @date 01/01/2014
   int get_Receiver_of_Junction(int junction) const;
@@ -1827,7 +1827,7 @@ double min_DA, double max_DA);
   vector<int> get_node_list_from_junction_list(vector<int> junction_list);
 
 
-  /// @details Gets a node list from a junction list. The nodes are the penultimate nodes before the reciever juctions
+  /// @details Gets a node list from a junction list. The nodes are the penultimate nodes before the receiver juctions
   /// @param junction_list a vector of junctions
   /// @param FlowInfo the LSDFlowInfo object
   /// @return vector of nodes
@@ -1903,7 +1903,7 @@ double min_DA, double max_DA);
   /// @return Get the baselevel junstions
   vector<int> get_BaseLevelJunctions() const { return BaseLevelJunctions; }
 
-  /// @return The Vector of recievers.
+  /// @return The Vector of receivers.
   vector<int> get_ReceiverVector() const { return ReceiverVector; }
 
   /// @return The Vector of stream orders.

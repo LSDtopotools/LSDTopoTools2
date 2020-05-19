@@ -453,7 +453,7 @@ void LSDFlowInfo::create(vector<string>& temp_BoundaryConditions,
         // first logic for baselevel node
         if (one_if_a_baselevel_node == 1)
     {
-      // get reciever index
+      // get receiver index
       FlowDirection[row][col] = -1;
       ReceiverVector.push_back(NodeIndex[row][col]);
       FlowLengthCode[row][col] = 0;
@@ -510,7 +510,7 @@ void LSDFlowInfo::create(vector<string>& temp_BoundaryConditions,
           }
       }
         }
-      // get reciever index
+      // get receiver index
       FlowDirection[row][col] = max_slope_index;
       ReceiverVector.push_back(NodeIndex[receive_row][receive_col]);
     }    // end if baselevel boundary  conditional
@@ -838,7 +838,7 @@ bool LSDFlowInfo::check_if_point_is_in_raster(float X_coordinate, float Y_coordi
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // algorithms for searching the vectors
-// This gets the reciever of current_node (its node, row, and column)
+// This gets the receiver of current_node (its node, row, and column)
 //
 // SMM 01/06/2012
 //
@@ -859,7 +859,7 @@ void LSDFlowInfo::retrieve_receiver_information(int current_node,
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // algorithms for searching the vectors
-// This gets the reciever of current_node, just its node version
+// This gets the receiver of current_node, just its node version
 //
 // BG 05/01/2018
 //
@@ -2363,7 +2363,7 @@ void LSDFlowInfo::print_flow_info_vectors(string filename)
   string_filename = filename+dot+extension;
   cout << "The filename is " << string_filename << endl;
 
-  // print out all the donor, reciever and stack info
+  // print out all the donor, receiver and stack info
   ofstream donor_info_out;
   donor_info_out.open(string_filename.c_str());
   for(int i = 0; i<NDataNodes; i++)
@@ -3950,7 +3950,7 @@ LSDRaster LSDFlowInfo::calculate_d8_slope(LSDRaster& Elevation)
     break;
   }
 
-      // get the reciever information
+      // get the receiver information
       retrieve_receiver_information(node,r_node, r_row, r_col);
 
       // now calculate the slope
@@ -4482,7 +4482,7 @@ void LSDFlowInfo::D8_Trace(int i, int j, LSDIndexRaster StreamNetwork, float& le
 
   int node;
 
-  int reciever_node = retrieve_node_from_row_and_column(i, j);
+  int receiver_node = retrieve_node_from_row_and_column(i, j);
   receiver_row = i;
   receiver_col = j;
 
@@ -4490,15 +4490,15 @@ void LSDFlowInfo::D8_Trace(int i, int j, LSDIndexRaster StreamNetwork, float& le
 
   while (StreamNetwork.get_data_element(receiver_row, receiver_col) == NoDataValue){  // need to do edge checking
 
-    retrieve_receiver_information(reciever_node, node, receiver_row, receiver_col);
+    retrieve_receiver_information(receiver_node, node, receiver_row, receiver_col);
 
     Path[receiver_row][receiver_col] = 1;
 
     //update length
-    if (retrieve_flow_length_code_of_node(reciever_node) == 1){ length += DataResolution; }
-    else if (retrieve_flow_length_code_of_node(reciever_node) == 2){ length += (DataResolution * root_2); }
+    if (retrieve_flow_length_code_of_node(receiver_node) == 1){ length += DataResolution; }
+    else if (retrieve_flow_length_code_of_node(receiver_node) == 2){ length += (DataResolution * root_2); }
 
-    reciever_node = node;
+    receiver_node = node;
 
   }
 
@@ -4649,23 +4649,23 @@ void LSDFlowInfo::MoveChannelHeadDown(vector<int> Sources, float MoveDist, vecto
   for(int q=0; q<int(Sources.size());++q){
     length = 0;
 
-    int reciever_node = Sources[q];
+    int receiver_node = Sources[q];
 
     while (length < MoveDist){
 
-      retrieve_receiver_information(reciever_node, node, receiver_row, receiver_col);
+      retrieve_receiver_information(receiver_node, node, receiver_row, receiver_col);
 
       //update length
-      if (retrieve_flow_length_code_of_node(reciever_node) == 1){ length += DataResolution; }
-      else if (retrieve_flow_length_code_of_node(reciever_node) == 2){ length += (DataResolution * root_2); }
-      else if (retrieve_flow_length_code_of_node(reciever_node) == 0){break;}
+      if (retrieve_flow_length_code_of_node(receiver_node) == 1){ length += DataResolution; }
+      else if (retrieve_flow_length_code_of_node(receiver_node) == 2){ length += (DataResolution * root_2); }
+      else if (retrieve_flow_length_code_of_node(receiver_node) == 0){break;}
 
-      reciever_node = node;
+      receiver_node = node;
 
 
     }
 
-    DownslopeSources.push_back(reciever_node);
+    DownslopeSources.push_back(receiver_node);
     FinalHeads.push_back(Sources[q]);
 
   }
@@ -8826,7 +8826,7 @@ int LSDFlowInfo::get_downslope_node_after_fixed_visited_nodes(int source_node,
   // you start from the source node and work your way downstream
   while( Am_I_at_the_bottom_of_the_channel == false )
   {
-    // get the reciever node
+    // get the receiver node
     retrieve_receiver_information(current_node,receiver_node, row,col);
 
     // check if this is a base level node

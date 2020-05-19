@@ -214,21 +214,21 @@ class LSDFlowInfo
   /// @date 13/11/2014
   bool check_if_point_is_in_raster(float X_coordinate,float Y_coordinate);
 
-  ///@brief Gives the reciever information for a given node.
+  ///@brief Gives the receiver information for a given node.
   ///@param current_node Integer
-  ///@param reveiver_node Empty integer to be assigned the index of the reciever
+  ///@param reveiver_node Empty integer to be assigned the index of the receiver
   ///node.
   ///@param receiver_row Empty integer to be assigned the row index of the
-  ///reciever node.
+  ///receiver node.
   ///@param receiver_col Empty integer to be assigned the column index of the
-  ///reciever node.
+  ///receiver node.
   /// @author SMM
   /// @date 01/016/12
   void retrieve_receiver_information(int current_node,int& reveiver_node, int& receiver_row,
                                              int& receiver_col);
-  ///@brief Gives the reciever information for a given node.
+  ///@brief Gives the receiver information for a given node.
   ///@param current_node Integer
-  ///@param reveiver_node Empty integer to be assigned the index of the reciever
+  ///@param reveiver_node Empty integer to be assigned the index of the receiver
   ///node.
   /// @author BG
   /// @date 06/01/2018
@@ -1438,7 +1438,7 @@ void get_nodeindices_from_csv(string csv_filename, vector<int>& NIs, vector<floa
   /// Nodes with flow direction of -1 drain to themselvs and are base level/sink nodes.
   Array2D<int> FlowDirection;
 
-  /// @brief A code to denote the flow length from the node to its reciever node.
+  /// @brief A code to denote the flow length from the node to its receiver node.
   /// <b>Each node has one and only one receiver.</b>
   /// \n\n
   /// 0 == no receiver/self receiver (base level) \n

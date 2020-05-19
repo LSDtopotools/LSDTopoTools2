@@ -1711,7 +1711,7 @@ void LSDJunctionNetwork::calculate_junction_angles_complete(vector<int> Junction
         //cout << "grad_D1: " << grad_D1 << " grad_D2: " << grad_D2 << " grad_R: " << grad_R << endl;
 
         // WORKING HERE 07 DEC NEED TO ADD THE FIXED VEERTICAL INTERVAL
-        // We now go through each  donor and the reciever to get the fixed drop
+        // We now go through each  donor and the receiver to get the fixed drop
         float z_search;
 
         // First donor 1
@@ -2542,7 +2542,7 @@ LSDIndexChannel LSDJunctionNetwork::generate_longest_index_channel_from_junction
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // this function extracts the longest channel originating from a basin
 // this differs from the extract_longest_channel_from_junction in that
-// basins continue down to a reciever junction
+// basins continue down to a receiver junction
 //
 // SMM 01/09/2012
 //
@@ -2650,7 +2650,7 @@ vector<int> LSDJunctionNetwork::get_basin_sources_from_outlet_vector(vector<int>
 // to see if there is a junction. If it hits a junction then all the contributing junction
 //
 // it overwrites two vectors:
-// tributary_junctions, which lists all junctions whose reciever is the main
+// tributary_junctions, which lists all junctions whose receiver is the main
 // stem
 // and
 // nodes_on_main_stem_of_tributaries, which are the njodes on the main_stem LSDIndexChannel
@@ -3704,9 +3704,7 @@ void LSDJunctionNetwork::write_valley_hilltop_chi_profiles_to_csv(vector<int> so
 		// get the LSDChannel
 		LSDChannel new_channel(hilltop_node, final_node, downslope_chi, m_over_n, A_0, FlowInfo, ElevationRaster);
 		// write to csv
-		ostringstream tmp_str;
-		tmp_str << source_junction;
-		string jn_str = static_cast<ostringstream*>( &tmp_str )->str();
+		string jn_str = static_cast<ostringstream*>( &(ostringstream() << source_junction) )->str();
 		string output_csv_filename = DEM_ID+"_chan_profile_"+jn_str;
 		new_channel.write_channel_to_csv(output_path, output_csv_filename, FlowDistance);
 	}
@@ -5523,14 +5521,14 @@ LSDIndexRaster LSDJunctionNetwork::ChannelIndexer(LSDFlowInfo& flowinfo)
     }
 
     int sourcenodeindex = JunctionVector[q]; //first cell of segment
-    int recieverjunction = ReceiverVector[q];
-    int recievernodeindex = JunctionVector[recieverjunction]; //last cell of segment
+    int receiverjunction = ReceiverVector[q];
+    int receivernodeindex = JunctionVector[receiverjunction]; //last cell of segment
 
     //get row and col of last px in junction. This location should not be written,
     //as it is the start of a new junction.
     int a = 0;
     int b = 0;
-    flowinfo.retrieve_current_row_and_col(recievernodeindex,a,b);
+    flowinfo.retrieve_current_row_and_col(receivernodeindex,a,b);
 
     //write first pixel
     flowinfo.retrieve_current_row_and_col(sourcenodeindex,g,h);
@@ -5551,7 +5549,7 @@ LSDIndexRaster LSDJunctionNetwork::ChannelIndexer(LSDFlowInfo& flowinfo)
         //cout << "I found the base level" << endl;
         Flag = true;
       }
-      else if(recievernodeindex== next_receiver)
+      else if(receivernodeindex== next_receiver)
       {
         //cout << "I found the receiver" << endl;
         Flag = true;
@@ -5599,17 +5597,17 @@ void LSDJunctionNetwork::GetChannelNodesAndJunctions(LSDFlowInfo& flowinfo, vect
     //cout << "Junction is: " << q << " ";
 
     int sourcenodeindex = JunctionVector[q]; //first cell of segment
-    int recieverjunction = ReceiverVector[q];
-    int recievernodeindex = JunctionVector[recieverjunction]; //last cell of segment
+    int receiverjunction = ReceiverVector[q];
+    int receivernodeindex = JunctionVector[receiverjunction]; //last cell of segment
 
-    //cout << "Source NI : " << sourcenodeindex << " and receiver NI: " << recievernodeindex << endl;
+    //cout << "Source NI : " << sourcenodeindex << " and receiver NI: " << receivernodeindex << endl;
 
-    //cout << "reciever is:"  <<  recieverjunction << " ";
+    //cout << "receiver is:"  <<  receiverjunction << " ";
     //get row and col of last px in junction. This location should not be written,
     //as it is the start of a new junction.
     int lp_row = 0;
     int lp_col = 0;
-    flowinfo.retrieve_current_row_and_col(recievernodeindex,lp_row,lp_col);
+    flowinfo.retrieve_current_row_and_col(receivernodeindex,lp_row,lp_col);
 
     //write first pixel
     flowinfo.retrieve_current_row_and_col(sourcenodeindex,row,col);
@@ -5620,7 +5618,7 @@ void LSDJunctionNetwork::GetChannelNodesAndJunctions(LSDFlowInfo& flowinfo, vect
     bool Flag = false; //Flag used to indicate if end of stream segemnt has been reached
     int CurrentNodeIndex = 0;
 
-    if(recieverjunction == q)
+    if(receiverjunction == q)
     {
       //cout << "You are on a baselevel junction" << endl;
       Flag = true;
@@ -5633,7 +5631,7 @@ void LSDJunctionNetwork::GetChannelNodesAndJunctions(LSDFlowInfo& flowinfo, vect
       CurrentNodeIndex = flowinfo.NodeIndex[row][col]; //update node index to move 1 px downstream
       flowinfo.retrieve_receiver_information(CurrentNodeIndex, next_receiver, row, col);
 
-      //cout << "CNI: " <<  CurrentNodeIndex << " and RNI: " << recievernodeindex << endl;
+      //cout << "CNI: " <<  CurrentNodeIndex << " and RNI: " << receivernodeindex << endl;
 
       if (CurrentNodeIndex == next_receiver)
       {
@@ -5641,7 +5639,7 @@ void LSDJunctionNetwork::GetChannelNodesAndJunctions(LSDFlowInfo& flowinfo, vect
         //cout << "I found the base level" << endl;
         Flag = true;
       }
-      else if(recievernodeindex== next_receiver)
+      else if(receivernodeindex== next_receiver)
       {
         //cout << "I found the receiver" << endl;
         Flag = true;
@@ -5687,17 +5685,17 @@ map<int,bool> LSDJunctionNetwork::GetMapOfChannelNodes(LSDFlowInfo& flowinfo)
     //cout << "Junction is: " << q << " ";
 
     int sourcenodeindex = JunctionVector[q]; //first cell of segment
-    int recieverjunction = ReceiverVector[q];
-    int recievernodeindex = JunctionVector[recieverjunction]; //last cell of segment
+    int receiverjunction = ReceiverVector[q];
+    int receivernodeindex = JunctionVector[receiverjunction]; //last cell of segment
 
-    //cout << "Source NI : " << sourcenodeindex << " and receiver NI: " << recievernodeindex << endl;
+    //cout << "Source NI : " << sourcenodeindex << " and receiver NI: " << receivernodeindex << endl;
 
-    //cout << "reciever is:"  <<  recieverjunction << " ";
+    //cout << "receiver is:"  <<  receiverjunction << " ";
     //get row and col of last px in junction. This location should not be written,
     //as it is the start of a new junction.
     int lp_row = 0;
     int lp_col = 0;
-    flowinfo.retrieve_current_row_and_col(recievernodeindex,lp_row,lp_col);
+    flowinfo.retrieve_current_row_and_col(receivernodeindex,lp_row,lp_col);
 
     //write first pixel
     flowinfo.retrieve_current_row_and_col(sourcenodeindex,row,col);
@@ -5706,7 +5704,7 @@ map<int,bool> LSDJunctionNetwork::GetMapOfChannelNodes(LSDFlowInfo& flowinfo)
     bool Flag = false; //Flag used to indicate if end of stream segemnt has been reached
     int CurrentNodeIndex = 0;
 
-    if(recieverjunction == q)
+    if(receiverjunction == q)
     {
       //cout << "You are on a baselevel junction" << endl;
       Flag = true;
@@ -5719,7 +5717,7 @@ map<int,bool> LSDJunctionNetwork::GetMapOfChannelNodes(LSDFlowInfo& flowinfo)
       CurrentNodeIndex = flowinfo.NodeIndex[row][col]; //update node index to move 1 px downstream
       flowinfo.retrieve_receiver_information(CurrentNodeIndex, next_receiver, row, col);
 
-      //cout << "CNI: " <<  CurrentNodeIndex << " and RNI: " << recievernodeindex << endl;
+      //cout << "CNI: " <<  CurrentNodeIndex << " and RNI: " << receivernodeindex << endl;
 
       if (CurrentNodeIndex == next_receiver)
       {
@@ -5727,7 +5725,7 @@ map<int,bool> LSDJunctionNetwork::GetMapOfChannelNodes(LSDFlowInfo& flowinfo)
         //cout << "I found the base level" << endl;
         Flag = true;
       }
-      else if(recievernodeindex== next_receiver)
+      else if(receivernodeindex== next_receiver)
       {
         //cout << "I found the receiver" << endl;
         Flag = true;
@@ -6507,7 +6505,7 @@ LSDIndexRaster LSDJunctionNetwork::extract_basin_from_junction(int basin_junctio
 
   int receiver_junc, n_nodes_in_channel,basin_outlet;
   Array2D<int> Basin(NRows,NCols,NoDataValue);
-  // get the reciever junction
+  // get the receiver junction
   receiver_junc = ReceiverVector[basin_junction];
 
   LSDIndexChannel StreamLinkVector = LSDIndexChannel(basin_junction, JunctionVector[basin_junction],
@@ -6580,7 +6578,7 @@ LSDIndexRaster LSDJunctionNetwork::extract_hollow(int CH_junction, LSDFlowInfo& 
   node_of_ch = get_Node_of_Junction(CH_junction);
   FlowInfo.retrieve_current_row_and_col(node_of_ch, channel_head_row, channel_head_col);
 
-  // get the reciever junction
+  // get the receiver junction
   receiver_junc = ReceiverVector[CH_junction];
 
   LSDIndexChannel StreamLinkVector = LSDIndexChannel(CH_junction, JunctionVector[CH_junction],
@@ -6635,7 +6633,7 @@ LSDIndexRaster LSDJunctionNetwork::extract_hollow(vector<int> CH_junctions, LSDF
     node_of_ch = get_Node_of_Junction(CH_junctions[q]);
     FlowInfo.retrieve_current_row_and_col(node_of_ch, channel_head_row, channel_head_col);
 
-    // get the reciever junction
+    // get the receiver junction
     receiver_junc = ReceiverVector[CH_junctions[q]];
 
     LSDIndexChannel StreamLinkVector = LSDIndexChannel(CH_junctions[q], JunctionVector[CH_junctions[q]],
@@ -6691,7 +6689,7 @@ LSDIndexRaster LSDJunctionNetwork::extract_basins_from_junction_vector(vector<in
 
     int receiver_junc, n_nodes_in_channel, basin_outlet;
 
-    // get the reciever junction
+    // get the receiver junction
     receiver_junc = ReceiverVector[basin_junction];
 
     LSDIndexChannel StreamLinkVector = LSDIndexChannel(basin_junction, JunctionVector[basin_junction],
@@ -6763,7 +6761,7 @@ LSDIndexRaster LSDJunctionNetwork::extract_basins_from_junction_vector_nested(ve
 
     int receiver_junc, n_nodes_in_channel, basin_outlet;
 
-    // get the reciever junction
+    // get the receiver junction
     receiver_junc = ReceiverVector[basin_junction];
 
     LSDIndexChannel StreamLinkVector = LSDIndexChannel(basin_junction, JunctionVector[basin_junction],
@@ -6906,7 +6904,7 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV(LSDFlowInfo& flowinfo, string 
   WriteData.open(FileName.c_str());
 
   WriteData.precision(8);
-  WriteData << "latitude,longitude,Junction Index,Stream Order,NI,receiver_NI" << endl;
+  WriteData << "latitude,longitude,Junction Index,Stream Order,NI,receiver_NI,receiver_JI" << endl;
 
   // the x and y locations
   double latitude,longitude;
@@ -6916,7 +6914,7 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV(LSDFlowInfo& flowinfo, string 
 
 
   // now get the number of channel nodes
-  int this_NI, receiver_NI;
+  int this_NI, receiver_NI, RJ;
   int row,col;
   int NNodes = int(NIvec.size());
   //cout << "The number of nodes is: " << NNodes << endl;
@@ -6926,8 +6924,9 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV(LSDFlowInfo& flowinfo, string 
     flowinfo.retrieve_current_row_and_col(this_NI,row,col);
     get_lat_and_long_locations(row, col, latitude, longitude, Converter);
     flowinfo.retrieve_receiver_information(this_NI, receiver_NI);
+    RJ = get_Receiver_of_Junction(node);
 
-    WriteData << latitude << "," << longitude << "," << JIvec[node] << "," << SOvec[node] << "," << NIvec[node] << "," << receiver_NI << endl;
+    WriteData << latitude << "," << longitude << "," << node << "," << SOvec[node] << "," << NIvec[node] << "," << receiver_NI << "," << RJ <<endl;
 
   }
 
@@ -6956,7 +6955,7 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV_nolatlon(LSDFlowInfo& flowinfo
   WriteData.open(FileName.c_str());
 
   WriteData.precision(8);
-  WriteData << "X,Y,Junction Index,Stream Order,NI,elevation,receiver_NI" << endl;
+  WriteData << "X,Y,Junction Index,Stream Order,NI,elevation,receiver_NI,receiver_JI" << endl;
 
   // the x and y locations
   double X,Y;
@@ -6964,7 +6963,7 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV_nolatlon(LSDFlowInfo& flowinfo
 
 
   // now get the number of channel nodes
-  int this_NI, receiver_NI;
+  int this_NI, receiver_NI, RJ;
   int row,col;
   int NNodes = int(NIvec.size());
   float this_elev;
@@ -6976,7 +6975,8 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV_nolatlon(LSDFlowInfo& flowinfo
     flowinfo.retrieve_receiver_information(this_NI, receiver_NI);
     this_elev = elevation.get_data_element(row,col);
     flowinfo.get_x_and_y_locations(row,col,X,Y);
-    WriteData << X << "," << Y << "," << JIvec[node] << "," << SOvec[node] << "," << NIvec[node] << "," << this_elev << "," << receiver_NI << endl;
+    RJ = get_Receiver_of_Junction(node);
+    WriteData << X << "," << Y << "," << node << "," << SOvec[node] << "," << NIvec[node] << "," << this_elev << "," << receiver_NI << ","<< RJ << endl;
 
   }
 
@@ -7006,7 +7006,7 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV_WithElevation(LSDFlowInfo& flo
   WriteData.open(FileName.c_str());
 
   WriteData.precision(8);
-  WriteData << "latitude,longitude,Junction Index,Stream Order,NI,receiver_NI,elevation(m)" << endl;
+  WriteData << "latitude,longitude,Junction Index,Stream Order,NI,receiver_NI,elevation(m),receiver_JI" << endl;
 
   // the x and y locations
   double latitude,longitude;
@@ -7020,6 +7020,7 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV_WithElevation(LSDFlowInfo& flo
   int row,col;
   int NNodes = int(NIvec.size());
   float this_elev;
+  int RJ;
   //cout << "The number of nodes is: " << NNodes << endl;
   for(int node = 0; node<NNodes; node++)
   {
@@ -7028,8 +7029,9 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV_WithElevation(LSDFlowInfo& flo
     get_lat_and_long_locations(row, col, latitude, longitude, Converter);
     flowinfo.retrieve_receiver_information(this_NI, receiver_NI);
     this_elev = Elevation.get_data_element(row,col);
+    RJ = get_Receiver_of_Junction(node);
 
-    WriteData << latitude << "," << longitude << "," << JIvec[node] << "," << SOvec[node] << "," << NIvec[node] << "," << receiver_NI << "," << this_elev << endl;
+    WriteData << latitude << "," << longitude << "," << node << "," << SOvec[node] << "," << NIvec[node] << "," << receiver_NI << "," << this_elev << "," << RJ << endl;
 
   }
 
@@ -7119,7 +7121,7 @@ void LSDJunctionNetwork::print_junction_info_vectors(string filename)
   string_filename = filename+dot+extension;
   cout << "The filename is " << string_filename << endl;
 
-  // print out all the donor, reciever and stack info
+  // print out all the donor, receiver and stack info
   ofstream donor_info_out;
   donor_info_out.open(string_filename.c_str());
   for(int i = 0; i<NJunctions; i++)
@@ -7260,21 +7262,21 @@ bool LSDJunctionNetwork::node_tester(LSDFlowInfo& FlowInfo, int input_junction)
   Array2D<int> FlowDirection = FlowInfo.get_FlowDirection();  //used as a proxy of the elevation data
   bool flag = false;
 
-  //get reciever junction of the input junction
+  //get receiver junction of the input junction
   int receiver_junc = ReceiverVector[input_junction];
 
   // This is the node where I will check all the upstream nodes
   int basin_outlet;
 
 
-  // Now see if it is the reciever junction
+  // Now see if it is the receiver junction
   if(input_junction == receiver_junc)
   {
     basin_outlet = JunctionVector[input_junction];
   }
   else   // this is a bit more complux but saves masses of computational time
   {
-    //cout << "input junction:" << input_junction << " and reciever junction " << receiver_junc << endl;
+    //cout << "input junction:" << input_junction << " and receiver junction " << receiver_junc << endl;
     // Create channel segement from input junction down to receiver junction
     LSDIndexChannel StreamLinkVector = LSDIndexChannel(input_junction, JunctionVector[input_junction],
                                                      receiver_junc, JunctionVector[receiver_junc], FlowInfo);
@@ -8561,7 +8563,7 @@ void LSDJunctionNetwork::snap_point_locations_to_channels(vector<float> x_locs,
   snapped_junction_indices = empty_vec;
 
 
-  vector<int> reciever_junc;
+  vector<int> receiver_junc;
   int this_junc, this_chan_node;
 
   float x_loc,y_loc;
@@ -8652,7 +8654,7 @@ void LSDJunctionNetwork::snap_point_locations_to_nearest_channel_node_index(vect
   valid_cosmo_points = empty_vec;
   snapped_node_indices = empty_vec;
 
-  vector<int> reciever_junc;
+  vector<int> receiver_junc;
   int this_junc, this_chan_node;
 
   float x_loc,y_loc;
@@ -9360,10 +9362,11 @@ void LSDJunctionNetwork::print_junctions_to_csv(LSDFlowInfo& FlowInfo, string fn
   sources_out.open(fname.c_str());
   sources_out.precision(9);
 
-  sources_out << "junction,node,x,y,latitude,longitude, stream_order" << endl;
+  sources_out << "junction,node,x,y,latitude,longitude, stream_order, receiver_junction" << endl;
 
   // this is for latitude and longitude
   LSDCoordinateConverterLLandUTM Converter;
+  int RJ;
 
   for (int i = 0; i<NJunctions; i++)
   {
@@ -9377,10 +9380,12 @@ void LSDJunctionNetwork::print_junctions_to_csv(LSDFlowInfo& FlowInfo, string fn
 
     // get the lat and long locations
     FlowInfo.get_lat_and_long_locations(row, col, latitude, longitude, Converter);
+    RJ = get_Receiver_of_Junction(JunctionList[i]);
 
     // print to file
     sources_out << JunctionList[i] << "," << this_node << "," << x_loc << ","
-                << y_loc << "," << latitude << "," << longitude << "," << StreamOrderVector[ JunctionList[i] ] << endl;
+                << y_loc << "," << latitude << "," << longitude << "," << StreamOrderVector[ JunctionList[i] ] 
+                << "," << RJ << endl;
 
   }
   sources_out.close();
@@ -9396,7 +9401,7 @@ void LSDJunctionNetwork::print_junctions_to_csv(LSDFlowInfo& FlowInfo, vector<in
 {
   int n_junctions = int(JunctionList.size());
   int this_node;
-  int row,col;
+  int row,col,RJ;
   double x_loc,y_loc;
   double latitude,longitude;
 
@@ -9416,7 +9421,7 @@ void LSDJunctionNetwork::print_junctions_to_csv(LSDFlowInfo& FlowInfo, vector<in
   sources_out.open(fname.c_str());
   sources_out.precision(9);
 
-  sources_out << "junction,node,x,y,latitude,longitude,stream_order" << endl;
+  sources_out << "junction,node,x,y,latitude,longitude,stream_order,receiver_junction" << endl;
 
   // this is for latitude and longitude
   LSDCoordinateConverterLLandUTM Converter;
@@ -9433,10 +9438,12 @@ void LSDJunctionNetwork::print_junctions_to_csv(LSDFlowInfo& FlowInfo, vector<in
 
     // get the lat and long locations
     FlowInfo.get_lat_and_long_locations(row, col, latitude, longitude, Converter);
+    RJ = get_Receiver_of_Junction(JunctionList[i]);
 
     // print to file
     sources_out << JunctionList[i] << "," << this_node << "," << x_loc << ","
-                << y_loc << "," << latitude << "," << longitude << "," << StreamOrderVector[ JunctionList[i] ] << endl;
+                << y_loc << "," << latitude << "," << longitude << "," << StreamOrderVector[ JunctionList[i] ] 
+                << "," << RJ << endl;
 
   }
 
