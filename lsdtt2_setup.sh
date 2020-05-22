@@ -66,12 +66,12 @@ elif [ $choice -eq 3 ]; then
   fi
 elif [ $choice -eq 4 ]; then
   echo "You chose somewhere else."
-  echo "Please enter the full directory path, without trailing slash, where you want "
+  echo "Please enter the full directory path, without trailing slash, where you want to install LSDTopoTools"
   read choice_dir
   echo "Checking to see if"
   echo $choice_dir
   echo "exists"
-  if [ -f $choice_dir ]; then
+  if [ -d "$choice_dir" ]; then
     echo "The directory exists. Setting that as the LSDTopoTools base directory"
     BASE_DIR=$choice_dir
   else
@@ -101,7 +101,7 @@ WRK_DIR="$BASE_DIR/LSDTopoTools/LSDTopoTools2"
 DATA_DIR="$BASE_DIR/LSDTopoTools/data/ExampleTopoDatasets"
 
 # Make the LSDTopoTools directory if it doesn't exist
-if [ -f $LSD_DIR ]
+if [ -d $LSD_DIR ]
   then
     echo "LSDTopoTools directory exists!"
   else
@@ -139,7 +139,7 @@ while true; do
   read yn
   case $yn in
     [Yy]* ) echo "Okay, checking for data...";
-            if [ -f $DATA_DIR ]
+            if [ -d $DATA_DIR ]
               then
                 echo "The Example data already exists!."
               else
