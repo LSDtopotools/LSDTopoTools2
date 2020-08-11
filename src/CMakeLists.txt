@@ -77,6 +77,6 @@ include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
 install(
-  PROGRAMS ${EXE_FILES}
+  TARGETS ${EXE_FILES}
   DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
