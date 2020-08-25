@@ -5898,6 +5898,7 @@ void LSDCosmoData::print_scaling_and_shielding_complete_rasters()
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDCosmoData::print_basins_to_for_checking()
 {
+  cout << "I am going to print basins with valid cosmogenic points for you now." << endl;
   // first get the names of the DEMs:
   vector<string> dfnames = get_DEM_fnames();
   string DEM_bil_extension = "bil";
@@ -5933,7 +5934,9 @@ void LSDCosmoData::print_basins_to_for_checking()
     sources = FlowInfo.get_sources_index_threshold(ContributingPixels, source_threshold);
 
     // now get the junction network
+    cout << "Getting the junction network...";
     LSDJunctionNetwork JNetwork(sources, FlowInfo);
+    cout << "...got it." << endl;
     
     // print the stream order raster (to check against points)
     //LSDIndexRaster SO_raster = JNetwork.StreamOrderArray_to_LSDIndexRaster();
@@ -5942,8 +5945,9 @@ void LSDCosmoData::print_basins_to_for_checking()
 
     // Also print a csv of the channel nodes
     string channel_csv_name = DEM_fname+"_CN";
+    cout << "Bear with me while I print the junction network..." << endl;
     JNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
-
+    cout << "Finished printing channel network." << endl;
 
     // Now convert the data into this UTM zone
     convert_to_UTM(filled_raster);

@@ -155,7 +155,7 @@ void LSDChiNetwork::create(string channel_network_fname)
     if (channel_number != last_cn)
     {
 
-      cout << "new channel: " << channel_number << " last cn: " << last_cn << endl;
+      // cout << "new channel: " << channel_number << " last cn: " << last_cn << endl;
 
       node_indices.push_back(node_vec);
       row_indices.push_back(row_vec);
@@ -372,6 +372,7 @@ void LSDChiNetwork::create(LSDFlowInfo& FlowInfo, int SourceNode, int OutletNode
   // now move downstream
   while(current_node != OutletNode)
   {
+    // std::cout << current_node << std::endl;
     FlowInfo.retrieve_receiver_information(current_node,reciever_node, row, col);
     
     // catch the loop if the OutletNode is not on the flow path
@@ -401,6 +402,7 @@ void LSDChiNetwork::create(LSDFlowInfo& FlowInfo, int SourceNode, int OutletNode
     // set the current node to the reciever
     current_node = reciever_node;
   }
+  // cout << "size:" << node_vec.size() << endl;
   
   // update the data elements
   node_indices.push_back(node_vec);
@@ -2236,9 +2238,9 @@ void LSDChiNetwork::monte_carlo_split_channel(float A_0, float m_over_n, int n_i
     // get the length of this break
     length_of_break_segment = (*br_iter)-start_of_last_break+1;
 
-    //cout << "LSDCN Line 1772, break " << (*br_iter) << " and start of last break: " << start_of_last_break << endl;
+    // cout << "LSDCN Line 1772, break " << (*br_iter) << " and start of last break: " << start_of_last_break << endl;
     //cout << " and length of segment: " << length_of_break_segment << " and max length: " << max_nodes_in_section << endl;
-
+    // cout << "1" << endl;
     // if this break is longer than the maximum length of the
     // break segment, start the monte carlo algorithm to break it
     if (length_of_break_segment > max_nodes_in_section)
@@ -2316,7 +2318,7 @@ void LSDChiNetwork::monte_carlo_split_channel(float A_0, float m_over_n, int n_i
       // now run the monte carlo algotithm thorugh N iterations
       for (int iteration = 0; iteration < n_iterations; iteration++)
       {
-        //cout << "LSDCN Line 1841 iteration is: " << iteration << endl;
+        // cout << "LSDCN Line 1841 iteration is: " << iteration << endl;
 
         // now the vectors that will be replaced by the fitting algorithm
         // they are from the individual channels, which are replaced each time a new channel is analyzed
@@ -2338,12 +2340,14 @@ void LSDChiNetwork::monte_carlo_split_channel(float A_0, float m_over_n, int n_i
         vector<float> seg_number_per_node;
 
         // Run the monte carlo algorithm on the break segment
-
+        // cout << "1" << endl;
         LSDMostLikelyPartitionsFinder channel_MLE_finder(minimum_segment_length, br_chi, br_elev);
+        // cout << "2" << endl;
 
         // now thin the data, preserving the data (not interpolating)
         channel_MLE_finder.thin_data_monte_carlo_skip(mean_skip, skip_range, node_reference);
         n_data_nodes = node_reference.size();
+        // cout << "3" << endl;
 
         // now create a single sigma value vector
         vector<float> sigma_values;
@@ -2351,18 +2355,19 @@ void LSDChiNetwork::monte_carlo_split_channel(float A_0, float m_over_n, int n_i
 
         // compute the best fit AIC
         channel_MLE_finder.best_fit_driver_AIC_for_linear_segments(sigma_values);
+        // cout << "4" << endl;
 
         // get the segments
         channel_MLE_finder.get_data_from_best_fit_lines(0, sigma_values, b_vec, m_vec,
                     r2_vec, DW_vec, fitted_elev,these_segment_lengths,
                     this_MLE, this_n_segments, n_data_nodes, this_AIC, this_AICc);
 
-        //cout << "Line 1887, n_nodes: " << n_nodes << endl;
+        // cout << "Line 1887, n_nodes: " << n_nodes << endl;
 
         n_segments = int(b_vec.size());
         for(int seg = 0; seg<n_segments; seg++)
         {
-          //cout << "segment length: " << these_segment_lengths[seg] << endl;
+          // cout << "segment length: " << these_segment_lengths[seg] << endl;
           for(int n = 0; n < these_segment_lengths[seg]; n++)
           {
             m_per_node.push_back(m_vec[seg]);
@@ -2371,6 +2376,7 @@ void LSDChiNetwork::monte_carlo_split_channel(float A_0, float m_over_n, int n_i
           }
         }
         n_segements_each_iteration.push_back(this_n_segments);
+        // std::cout << "stop here" << std::endl;
 
         // now assign the values of these variable to the vecvecvecs
         for (int n = 0; n< n_data_nodes; n++)
@@ -2422,8 +2428,8 @@ void LSDChiNetwork::monte_carlo_split_channel(float A_0, float m_over_n, int n_i
       // now show the data
       //for (int br_node = 0; br_node < n_br; br_node++)
       //{
-      //  cout << "i: " << br_node << " b: " << b_means[br_node] << " m: " << m_means[br_node]
-      //     << " seg_num: " << seg_number_means[br_node] << endl;
+       // cout << "i: " << br_node << " b: " << b_means[br_node] << " m: " << m_means[br_node]
+          // << " seg_num: " << seg_number_means[br_node] << endl;
       //}
 
       // now we want to split the data. We do this where the segment number is intermediate
@@ -2464,26 +2470,28 @@ void LSDChiNetwork::monte_carlo_split_channel(float A_0, float m_over_n, int n_i
       //cout << " and after: " << *br_iter << endl;
 
     }    // finished attempting to break the segment
-
     else  // if the section is within the allowed node limit, move on to the next segment
     {
+      // cout << "1.99" << endl;
+
       start_of_last_break = (*br_iter)+1;
       br_iter++;
     }
+    // cout << "2" << endl;
 
   }
 
   // put the breaks into the break_nodes vector
   br_iter = breaks.begin();
   vector<int> br_nds;
-  //cout << "Entering the breaks"  << endl;
+  // cout << "Entering the breaks"  << endl;
   while(br_iter != breaks.end())
   {
     //cout << "break at: " << (*br_iter) << endl;
     br_nds.push_back( (*br_iter) );
     br_iter++;
   }
-  //cout << "Finished with the breaks" << endl;
+  // cout << "Finished with the breaks" << endl;
 
   break_nodes = br_nds;
   // now that you have the splits, it is time to accumulate the data
@@ -2832,7 +2840,7 @@ void LSDChiNetwork::split_all_channels(float A_0, float m_over_n, int n_iteratio
   // loop through the channels, breaking into smaller bits
   for (int chan = 0; chan<n_channels; chan++)
   {
-    //cout << "Splitting channel " << chan << endl;
+    // cout << "Splitting channel " << chan << endl;
     monte_carlo_split_channel(A_0, m_over_n, n_iterations, target_skip, target_nodes,
                               minimum_segment_length, sigma, chan, break_nodes);
 

@@ -97,7 +97,7 @@
 #include <map>
 #include <math.h>
 #include <string.h>
-#include <omp.h>
+// #include <omp.h>
 #include <ctime>
 #include <sys/stat.h>
 #include <stdint.h>

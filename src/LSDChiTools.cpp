@@ -949,6 +949,17 @@ void LSDChiTools::chi_map_automator(LSDFlowInfo& FlowInfo,
                                     int n_iterations, int skip,
                                     int minimum_segment_length, float sigma)
 {
+  // cout << "Starting here!!!" << endl;
+  // cout << "Sources:" << source_nodes.size() << endl;
+  // cout << "outlet_nodes:" << outlet_nodes.size() << endl;
+  // cout << "baselevel nodes:" << baselevel_node_of_each_basin.size() << endl;
+
+  // for(size_t i=0; i< source_nodes.size(); i++)
+  // {
+  //   std::cout << "source_nodes:" << source_nodes[i];
+  //   std::cout << "outlet_nodes:" << outlet_nodes[i];
+  //   std::cout << "baselevel_node_of_each_basin:" << baselevel_node_of_each_basin[i] << std::endl;
+  // }
 
   // IMPORTANT THESE PARAMETERS ARE NOT USED BECAUSE CHI IS CALCULATED SEPARATELY
   // However we need to give something to pass to the Monte carlo functions
@@ -1001,11 +1012,11 @@ void LSDChiTools::chi_map_automator(LSDFlowInfo& FlowInfo,
   int n_channels = int(source_nodes.size());
   for(int chan = 0; chan<n_channels; chan++)
   {
-    //cout << "Sampling channel " << chan+1 << " of " << n_channels << endl;
+    // cout << "Sampling channel " << chan+1 << " of " << n_channels << endl;
 
     // get the base level
     this_base_level = baselevel_node_of_each_basin[chan];
-    //cout << "Got the base level" << endl;
+    // cout << "Got the base level: " << this_base_level << endl;
 
     // If a key to this base level does not exist, add one.
     if ( this_key_to_baselevel_map.find(this_base_level) == this_key_to_baselevel_map.end() )
@@ -1013,7 +1024,7 @@ void LSDChiTools::chi_map_automator(LSDFlowInfo& FlowInfo,
       baselevel_tracker++;
       // this resets the ranked source node tracker
       ranked_source_node_tracker = -1;
-      //cout << "Found a new baselevel. The node is: " << this_base_level << " and key is: " << baselevel_tracker << endl;
+      // cout << "Found a new baselevel. The node is: " << this_base_level << " and key is: " << baselevel_tracker << endl;
       this_key_to_baselevel_map[this_base_level] = baselevel_tracker;
       ordered_baselevel_nodes.push_back(this_base_level);
 
@@ -1037,18 +1048,18 @@ void LSDChiTools::chi_map_automator(LSDFlowInfo& FlowInfo,
     // now add the source node to the data map
     this_key_to_source_map[this_source_node] = source_node_tracker;
 
-    //cout << "The source key is: " << source_node_tracker << " and basin key is: " << baselevel_tracker << endl;
+    // cout << "The source key is: " << source_node_tracker << " and basin key is: " << baselevel_tracker << endl;
 
     // get this particular channel (it is a chi network with only one channel)
     LSDChiNetwork ThisChiChannel(FlowInfo, source_nodes[chan], outlet_nodes[chan],
                                 Elevation, FlowDistance, DrainageArea,chi_coordinate);
 
     // split the channel
-    //cout << "Splitting channels" << endl;
+    // cout << "Splitting channels" << endl;
     ThisChiChannel.split_all_channels(A_0, m_over_n, n_iterations, skip, target_nodes, minimum_segment_length, sigma);
 
     // monte carlo sample all channels
-    //cout << "Entering the monte carlo sampling" << endl;
+    // cout << "Entering the monte carlo sampling" << endl;
     ThisChiChannel.monte_carlo_sample_river_network_for_best_fit_after_breaks(A_0, m_over_n, n_iterations, skip, minimum_segment_length, sigma);
 
     // okay the ChiNetwork has all the data about the m vales at this stage.
@@ -1072,7 +1083,7 @@ void LSDChiTools::chi_map_automator(LSDFlowInfo& FlowInfo,
     these_chi_coordinates = chi_coordinates[0];
     these_chi_node_indices = chi_node_indices[0];
 
-    //cout << "I have " << these_chi_m_means.size() << " nodes." << endl;
+    // cout << "I have " << these_chi_m_means.size() << " nodes." << endl;
 
 
     int n_nodes_in_channel = int(these_chi_m_means.size());

@@ -86,7 +86,7 @@
 #include "LSDChiNetwork.hpp"
 using namespace std;
 using namespace TNT;
-#include "omp.h"
+// #include "omp.h"
 
 
 /// @brief This object packages a number of tools for chi analysis

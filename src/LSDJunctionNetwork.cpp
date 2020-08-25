@@ -3704,7 +3704,10 @@ void LSDJunctionNetwork::write_valley_hilltop_chi_profiles_to_csv(vector<int> so
 		// get the LSDChannel
 		LSDChannel new_channel(hilltop_node, final_node, downslope_chi, m_over_n, A_0, FlowInfo, ElevationRaster);
 		// write to csv
-		string jn_str = static_cast<ostringstream*>( &(ostringstream() << source_junction) )->str();
+    // B.G Changing that line on the 17th of June 2020, cause modern compilers post 1990s struggle with it
+    // string jn_str = static_cast<ostringstream*>( &(ostringstream() << source_junction) )->str();
+		string jn_str = to_string(source_junction);
+
 		string output_csv_filename = DEM_ID+"_chan_profile_"+jn_str;
 		new_channel.write_channel_to_csv(output_path, output_csv_filename, FlowDistance);
 	}
@@ -5514,6 +5517,8 @@ LSDIndexRaster LSDJunctionNetwork::ChannelIndexer(LSDFlowInfo& flowinfo)
   int g = 0;  //ints to store the row and col of the current px
   int h = 0;
 
+  cout << "I am indexing all the channels." << endl;
+
   for (int q = 1; q < NJunctions; ++q){
 
     if (q % 100 == 0){
@@ -5587,6 +5592,7 @@ void LSDJunctionNetwork::GetChannelNodesAndJunctions(LSDFlowInfo& flowinfo, vect
 
   //cout << "I am going to go through " << NJunctions << " Junctions for you." << endl;
 
+  cout << "I am getting the channel nodes and junctions." << endl;
   for (int q = 0; q < NJunctions; ++q)
   {
 
@@ -5655,6 +5661,7 @@ void LSDJunctionNetwork::GetChannelNodesAndJunctions(LSDFlowInfo& flowinfo, vect
   //cout << "Okay, I've got the nodes" << endl;
 
 
+  cout << "Finished getting the nodes and junctions." << endl;
   NIvec = NI_vector;
   JIvec = JI_vector;
   SOvec = SO_vector;
@@ -5673,6 +5680,7 @@ map<int,bool> LSDJunctionNetwork::GetMapOfChannelNodes(LSDFlowInfo& flowinfo)
   int row = 0;  //ints to store the row and col of the current px
   int col = 0;
 
+  cout << "I am making a map of all the nodes in the channel." << endl;
   //cout << "I am going to go through " << NJunctions << " Junctions for you." << endl;
 
   for (int q = 0; q < NJunctions; ++q)
@@ -6924,9 +6932,9 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV(LSDFlowInfo& flowinfo, string 
     flowinfo.retrieve_current_row_and_col(this_NI,row,col);
     get_lat_and_long_locations(row, col, latitude, longitude, Converter);
     flowinfo.retrieve_receiver_information(this_NI, receiver_NI);
-    RJ = get_Receiver_of_Junction(node);
+    RJ = get_Receiver_of_Junction(JIvec[node]);
 
-    WriteData << latitude << "," << longitude << "," << node << "," << SOvec[node] << "," << NIvec[node] << "," << receiver_NI << "," << RJ <<endl;
+    WriteData << latitude << "," << longitude << "," << JIvec[node] << "," << SOvec[node] << "," << NIvec[node] << "," << receiver_NI << "," << RJ <<endl;
 
   }
 
@@ -6975,8 +6983,8 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV_nolatlon(LSDFlowInfo& flowinfo
     flowinfo.retrieve_receiver_information(this_NI, receiver_NI);
     this_elev = elevation.get_data_element(row,col);
     flowinfo.get_x_and_y_locations(row,col,X,Y);
-    RJ = get_Receiver_of_Junction(node);
-    WriteData << X << "," << Y << "," << node << "," << SOvec[node] << "," << NIvec[node] << "," << this_elev << "," << receiver_NI << ","<< RJ << endl;
+    RJ = get_Receiver_of_Junction(JIvec[node]);
+    WriteData << X << "," << Y << "," << JIvec[node] << "," << SOvec[node] << "," << NIvec[node] << "," << this_elev << "," << receiver_NI << ","<< RJ << endl;
 
   }
 
@@ -7029,9 +7037,9 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV_WithElevation(LSDFlowInfo& flo
     get_lat_and_long_locations(row, col, latitude, longitude, Converter);
     flowinfo.retrieve_receiver_information(this_NI, receiver_NI);
     this_elev = Elevation.get_data_element(row,col);
-    RJ = get_Receiver_of_Junction(node);
+    RJ = get_Receiver_of_Junction(JIvec[node]);
 
-    WriteData << latitude << "," << longitude << "," << node << "," << SOvec[node] << "," << NIvec[node] << "," << receiver_NI << "," << this_elev << "," << RJ << endl;
+    WriteData << latitude << "," << longitude << "," << JIvec[node] << "," << SOvec[node] << "," << NIvec[node] << "," << receiver_NI << "," << this_elev << "," << RJ << endl;
 
   }
 

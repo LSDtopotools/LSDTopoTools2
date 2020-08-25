@@ -676,14 +676,17 @@ void LSDMostLikelyPartitionsFinder::print_x_y_data_to_screen()
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 void LSDMostLikelyPartitionsFinder::best_fit_driver_AIC_for_linear_segments(vector<float> sigma_values)
 {
-  //cout << "best_fit_driver_AIC_for_linear_segments, getting like data" <<endl;
+  // cout << "best_fit_driver_AIC_for_linear_segments, getting like data" <<endl;
   calculate_segment_matrices(base_sigma);
-  //cout << "best_fit_driver_AIC_for_linear_segments, got like data" <<endl;
+  // cout << "best_fit_driver_AIC_for_linear_segments, got like data" <<endl;
 
   // get the maximum liklihood of segments
   find_max_like_of_segments();
 
+  // cout << "||" << endl;
+
   get_n_segments_for_various_sigma(sigma_values);
+  // cout << "!!" << endl;
 
   //print_AIC_and_AICc_to_screen(sigma_values);
 
@@ -1003,8 +1006,8 @@ void LSDMostLikelyPartitionsFinder::find_max_like_of_segments()
   int n_data_points = like_array.dim1();
   if (minimum_segment_length>n_data_points)
   {
-    //cout << "LSDStatsTools find_max_AIC_of_segments: your segment length is greater than the number of data points" << endl;
-    //cout << "This means that there can only be overlapping segments. Changing segment length to minimum segment length "<< endl;
+    cout << "LSDStatsTools find_max_AIC_of_segments: your segment length is greater than the number of data points" << endl;
+    cout << "This means that there can only be overlapping segments. Changing segment length to minimum segment length "<< endl;
     minimum_segment_length = n_data_points;
   }
 
@@ -1029,10 +1032,10 @@ void LSDMostLikelyPartitionsFinder::find_max_like_of_segments()
 
     partition_vecvec = partitions[n_elem];
     int n_partitions_this_nsegments = partition_vecvec.size();
-    //cout << "n_segments: " << n_elem+1 << " and number of partitions of this n segments: " << n_partitions_this_nsegments << endl;
+    // cout << "n_segments: " << n_elem+1 << " and number of partitions of this n segments: " << n_partitions_this_nsegments << endl;
     for (int n_partition = 0; n_partition< n_partitions_this_nsegments; n_partition++)
     {
-      //cout << "number of partitions: " << n_partition+1 << " of " << n_partitions_this_nsegments << endl;
+      // cout << "number of partitions: " << n_partition+1 << " of " << n_partitions_this_nsegments << endl;
       vector<int> individual_partition = partition_vecvec[n_partition];
       int n_elements = individual_partition.size();
 

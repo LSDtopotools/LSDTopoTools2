@@ -42,6 +42,7 @@ set(LIB_HEADERS
   LSDRasterInfo.hpp
   LSDRasterMaker.hpp 
   LSDRasterSpectral.hpp  
+  LSDSoilHydroRaster.hpp
   LSDStatsTools.hpp
   LSDShapeTools.hpp 
   LSDSpatialCSVReader.hpp
