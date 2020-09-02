@@ -3,7 +3,7 @@
 // lsdtt-hillslope-channel-coupling.cpp
 //
 // This programme combines the chi analysis of Mudd et al. 2014 and the hillslope analysis
-// of Hurst et al 2012 and Grieve et al. 2016 to allow combined topographic analysis comparing hillslope and 
+// of Hurst et al 2012 and Grieve et al. 2016 to allow combined topographic analysis comparing hillslope and
 // channel metrics for erosion rate in order to explore landscape morphology and transience.
 //
 // This program was first deployed in Hurst et al., 2019 EPSL
@@ -85,9 +85,9 @@ int main (int nNumberofArgs,char *argv[])
   cout << "|| This program was developed by Martin D. Hurst       ||" << endl;
   cout << "||  at the University of Glasgow                       ||" << endl;
   cout << "|| and Simon M. Mudd                                   ||" << endl;
-  cout << "||  at the University of Edinburgh                     ||" << endl;    
-  cout << "=========================================================" << endl;   
-  cout << "|| If you use these routines please cite:              ||" << endl;   
+  cout << "||  at the University of Edinburgh                     ||" << endl;
+  cout << "=========================================================" << endl;
+  cout << "|| If you use these routines please cite:              ||" << endl;
   cout << "|| Hurst et al., 2019, Detection of channel-hillslope  ||" << endl;
   cout << "|| coupling along a tectonic gradient, EPSL, 522, 30-39||" << endl;
   cout << "|| , https://doi.org/10.1016/j.epsl.2019.06.018        ||" << endl;
@@ -141,14 +141,14 @@ int main (int nNumberofArgs,char *argv[])
 
   // Input filenames
   string_default_map["ChannelSegments_file"] = "NULL";
-	string_default_map["Floodplain_file"] = "NULL";  
+	string_default_map["Floodplain_file"] = "NULL";
   string_default_map["CHeads_file"] = "NULL";
   bool_default_map["get_basins_from_outlets"] = false;
   int_default_map["search_radius_nodes"] = 8;
   string_default_map["BaselevelJunctions_file"] = "NULL";
   string_default_map["basin_outlet_csv"] = "NULL";
 
-  // Selecting basins 
+  // Selecting basins
   int_default_map["minimum_basin_size_pixels"] = 1000;
   bool_default_map["extend_channel_to_node_before_receiver_junction"] = true;
   bool_default_map["test_drainage_boundaries"] = false;
@@ -177,6 +177,9 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["write_hillslope_length"] = false;
   bool_default_map["write_hillslope_gradient"] = false;
   bool_default_map["write_hillslope_relief"] = false;
+  // set these if you want to read in a premade curvature raster
+  bool_default_map["read_curvature_raster"] = false;
+  string_default_map["curvature_fname"] = "NULL";
 
 
  	// these params do not need changed during normal use of the HFR algorithm
@@ -202,7 +205,7 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["burn_raster_to_csv"] = false;
   string_default_map["burn_raster_prefix"] = "NULL";
   string_default_map["burn_data_csv_column_header"] = "burned_data";
-    
+
   // This burns a secondary raster value to any csv output of chi data
   // Useful when there are two datasets, e.g., precipitation data and geology data
   bool_default_map["secondary_burn_raster_to_csv"] = false;
@@ -306,7 +309,7 @@ int main (int nNumberofArgs,char *argv[])
   secondary_burn_raster_header = DATA_DIR+this_string_map["secondary_burn_raster_prefix"]+".hdr";
   secondary_burn_prefix = DATA_DIR+this_string_map["secondary_burn_raster_prefix"];
 
-  
+
   if (this_bool_map["burn_raster_to_csv"])
   {
     cout << "I am going to burn a raster to all your csv files. The header name for this raster is: " << endl;
@@ -329,12 +332,12 @@ int main (int nNumberofArgs,char *argv[])
     this_bool_map["burn_raster_to_csv"] = false;
   }
 
-  // Adding a second burn raster    
+  // Adding a second burn raster
   if (this_bool_map["burn_raster_to_csv"])
   {
     if (this_bool_map["secondary_burn_raster_to_csv"])
     {
-    
+
       cout << "I am going to burn a secondary raster to all your csv files. The header name for this raster is: " << endl;
       cout <<  secondary_burn_raster_header << endl;
     }
@@ -369,7 +372,7 @@ int main (int nNumberofArgs,char *argv[])
   // LOAD THE DEM
   //
   //============================================================================
-  //============================================================================  
+  //============================================================================
   LSDRaster topography_raster;
   if (this_bool_map["remove_seas"])
   {
@@ -410,7 +413,7 @@ int main (int nNumberofArgs,char *argv[])
   // Start gathering necessary rasters
   //
   //============================================================================
-  //============================================================================  
+  //============================================================================
   LSDRaster filled_topography;
   // now get the flow info object
   if ( this_bool_map["raster_is_filled"] )
@@ -431,7 +434,6 @@ int main (int nNumberofArgs,char *argv[])
     filled_topography.write_raster(filled_raster_name,raster_ext);
   }
 
-	//Surface fitting to get slope, aspect, curvature and planform curvature
 	static const int Arr[] = {0,1,1,1,1,0,0,0};
 	vector<int> RasterSelection (Arr, Arr + sizeof(Arr) / sizeof(Arr[0]));
   cout << endl << endl << "=========================================" << endl;
@@ -443,6 +445,14 @@ int main (int nNumberofArgs,char *argv[])
 	vector<LSDRaster> Surfaces = filled_topography.calculate_polyfit_surface_metrics(this_float_map["surface_fitting_radius"], RasterSelection);
   LSDRaster Aspect = Surfaces[2];
 
+  //Surface fitting to get slope, aspect, curvature and planform curvature
+  if (this_bool_map["read_curvature_raster"])
+  {
+    cout << "I'm reading in a pre-calculated curvature raster." << endl;
+    cout << "NOTE: This will overwrite the curvature calculated through polynomial surface fitting" << endl;
+    LSDRaster curvature_raster((DATA_DIR+this_string_map["curvature_fname"]),raster_ext);
+    Surfaces[3] = curvature_raster;
+  }
 
   cout << "\t Flow routing..." << endl;
   // get a flow info object
@@ -467,7 +477,7 @@ int main (int nNumberofArgs,char *argv[])
 
   cout << "\t Loading Sources..." << endl;
   cout << "\t Source file is... " << CHeads_file << endl;
-  
+
   // load the sources
   vector<int> sources;
   if (CHeads_file == "NULL" || CHeads_file == "Null" || CHeads_file == "null")
@@ -523,7 +533,7 @@ int main (int nNumberofArgs,char *argv[])
   {
     cout << endl << endl << endl;
     cout << endl << "\t\t==================================" << endl;
-    cout << "\t\tI found a channel head filename. " << endl; 
+    cout << "\t\tI found a channel head filename. " << endl;
     cout << "\t\tLoading channel heads from the file: " << DATA_DIR+CHeads_file << endl;
     cout << "\t\tWarning: if you got the filename wrong this won't work." << endl;
     sources = FlowInfo.Ingest_Channel_Heads((DATA_DIR+CHeads_file), "csv",2);
@@ -556,7 +566,7 @@ int main (int nNumberofArgs,char *argv[])
     JunctionNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
 
     // convert to geojson if that is what the user wants
-    
+
     // It is read more easily by GIS software but has bigger file size
     if ( this_bool_map["convert_csv_to_geojson"])
     {
@@ -602,7 +612,7 @@ int main (int nNumberofArgs,char *argv[])
       thiscsv.print_data_to_geojson(gjson_name);
     }
   }
-  
+
   // Print stream order rasters if you want them
   if (this_bool_map["print_stream_order_raster"])
   {
@@ -740,7 +750,7 @@ int main (int nNumberofArgs,char *argv[])
   cout << "\tPruning junctions that drain to the edge of the DEM..." << endl;
   BaseLevelJunctions = JunctionNetwork.Prune_Junctions_Edge_Ignore_Outlet_Reach(BaseLevelJunctions_Initial, FlowInfo, filled_topography);
 
-  // Now we get channel segments for use with chi plotting. 
+  // Now we get channel segments for use with chi plotting.
   vector<int> source_nodes;
   vector<int> outlet_nodes;
   vector<int> baselevel_node_of_each_basin;
@@ -789,7 +799,7 @@ int main (int nNumberofArgs,char *argv[])
   {
     cout << "I am calculating the chi coordinate." << endl;
     chi_coordinate = FlowInfo.get_upslope_chi_from_all_baselevel_nodes(this_float_map["m_over_n"],this_float_map["A_0"],this_int_map["threshold_contributing_pixels"]);
-  
+
     // Print the basin raster if you want it:
     if(this_bool_map["print_basin_raster"])
     {
@@ -814,10 +824,10 @@ int main (int nNumberofArgs,char *argv[])
       ChiTool.chi_map_automator_chi_only(FlowInfo, source_nodes, outlet_nodes, baselevel_node_of_each_basin,
                               filled_topography, DistanceFromOutlet,
                               DrainageArea, chi_coordinate);
-  
+
       string chi_data_maps_string = OUT_DIR+OUT_ID+"_chi_data_map.csv";
       ChiTool.print_chi_data_map_to_csv(FlowInfo, chi_data_maps_string);
-  
+
       if ( this_bool_map["convert_csv_to_geojson"])
       {
         string gjson_name = OUT_DIR+OUT_ID+"_chi_data_map.geojson";
@@ -828,7 +838,7 @@ int main (int nNumberofArgs,char *argv[])
     //======================================================================
 
 
-    // This does all the segmenting. 
+    // This does all the segmenting.
     // It uses a chi coordinate raster that has been inherited from earlier in this
     // program
     if (this_bool_map["print_segmented_M_chi_map_to_csv"])
@@ -873,19 +883,19 @@ int main (int nNumberofArgs,char *argv[])
       string csv_full_fname = OUT_DIR+OUT_ID+"_MChiSegmented.csv";
       cout << "Let me print all the data for you into a csv file called " << csv_full_fname << endl;
       ChiTool.print_data_maps_to_file_full(FlowInfo, csv_full_fname);
-      
+
       //adding burned raster data to MChiSegmented output
-      if (this_bool_map["burn_raster_to_csv"])  
-      {  
+      if (this_bool_map["burn_raster_to_csv"])
+      {
           cout << "You asked me to burn a raster to the csv, I'm attemping to add this to your MChiSegmented output.";
           if(burn_raster_exists)
           {
-              string header_for_burn_data = this_string_map["burn_data_csv_column_header"];        
+              string header_for_burn_data = this_string_map["burn_data_csv_column_header"];
               LSDSpatialCSVReader CSVFile(RI,csv_full_fname);
-          
+
               cout << "I am burning the raster to the csv file." << endl;
               CSVFile.burn_raster_data_to_csv(BurnRaster,header_for_burn_data);
-          
+
               string csv_full_fname_burned = OUT_DIR+OUT_ID+"_MChiSegmented_burned.csv";
               cout << "Now I'll print the data to a new file" << endl;
               CSVFile.print_data_to_csv(csv_full_fname_burned);
@@ -900,13 +910,13 @@ int main (int nNumberofArgs,char *argv[])
           cout << "You asked me to burn a secondary raster to the csv, attemping to add to MChiSegmented output.";
           if(secondary_burn_raster_exists)
           {
-              string header_for_burn_data = this_string_map["secondary_burn_data_csv_column_header"];        
+              string header_for_burn_data = this_string_map["secondary_burn_data_csv_column_header"];
               string csv_full_fname_burned = OUT_DIR+OUT_ID+"_MChiSegmented_burned.csv";
               LSDSpatialCSVReader CSVFile(RI,csv_full_fname_burned);
-          
+
               cout << "I am burning the secondary raster to the csv file." << endl;
               CSVFile.burn_raster_data_to_csv(SecondaryBurnRaster,header_for_burn_data);
-          
+
               cout << "Now I'll print the data to a new file" << endl;
               CSVFile.print_data_to_csv(csv_full_fname_burned);
           }
@@ -968,7 +978,7 @@ int main (int nNumberofArgs,char *argv[])
     cout << "\tRunning hillslope flow routing. You might want to find a good book..." << endl;
     string HillslopeTracesFolder = DATA_DIR;
     vector< Array2D<float> > HFR_Arrays = FlowInfo.HilltopFlowRouting(filled_topography, Hilltops, Surfaces[1], Surfaces[2], Surfaces[3], Surfaces[4], StreamNetwork, BasinsRaster, (DATA_DIR+DEM_ID), this_bool_map["print_hillslope_traces"], this_int_map["hillslope_trace_thinning"], HillslopeTracesFolder, this_bool_map["hillslope_traces_basin_filter"], Target_Basin_Vector);
-    cout << "\tDone" << endl;  
+    cout << "\tDone" << endl;
 
     //hilltops
     if (this_bool_map["write_hilltops"])

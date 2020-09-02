@@ -24,7 +24,9 @@ std::ostream& operator<<(std::ostream &s, const Array3D<T> &A)
         for (int j=0; j<N; j++)
         {
 			for (int k=0; k<K; k++)
+			{
             	s << A[i][j][k] << " ";
+			}
 			s << "\n";
         }
         s << "\n";
@@ -45,9 +47,15 @@ std::istream& operator>>(std::istream &s, Array3D<T> &A)
 	Array3D<T> B(M,N,K);
 
     for (int i=0; i<M; i++)
+	{
         for (int j=0; j<N; j++)
+		{
 			for (int k=0; k<K; k++)
+			{
             	s >>  B[i][j][k];
+			}
+		}
+	}
 
 	A = B;
     return s;
@@ -70,9 +78,15 @@ Array3D<T> operator+(const Array3D<T> &A, const Array3D<T> &B)
 		Array3D<T> C(m,n,p);
 
 		for (int i=0; i<m; i++)
+		{
 			for (int j=0; j<n; j++)
+			{
 				for (int k=0; k<p; k++)
-				C[i][j][k] = A[i][j][k] + B[i][j][k];
+				{
+					C[i][j][k] = A[i][j][k] + B[i][j][k];
+				}
+			}
+		}
 
 		return C;
 	}
@@ -94,9 +108,15 @@ Array3D<T> operator-(const Array3D<T> &A, const Array3D<T> &B)
 		Array3D<T> C(m,n,p);
 
 		for (int i=0; i<m; i++)
+		{
 			for (int j=0; j<n; j++)
+			{
 				for (int k=0; k<p; k++)
-				C[i][j][k] = A[i][j][k] - B[i][j][k];
+				{
+					C[i][j][k] = A[i][j][k] - B[i][j][k];
+				}
+			}
+		}
 
 		return C;
 	}

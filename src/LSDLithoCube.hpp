@@ -16,6 +16,7 @@
 #include <fstream>
 #include <iomanip>
 #include <vector>
+#include <list>
 #include <string>
 #include "TNT/tnt.h"
 #include "LSDRaster.hpp"
@@ -75,11 +76,12 @@ class LSDLithoCube
 
     /// @brief This takes an elevation raster and writes the layer to a raster
     /// @param ElevationRaster A raster of elevations
+    /// @param forbidden_codes The lithocodes that cannot be kept in the raster (e.g., and air code)
     /// @param fname the filename (without extension but with path)
     /// @param f_ext the raster extension (almost always bil)
     /// @author SMM
     /// @date 30/01/2020
-    void write_litho_raster_from_elevations(LSDRaster& ElevationRaster, string fname, string f_ext);
+    void write_litho_raster_from_elevations(LSDRaster& ElevationRaster, list<int> forbidden_codes, string fname, string f_ext);
 
     /// @brief Impose UTM georeferencing strings
     /// @param zone The UTM zone
@@ -138,6 +140,19 @@ class LSDLithoCube
     /// @date 30/01/2020
     int get_layer_from_elevation(float elevation);
 
+    /// @brief Gets the lithocode from a location. 
+    /// @detail Includes logic to drill through forbidden lithocode values until
+    ///  it finds a valid value
+    /// @param LLayer the starting layer
+    /// @param LRow the row in the lithocube
+    /// @param LCol the col in the lithocube
+    /// @param forbidden_codes the list of codes that are not allowed to be returned
+    ///  for example if you want to remove "air" or quaternary pixels in the lithocube
+    /// @return the lithocode
+    /// @author SMM
+    /// @date 31/08/2020
+    int get_lithocode_from_location(int LLayer, int LRow, int LCol, list<int> forbidden_codes);
+
     /// @brief Takes an elevation raster and returns an erodibility raster
     /// @param ElevationRaster A raster of elevations
     /// @return a raster of erodbility (K) values
@@ -151,10 +166,18 @@ class LSDLithoCube
     /// @date 30/01/2020
     void read_strati_to_K_csv(string lookup_filename);
 
-    /// @brief Fills a map with stratigraphy code (key) and corresponding K (value)
-    /// @author ELSG
-    /// @date 30/01/2020
-    void fill_strati_to_K_map();
+
+    /// @brief Reads in a csv file (lookup table for stratigrapy code and Sc value)
+    /// @param lookup_filename
+    /// @author SMM
+    /// @date 31/08/2020
+    void read_strati_to_Sc_csv(string lookup_filename);
+
+    /// @brief Prints the K and Sc code to screen
+    /// @author SMM
+    /// @date 31/08/2020
+    void print_K_and_Sc_maps_to_screen();
+
 
     /// @brief Fills a map with stratigraphy code (key) and corresponding K (value)
     /// @author ELSG
@@ -174,10 +197,11 @@ class LSDLithoCube
 
     /// @brief This takes an elevation raster and gets a stratigraphic layer raster
     /// @param ElevationRaster A raster of elevations
+    /// @param forbidden_codes A list of forbidden lithocube codes (e.g., for removing air from codes)
     /// @return StratData The raster containing the stratigraphic information
     /// @author SMM
     /// @date 30/01/2020
-    LSDIndexRaster get_lithology_codes_from_raster(LSDRaster& ElevationRaster );
+    LSDIndexRaster get_lithology_codes_from_raster(LSDRaster& ElevationRaster, list<int> forbidden_codes );
 
     /// @brief This takes an elevation raster and writes a K raster
     /// @param ElevationRaster A raster of elevations

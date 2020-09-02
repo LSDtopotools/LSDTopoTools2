@@ -1937,6 +1937,26 @@ LSDSpatialCSVReader LSDRasterModel::get_channels_for_burning(int contributing_pi
   return source_points_data;
 }
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Cap elevations using an initial raster
+//------------------------------------------------------------------------------
+void LSDRasterModel::cap_elevations(LSDRaster& InitialRaster)
+{
+  for(int row=0; row<NRows; ++row)
+  {
+    for(int col=0; col<NCols; ++col)
+    {
+      if(RasterData[row][col]!=NoDataValue)
+      {
+        if (RasterData[row][col] > InitialRaster.get_data_element(row,col))
+        {
+          RasterData[row][col] = InitialRaster.get_data_element(row,col);
+        }
+      }
+    }
+  }  
+}
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // CALCULATE EROSION RATES

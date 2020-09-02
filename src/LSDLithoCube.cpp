@@ -16,9 +16,11 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <list>
 #include <string>
 #include <ctime>
 #include <cmath>
+#include <algorithm>
 #include "TNT/tnt.h"
 #include "LSDRaster.hpp"
 #include "LSDIndexRaster.hpp"
@@ -45,6 +47,7 @@ void LSDLithoCube::create()
 
   int zone = 1;
   string NorS = "N";
+  impose_georeferencing_UTM(zone, NorS);
 
   loaded_vo_file = false;
 }
@@ -254,9 +257,15 @@ void LSDLithoCube::ingest_vo_file(string filename)
   vector<string> lines;
   string str;
 
-  int n_rows, n_cols, n_layers;
-  float x_dim, y_dim, z_dim;
-  float x_min, y_min, z_min;
+  int n_rows = 0;
+  int n_cols = 0;
+  int n_layers = 0;
+  float x_dim = 0;
+  float y_dim = 0;
+  float z_dim = 0;
+  float x_min = 0;
+  float y_min = 0;
+  float z_min = 0;
 
   string axis_n = "AXIS_N";
   string xd = "AXIS_U";
@@ -474,13 +483,13 @@ void LSDLithoCube::write_litho_raster_from_layer(int layer, string fname, string
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
-// This prints a layter as a raster
+// This prints a layer as a raster
 //
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDLithoCube::write_litho_raster_from_elevations(LSDRaster& ElevationRaster, string fname, string f_ext)
+void LSDLithoCube::write_litho_raster_from_elevations(LSDRaster& ElevationRaster, list<int> forbidden_codes, string fname, string f_ext)
 {
-
-  LSDIndexRaster Layer_raster = get_lithology_codes_from_raster(ElevationRaster );
+ 
+  LSDIndexRaster Layer_raster = get_lithology_codes_from_raster(ElevationRaster, forbidden_codes);
   Layer_raster.write_raster(fname,f_ext);
   
 }
@@ -555,7 +564,7 @@ bool LSDLithoCube::check_if_point_is_in_raster(float X_coordinate,float Y_coordi
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 int LSDLithoCube::get_layer_from_elevation(float elevation)
 {
-  float ZMaximum = float(NLayers)*ZSpacing+ZMinimum;
+  //float ZMaximum = float(NLayers)*ZSpacing+ZMinimum;
   int this_layer = 0;
 
   this_layer = floor( (elevation-ZMinimum)/ZSpacing );
@@ -576,10 +585,51 @@ int LSDLithoCube::get_layer_from_elevation(float elevation)
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
+// This gets a lithocode from a location
+// It has logic to "drill" down the lithocube so that it returns the 
+// topmost allowed values
+// the forbidden values are in the list called forbidden_codes
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+int LSDLithoCube::get_lithocode_from_location(int LLayer, int LRow, int LCol, list<int> forbidden_codes)
+{
+
+  int this_lcode = LithoLayers[LLayer][LRow][LCol];
+
+  //cout << "Here are the forbidden lithocodes" << endl;
+  //list<int>::iterator it;
+  //for (it = forbidden_codes.begin(); it != forbidden_codes.end(); ++it)
+  // {
+  //  cout << *it << endl;
+  //}
+
+
+  if (forbidden_codes.size() > 0)
+  {
+    
+    int this_layer = LLayer;
+    // cout << "This lithocode is: " << this_lcode << endl;
+    while (  (find(forbidden_codes.begin(),forbidden_codes.end(),this_lcode) != forbidden_codes.end()) && this_layer > 0)
+    {
+      // cout << "Got a forbidden code! Let me dig a layer!" << endl;
+      this_layer--;
+      this_lcode = LithoLayers[this_layer][LRow][LCol];
+      // cout << "New layer is: " << this_layer << " and new code is: " << this_lcode << endl;
+    } 
+  }
+    
+  return this_lcode;
+
+}
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
 // This takes an elevation raster and gets a stratigraphic layer raster
 //
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-LSDIndexRaster LSDLithoCube::get_lithology_codes_from_raster(LSDRaster& ElevationRaster )
+LSDIndexRaster LSDLithoCube::get_lithology_codes_from_raster(LSDRaster& ElevationRaster, list<int> forbidden_codes)
 {
   vector<float> Eastings;
   vector<float> Northings;
@@ -629,7 +679,7 @@ LSDIndexRaster LSDLithoCube::get_lithology_codes_from_raster(LSDRaster& Elevatio
           XY_to_rowcol_careful(Eastings[col],Northings[row],LRow, LCol, true);
           if (LRow == -9999 || LCol == -9999)
           {
-            cout << "well shit";
+            cout << "I am afraid this pixel does not seem to be within the lithocube.";
           }
           // cout << "D";
           this_layer = get_layer_from_elevation(ElevationRaster.get_data_element(row,col)); // this is where you change the relative uplift in a hacky way yo!!!!! < ----
@@ -637,7 +687,7 @@ LSDIndexRaster LSDLithoCube::get_lithology_codes_from_raster(LSDRaster& Elevatio
 
           // if(LRow < 0 || LRow >= NRows || LCol < 0 || LCol>= NCols )
           //cout << "LRow is " << LRow << " LCol is" << LCol << " row is" << row << " col is " << col << std::endl;
-          lithocode[row][col] = LithoLayers[this_layer][LRow][LCol];
+          lithocode[row][col] = get_lithocode_from_location(this_layer, LRow, LCol, forbidden_codes);
           // cout << "F";
         }
         else
@@ -715,8 +765,8 @@ LSDRaster LSDLithoCube::index_to_K(LSDIndexRaster& index_raster, float default_K
 {
   Array2D<float> data_K(index_raster.get_NRows(),index_raster.get_NCols(), default_K);
 
-  for(size_t row=0;row<index_raster.get_NRows();row++)
-  for(size_t col=0;col<index_raster.get_NCols();col++)
+  for(int row=0;row<index_raster.get_NRows();row++)
+  for(int col=0;col<index_raster.get_NCols();col++)
   {
     if(StratiToK.count(index_raster.get_data_element(row,col))>0)
     {
@@ -737,8 +787,8 @@ LSDRaster LSDLithoCube::index_to_Sc(LSDIndexRaster& index_raster, float default_
 {
   Array2D<float> data_Sc(index_raster.get_NRows(),index_raster.get_NCols(), default_Sc);
 
-  for(size_t row=0;row<index_raster.get_NRows();row++)
-  for(size_t col=0;col<index_raster.get_NCols();col++)
+  for(int row=0;row<index_raster.get_NRows();row++)
+  for(int col=0;col<index_raster.get_NCols();col++)
   {
     if(StratiToSc.count(index_raster.get_data_element(row,col))>0)
     {
@@ -773,8 +823,12 @@ void LSDLithoCube::write_K_raster_from_elevations(LSDRaster& ElevationRaster, st
 // Reads in a csv file
 //
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDLithoCube::read_strati_to_K_csv(string lookup_filename) {
+void LSDLithoCube::read_strati_to_K_csv(string lookup_filename) 
+{
 
+  cout << "I am reading a lithocode to K value file." << endl;
+  cout << "This needs to be a csv, and it uses a header." << endl;
+  
   // Open the file
   ifstream data_in;
   data_in.open(lookup_filename.c_str());
@@ -795,6 +849,8 @@ void LSDLithoCube::read_strati_to_K_csv(string lookup_filename) {
   
   int this_strati_code;
   float this_K;
+
+  map<int,float> TempStratiToK;
   
   while (getline(data_in, str)) 
   {
@@ -815,19 +871,92 @@ void LSDLithoCube::read_strati_to_K_csv(string lookup_filename) {
       
       
         cout << "Strati code: " << this_strati_code << " K: " << this_K << endl;
-        }
+        TempStratiToK[this_strati_code] = this_K;
+      }
     }
   }
 
+  StratiToK = TempStratiToK;
+
+}
+
+void LSDLithoCube::read_strati_to_Sc_csv(string lookup_filename) 
+{
+
+  cout << "I am reading a lithocode to K value file." << endl;
+  cout << "This needs to be a csv, and it uses a header." << endl;
+
+  // Open the file
+  ifstream data_in;
+  data_in.open(lookup_filename.c_str());
+
+  // check if the parameter file exists
+  if( data_in.fail() )
+  {
+    cout << "\nFATAL ERROR: The file \"" << lookup_filename
+         << "\" doesn't exist" << endl;
+    exit(EXIT_FAILURE);
+  }    
+
+  // get the header. Print and discard.
+  string str;
+  getline(data_in,str);
+  cout << "The header is: " << str << endl;
+  cout << "Let me get the data for you." << endl;
+  
+  int this_strati_code;
+  float this_Sc;
+
+  map<int,float> TempStratiToSc;
+  
+  while (getline(data_in, str)) 
+  {
+    string this_line = strip_and_clean_string(str);    
+
+    int sz = this_line.size();
+    vector<string> stringvec;
+    char comma =',';
+    if (sz != 0)
+    {
+      split_delimited_string( this_line, comma, stringvec);
+      cout << "The string is: " << this_line << endl; 
+      if (stringvec.size() > 0)
+      {
+        setprecision(9);
+        this_strati_code = stoi(stringvec[0]);
+        this_Sc = stof(stringvec[1]);
+      
+      
+        cout << "Strati code: " << this_strati_code << " Sc: " << this_Sc << endl;
+        TempStratiToSc[this_strati_code] = this_Sc;
+      }
+    }
+  }
+  StratiToSc = TempStratiToSc;
 }
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
-// Fills a map with stratigraphy codes and corresponding K value
+// Prints stratigraphic codes to screenb
 //
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDLithoCube::fill_strati_to_K_map() {
+void LSDLithoCube::print_K_and_Sc_maps_to_screen() 
+{
+  cout << "Hello, I cannot wait to tell you the K and Sc values for the stratigraphic codes. " << endl;
+  cout << "Here they are!!" << endl;
+  cout << "The K values are: " << endl;
+
+  for(auto it = StratiToK.begin(); it != StratiToK.end(); ++it)
+  {
+    cout << "Strati code: " << it->first << " => K value: " << it->second << endl;
+  }
+
+  cout << endl << endl << "and the Sc values are:" << endl;
+  for(auto it = StratiToSc.begin(); it != StratiToSc.end(); ++it)
+  {
+    cout << "Strati code: " << it->first << " => Sc value: " << it->second << endl;
+  }
 
 }
 

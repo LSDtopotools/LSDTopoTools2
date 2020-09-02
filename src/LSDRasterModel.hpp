@@ -407,6 +407,12 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @date 04/03/2020
   LSDSpatialCSVReader  get_channels_for_burning(int contributing_pixels);
 
+  /// @brief Caps elevations using the initial raster
+  ///  WARNING no testing if the raster is the correct shape!
+  /// @param InitialRaster The initial raster above which the new surface cannot rise.
+  /// @author SMM
+  /// @date 31/08/2020
+  void cap_elevations(LSDRaster& InitialRaster);
 
   //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   // @@@@@@@@@@@@!!!!!!!!!!!!!!!!!!!@@@@@@@@@@@@@@@@@@@@@

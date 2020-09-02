@@ -66,6 +66,7 @@
 #include "../LSDJunctionNetwork.hpp"
 #include "../LSDIndexChannelTree.hpp"
 #include "../LSDParameterParser.hpp"
+#include "../LSDSoilHydroRaster.hpp"
 #include "../LSDSpatialCSVReader.hpp"
 #include "../LSDShapeTools.hpp"
 #include "../LSDRasterSpectral.hpp"
@@ -140,8 +141,26 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["spawn_cosmo_basins"] = false;
   int_default_map["spawn_padding_pixels"] = 20;
 
+  // Here are some options for shielding
   bool_default_map["make_shielding_rasters"] = false;
   bool_default_map["calculate_shielding"] = false;
+
+  // This is all for snow shielding
+  bool_default_map["calculate_snow_shielding"] = false;
+  string_default_map["snowpack_method"] = "Bilinear";
+
+  // parameters for bilinear snowpack
+  float_default_map["snow_SlopeAscend"] = 0.035;
+  float_default_map["snow_SlopeDescend"] = -0.03;
+  float_default_map["snow_PeakElevation"] = 1500;
+  float_default_map["snow_PeakSnowpack"] = 30;
+
+  // parameters for richards snowpack
+  float_default_map["snow_v"] = 0.5;
+  float_default_map["snow_lambda"] = 0.5;
+  float_default_map["snow_MaximumSlope"] = 0.05;
+
+  // These are for the erosion rate calculations
   bool_default_map["calculate_erosion_rates"] = false;
   bool_default_map["calculate_soil_erosion_rates"] = false;
   bool_default_map["calculate_nested_erosion_rates"] = false;
@@ -267,6 +286,42 @@ int main (int nNumberofArgs,char *argv[])
     exit(0);
   }
 
+  //============================================================================
+  // Snow shielding
+  // This makes a snow shielding raster
+  //============================================================================
+  if (this_bool_map["calculate_snow_shielding"])
+  {
+    cout << "Let me make a snow shielding raster for you." << endl;
+    
+    // now make a snow raster
+    LSDSoilHydroRaster SnowRaster(topography_raster);
+    
+    string snow_ext = "_SnowBL";
+    string snow_out_name = OUT_DIR+OUT_ID+snow_ext;
+    
+    // update it with a bilinear snow function
+    if (this_string_map["snowpack_method"] == "Bilinear")
+    {
+      SnowRaster.SetSnowEffDepthBilinear(this_float_map["snow_SlopeAscend"], this_float_map["snow_SlopeDescend"], 
+                                         this_float_map["snow_PeakElevation"], 
+                                         this_float_map["snow_PeakSnowpack"], topography_raster);
+                                  
+      SnowRaster.write_raster(snow_out_name,raster_ext);
+    }   
+    else if (this_string_map["snowpack_method"] == "Richards")
+    {
+      SnowRaster.SetSnowEffDepthRichards(this_float_map["snow_PeakSnowpack"], this_float_map["snow_MaximumSlope"], 
+                                         this_float_map["snow_v"], this_float_map["snow_lambda"],
+                                         topography_raster);
+      SnowRaster.write_raster(snow_out_name,raster_ext);
+    }
+    else
+    {
+      cout << "You did not give me a valid snow shielding method. " << endl;
+      cout << "Options are Richards or Bilinear" << endl;
+    } 
+  }  
 
   //============================================================================
   // Raster burning
