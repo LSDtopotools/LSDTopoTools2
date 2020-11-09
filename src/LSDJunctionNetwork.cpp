@@ -7047,6 +7047,64 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV_WithElevation(LSDFlowInfo& flo
 
 }
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+// This prints a channel network to csv in WGS84
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+void LSDJunctionNetwork::PrintChannelNetworkToCSV_WithElevation_WithDonorJunction(LSDFlowInfo& flowinfo, string fname_prefix, LSDRaster& Elevation)
+{
+
+  // first get the vectors
+  vector<int> NIvec;
+  vector<int> SOvec;
+  vector<int> JIvec;
+  GetChannelNodesAndJunctions(flowinfo, NIvec, JIvec, SOvec);
+
+  // Deal with setting up the file
+  // append csv to the filename
+  string FileName = fname_prefix+".csv";
+
+  //open a file to write
+  ofstream WriteData;
+  WriteData.open(FileName.c_str());
+
+  WriteData.precision(8);
+  WriteData << "latitude,longitude,Junction Index,Stream Order,NI,receiver_NI,elevation(m),receiver_JI,upstream_JI" << endl;
+
+  // the x and y locations
+  double latitude,longitude;
+
+  // this is for latitude and longitude
+  LSDCoordinateConverterLLandUTM Converter;
+
+
+  // now get the number of channel nodes
+  int this_NI, receiver_NI;
+  int row,col;
+  int NNodes = int(NIvec.size());
+  float this_elev;
+  int RJ;
+  int UJ;
+  //cout << "The number of nodes is: " << NNodes << endl;
+  for(int node = 0; node<NNodes; node++)
+  {
+    this_NI = NIvec[node];
+    flowinfo.retrieve_current_row_and_col(this_NI,row,col);
+    get_lat_and_long_locations(row, col, latitude, longitude, Converter);
+    flowinfo.retrieve_receiver_information(this_NI, receiver_NI);
+    this_elev = Elevation.get_data_element(row,col);
+    RJ = get_Receiver_of_Junction(JIvec[node]);
+    UJ = find_upstream_junction_from_channel_nodeindex(this_NI,flowinfo);
+
+    WriteData << latitude << "," << longitude << "," << JIvec[node] << "," 
+              << SOvec[node] << "," << NIvec[node] << "," << receiver_NI << "," 
+              << this_elev << "," << RJ << "," << UJ << endl;
+
+  }
+
+  WriteData.close();
+
+}
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

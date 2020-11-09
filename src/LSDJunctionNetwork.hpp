@@ -445,6 +445,15 @@ class LSDJunctionNetwork
   /// @date 04/03/2020
   void PrintChannelNetworkToCSV_WithElevation(LSDFlowInfo& flowinfo, string fname_prefix,LSDRaster& elevation);
 
+  /// @brief This prints a stream network to a csv in WGS84. It includes the elevation data and the donor junction
+  /// @param FlowInfo the flow info object which translates node indices to actual points
+  /// @param FileName_prefix The prefix of the file to write, if no path is included it will write to the current directory.
+  ///  The csv extension is added automatically.
+  /// @param elevation The elevation raster
+  /// @author SMM
+  /// @date 08/11/2020
+  void PrintChannelNetworkToCSV_WithElevation_WithDonorJunction(LSDFlowInfo& flowinfo, string fname_prefix,LSDRaster& elevation);
+
 
   /// @brief This sends the JunctionArray to a LSDIndexRaster.
   /// @return LSDIndexRaster of JunctionArray.
@@ -1309,7 +1318,7 @@ vector<int> GetChannelHeadsChiMethodFromValleys(vector<int> ValleyNodes,
   /// @date 04/04/13
   LSDIndexRaster ChannelIndexer(LSDFlowInfo& flowinfo);
 
-  /// @brief This extracts vectors containing node incidex, junction indices
+  /// @brief This extracts vectors containing node indices, junction indices
   ///  and stream orders of pixels in the channel network.
   /// @detail The vectors are replaced by the method
   /// @author SMM

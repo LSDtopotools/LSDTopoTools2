@@ -1109,6 +1109,39 @@ void LSDRasterModel::raise_and_fill_raster(float min_slope_for_fill)
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This takes another raster, does boundfs checking, 
+// and replaces any value in the model with nodata if it is nodata
+// in the other raster
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterModel::mask_to_nodata_impose_nodata(LSDRaster& OtherRaster)
+{
+  int OR_NCols = OtherRaster.get_NCols();
+  int OR_NRows = OtherRaster.get_NRows();
+  float NDV = OtherRaster.get_NoDataValue();
+  cout << "Trying to mask nodata" << endl;
+  if (NCols != OR_NCols || NRows != OR_NRows)
+  {
+    cout << "The rasters are not the same dimensions. I am not masking anything the the rastermodel will not be affected." << endl;
+  }
+  else
+  {
+    for (int row = 0; row< NRows; row++)
+    {
+      for (int col = 0; col < NCols; col++)
+      {
+        if (OtherRaster.get_data_element(row,col) == NDV)
+        {
+          RasterData[row][col] = NoDataValue;
+        }
+      }
+    }
+  }
+}
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This raises part of the raster by a specified amount, in metres. Simulates
 // fault cutting horizontally across the raster.
 // throw amount is instantaneously applied.
@@ -1855,32 +1888,34 @@ void LSDRasterModel::impose_channels(LSDSpatialCSVReader& source_points_data)
 
   string column_name = "elevation(m)";
 
+  
+
 
   Array2D<float> zeta=RasterData.copy();
 
-  // Step one, create donor "stack" etc. via FlowInfo
-  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
-
-  // need to fill the raster to ensure there are no internal base level nodes
-  cout << "I am going to fill" << endl;
-  float slope_for_fill = 0.0001; 
-  cout << "Filling." << endl;
-  LSDRaster filled_topography = temp.fill(slope_for_fill);
-
-  cout << "Getting the flow info. This might take some time." << endl;
-  LSDFlowInfo flow(boundary_conditions, filled_topography);
-  // update the raster
-  zeta = filled_topography.get_RasterData();
-
   // Get the local node index as well as the elevations
-  vector<int> ni = source_points_data.get_nodeindices_from_lat_long(flow);
+  vector<float> UTME, UTMN;
+  source_points_data.get_x_and_y_from_latlong(UTME,UTMN);
+
+  //vector<int> ni = source_points_data.get_nodeindices_from_lat_long(flow);
   vector<float> elev = source_points_data.data_column_to_float(column_name);
   // make the map
   cout << "I am making an elevation map. This will not work if points in the raster lie outside of the csv channel points." << endl;
   int row,col;
-  for(int i = 0; i< int(ni.size()); i++)
+  for(int i = 0; i< int(elev.size()); i++)
   {
-    flow.retrieve_current_row_and_col( ni[i], row, col);
+
+    source_points_data.get_row_and_col_of_a_point(UTME[i],UTMN[i],row, col);
+
+    if(zeta[row][col] == NoDataValue)
+    {
+      cout << "Imposing channels, I seem to be on a nodata node. Check your single channel data." << endl;
+    }
+    //else if (elev[i] > 222 && elev[i] < 228)
+    //{
+    //  cout << "zold: " << zeta[row][col] << " znew: " << elev[i] << endl;
+    //}
+  
     zeta[row][col] = elev[i];
   }
 
@@ -1895,7 +1930,93 @@ void LSDRasterModel::impose_channels(LSDSpatialCSVReader& source_points_data)
 //// impose_channels: this imposes channels onto the landscape
 //// You need to print a channel to csv and then load the data
 ////------------------------------------------------------------------------------
-LSDSpatialCSVReader LSDRasterModel::get_channels_for_burning(int contributing_pixels)
+void LSDRasterModel::impose_channels_and_lift_raster(LSDSpatialCSVReader& source_points_data)
+{
+
+  string column_name = "elevation(m)";
+ 
+  Array2D<float> zeta=RasterData.copy();
+
+  // Get the local node index as well as the elevations
+  vector<float> UTME, UTMN;
+  source_points_data.get_x_and_y_from_latlong(UTME,UTMN);
+  vector<float> elev = source_points_data.data_column_to_float(column_name);
+
+
+  // find minimum values
+  float min_chan_elev = 9999999999;
+  for(int i = 0;i< int(elev.size()); i++)
+  {
+    if (min_chan_elev > elev[i])
+    {
+      min_chan_elev = elev[i];
+    }
+  }
+
+  float min_rast_elev = 999999999;
+  for(int row = 0; row<NRows; row++)
+  {
+    for(int col =0; col<NCols; col++)
+    {
+      if (zeta[row][col] != NoDataValue)
+      {
+        if (min_rast_elev > zeta[row][col] )
+        {
+          min_rast_elev = zeta[row][col];
+        }
+      }
+    }
+  }
+
+  float elev_diff = min_rast_elev - min_chan_elev;
+  // now adjust the elevations of the raster
+  for(int row = 0; row<NRows; row++)
+  {
+    for(int col =0; col<NCols; col++)
+    {
+      if (zeta[row][col] != NoDataValue)
+      {
+        if (min_rast_elev > zeta[row][col] )
+        {
+          zeta[row][col] = zeta[row][col] - elev_diff;
+        }
+      }
+    }
+  }
+
+  // make the map
+  cout << "I am making an elevation map. This will not work if points in the raster lie outside of the csv channel points." << endl;
+  int row,col;
+  for(int i = 0; i< int(elev.size()); i++)
+  {
+
+    source_points_data.get_row_and_col_of_a_point(UTME[i],UTMN[i],row, col);
+
+    if(zeta[row][col] == NoDataValue)
+    {
+      cout << "Imposing channels, I seem to be on a nodata node. Check your single channel data." << endl;
+    }
+    //else if (elev[i] > 222 && elev[i] < 228)
+    //{
+    //  cout << "zold: " << zeta[row][col] << " znew: " << elev[i] << endl;
+    //}
+  
+    zeta[row][col] = elev[i];
+  }
+
+
+  this->RasterData = zeta.copy();
+
+  RasterData = zeta.copy();
+}
+
+
+////------------------------------------------------------------------------------
+//// This gets the channels for "burning". All it really does is extracts the 
+//// channel network to a CSV file as well as returning a csvreader object
+//// that can be used to burn raster values onto this csv. 
+////------------------------------------------------------------------------------
+LSDSpatialCSVReader LSDRasterModel::get_channels_for_burning(int contributing_pixels, string temp_channel_path, string temp_channel_fname)
 {
 
   string column_name = "elevation(m)";
@@ -1926,8 +2047,8 @@ LSDSpatialCSVReader LSDRasterModel::get_channels_for_burning(int contributing_pi
   LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
   
   // print the network
-  string chan_fname = "./temp_channels";
-  string full_chan_fname = "./temp_channels.csv";
+  string chan_fname = temp_channel_path+temp_channel_fname;
+  string full_chan_fname = temp_channel_path+temp_channel_fname+".csv";
   ChanNetwork.PrintChannelNetworkToCSV_WithElevation(FlowInfo, chan_fname,filled_topography);
 
   // Now load a csv object
@@ -4541,6 +4662,9 @@ void LSDRasterModel::fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_v
 
   string column_name = "elevation(m)";
 
+  // impose the channel before you fill
+  impose_channels(source_points_data);
+
 
   Array2D<float> zeta=RasterData.copy();
 
@@ -4672,6 +4796,9 @@ void LSDRasterModel::fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_v
 
   cout << "I am reading points from the file: "+ csv_of_fixed_channel << endl;
   LSDSpatialCSVReader source_points_data( RI,csv_of_fixed_channel );
+
+  // impose the channel before you fill
+  impose_channels(source_points_data);
 
   //*****************************
   // Working from here

@@ -244,6 +244,32 @@ class LSDSpatialCSVReader
     /// @date 27/09/2018
     vector<double> data_column_to_double(string column_name);
 
+    /// @brief This takes the values in the data column and adds
+    ///  a float value. to them. It will not check if the column is actually floats
+    ///  so caution is needed!
+    /// @param column_name a string that holds the column name
+    /// @float add_value The value to be added. If you want to subtract use the negative value
+    /// @author SMM
+    /// @date 28/09/2020
+    void data_column_add_float(string column_name, float add_value);
+
+    /// @brief This takes the values in the data column and multiplies
+    ///  a float value. to them. It will not check if the column is actually floats
+    ///  so caution is needed!
+    /// @param column_name a string that holds the column name
+    /// @float mulitply_value The value to be multiplied. If you want to divide use the inverse value
+    /// @author SMM
+    /// @date 28/09/2020
+    void data_column_multiply_float(string column_name, float multiply_value);
+
+    /// @brief This is a very specific function used only to impose a minimum gradient on the single
+    ///   channel
+    /// @param fd_column_name a string that holds the flow distance column name
+    /// @param elevation_column_name a string that holds the elevation column name
+    /// @float minimum_slope The minimum slope along the single channel
+    /// @author SMM
+    /// @date 28/09/2020
+    void enforce_slope(string fd_column_name, string elevation_column_name, float minimum_slope);
 
     /// @brief this check to see if a point is within the raster
     /// @param X_coordinate the x location of the point
@@ -301,6 +327,16 @@ class LSDSpatialCSVReader
     /// @date 20/02/2017
     void print_data_map_keys_to_screen();
 
+    /// @brief Gets the row and col of a point in UTM
+    /// @param X_coordinate in UTM
+    /// @param Y_coordinate in UTM
+    /// @param row
+    /// @param col
+    /// @author SMM
+    /// @date 30/09/2020    
+    void get_row_and_col_of_a_point(float X_coordinate,float Y_coordinate,int& row, int& col);
+    void get_row_and_col_of_a_point(double X_coordinate,double Y_coordinate,int& row, int& col);
+
     /// @brief this prints the latitude and longitude to screen
     /// @author SMM
     /// @date 17/02/2017
@@ -318,6 +354,13 @@ class LSDSpatialCSVReader
     /// @author FJC
     /// @date 03/03/17
     void print_UTM_coords_to_csv(vector<float> UTME, vector<float> UTMN, string csv_outname);
+
+    /// @brief print the rows and columns to a csv file for checking
+    /// @param csv_outname nAME OF THE OUTFILE
+    /// @param UTMN northings
+    /// @author SMM
+    /// @date 30/09/2020
+    void print_row_and_col_to_csv(string csv_outname);
 
     /// @brief print the data to a csv. Used after updating data
     /// @param csv_outname the name of the new file

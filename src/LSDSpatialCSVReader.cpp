@@ -521,7 +521,7 @@ vector<float> LSDSpatialCSVReader::data_column_to_float(string column_name)
   return float_vec;
 }
 
-// Converts a data column to a float vector
+// Converts a data column to a double vector
 vector<int> LSDSpatialCSVReader::data_column_to_int(string column_name)
 {
   vector<string> string_vec = get_data_column(column_name);
@@ -538,7 +538,7 @@ vector<int> LSDSpatialCSVReader::data_column_to_int(string column_name)
   return int_vec;
 }
 
-// Converts a data column to a float vector
+// Converts a data column to a double vector
 vector<double> LSDSpatialCSVReader::data_column_to_double(string column_name)
 {
   vector<string> string_vec = get_data_column(column_name);
@@ -553,6 +553,88 @@ vector<double> LSDSpatialCSVReader::data_column_to_double(string column_name)
     double_vec.push_back( atof(string_vec[i].c_str()));
   }
   return double_vec;
+}
+
+// Adds a float to a data column
+void LSDSpatialCSVReader::data_column_add_float(string column_name, float add_value)
+{
+  cout << "Adding " << add_value << " to the column " << column_name << endl;
+  vector<string> string_vec = get_data_column(column_name);
+  float this_value;
+  vector<string> new_string_vec;
+  int N_data_elements = string_vec.size();
+  if (N_data_elements == 0)
+  {
+    cout << "Couldn't read in the data column. Check the column name!" << endl;
+  }
+  for(int i = 0; i<N_data_elements; i++)
+  {
+    this_value = atof(string_vec[i].c_str())+add_value;
+    new_string_vec.push_back(to_string(this_value));
+  }
+  data_map[column_name] = new_string_vec;
+}
+
+// Multiplies values in a data column
+void LSDSpatialCSVReader::data_column_multiply_float(string column_name, float multiply_value)
+{
+  vector<string> string_vec = get_data_column(column_name);
+  float this_value;
+  vector<string> new_string_vec;
+  int N_data_elements = string_vec.size();
+  if (N_data_elements == 0)
+  {
+    cout << "Couldn't read in the data column. Check the column name!" << endl;
+  }
+  for(int i = 0; i<N_data_elements; i++)
+  {
+    this_value = atof(string_vec[i].c_str())*multiply_value;
+    new_string_vec.push_back(to_string(this_value));
+  }
+  data_map[column_name] = new_string_vec;
+}
+
+// This is very specific: it enforces a slope for a particular data colum
+void LSDSpatialCSVReader::enforce_slope(string fd_column_name, string elevation_column_name, float minimum_slope)
+{
+  double min_slope = double(minimum_slope);
+  cout << "I am going to enforce a minimum slope." << endl;
+  vector<double> flow_distance = data_column_to_double(fd_column_name);
+  vector<double> elevation = data_column_to_double(elevation_column_name);
+
+  // the single channel starts from the top, so the last node is the base level and doesn't get modified. 
+  int N_data_elements = int(flow_distance.size());
+  vector<double> new_elevation = elevation;
+  float dist, min_elev;
+
+  cout.precision(9);
+
+  //cout << "Minimum slope is: " << min_slope << endl;
+  for (int i = N_data_elements-2; i>=0; i--)
+  {
+    dist = flow_distance[i]-flow_distance[i+1];
+    
+    min_elev = dist*min_slope+new_elevation[i+1];
+    //cout << "dist: " << dist << " z[i+1]: " << new_elevation[i+1] << " z[i]: " << elevation[i] << " min_elev: " << min_elev << endl;
+    if (elevation[i] < min_elev)
+    {
+      //cout << "Found something where I need to increase slope!" << endl;
+      new_elevation[i] = min_elev;
+    }
+    else
+    {
+      new_elevation[i] = elevation[i];
+    }
+  }
+
+  vector<string> new_elev_string;
+  for(int i = 0; i< N_data_elements; i++)
+  {
+    new_elev_string.push_back(to_string(new_elevation[i]));
+  }
+  
+  data_map[elevation_column_name] = new_elev_string;
+
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -1240,6 +1322,69 @@ void LSDSpatialCSVReader::print_lat_long_to_screen(bool only_print_in_raster)
   }
 }
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// Gets the row and column of a point
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDSpatialCSVReader::get_row_and_col_of_a_point(float X_coordinate,float Y_coordinate,int& row, int& col)
+{
+  int this_row = NoDataValue;
+  int this_col = NoDataValue;
+
+  // Shift origin to that of dataset
+  float X_coordinate_shifted_origin = X_coordinate - XMinimum;
+  float Y_coordinate_shifted_origin = Y_coordinate - YMinimum;
+
+  // Get row and column of point
+  int col_point = int(X_coordinate_shifted_origin/DataResolution);
+  int row_point = (NRows - 1) - int(ceil(Y_coordinate_shifted_origin/DataResolution)-0.5);
+
+  //cout << "Getting row and col, " << row_point << " " << col_point << endl;
+
+  if(col_point > 0 && col_point < NCols-1)
+  {
+    this_col = col_point;
+  }
+  if(row_point > 0 && row_point < NRows -1)
+  {
+    this_row = row_point;
+  }
+
+  row = this_row;
+  col = this_col;
+}
+
+void LSDSpatialCSVReader::get_row_and_col_of_a_point(double X_coordinate,double Y_coordinate,int& row, int& col)
+{
+  int this_row = NoDataValue;
+  int this_col = NoDataValue;
+
+  // Shift origin to that of dataset
+  double X_coordinate_shifted_origin = X_coordinate - XMinimum;
+  double Y_coordinate_shifted_origin = Y_coordinate - YMinimum;
+
+  // Get row and column of point
+  int col_point = int(X_coordinate_shifted_origin/DataResolution);
+  int row_point = (NRows - 1) - int(ceil(Y_coordinate_shifted_origin/DataResolution)-0.5);
+
+  //cout << "Getting row and col, " << row_point << " " << col_point << endl;
+
+  if(col_point > 0 && col_point < NCols-1)
+  {
+    this_col = col_point;
+  }
+  if(row_point > 0 && row_point < NRows -1)
+  {
+    this_row = row_point;
+  }
+
+  row = this_row;
+  col = this_col;
+}
+
+
+
 //==============================================================================
 // This prints the UTM coordinates to csv for checking
 // FJC 03/03/17
@@ -1257,6 +1402,37 @@ void LSDSpatialCSVReader::print_UTM_coords_to_csv(vector<float> UTME, vector<flo
   }
   outfile.close();
 }
+
+//==============================================================================
+// This prints the UTM coordinates to csv for checking
+// SMM 30/09/2020
+//==============================================================================
+void LSDSpatialCSVReader::print_row_and_col_to_csv(string csv_outname)
+{
+  ofstream outfile;
+  outfile.open(csv_outname.c_str());
+
+  int rf,rd,cf,cd;
+
+
+  vector<float> UTME, UTMN;
+  get_x_and_y_from_latlong(UTME,UTMN);
+
+
+
+  outfile << "Easting, Norting, row_float,col_float,row_double,col_double" << endl;
+  outfile.precision(9);
+  for (int i = 0; i < int(latitude.size()); i++)
+  {
+
+    get_row_and_col_of_a_point(UTME[i],UTMN[i],rf,cf);
+    get_row_and_col_of_a_point(double(UTME[i]),double(UTMN[i]),rd,cd);
+    outfile << UTME[i] << "," << UTMN[i] << "," << rf << "," << cf << "," << rd << "," << cd << endl;
+  }
+  outfile.close();
+}
+
+
 
 
 //==============================================================================

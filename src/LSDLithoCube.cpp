@@ -286,12 +286,12 @@ void LSDLithoCube::ingest_vo_file(string filename)
     if (sz != 0)
     {
       split_delimited_string( this_line, space, stringvec);
-      cout << "The string is: " << this_line << endl; 
+      //cout << "The string is: " << this_line << endl; 
       if (stringvec.size() > 0)
       {
         if (stringvec[0] == axis_n) 
         {
-          cout << "Found axis_N" << endl;
+          //cout << "Found axis_N" << endl;
           n_cols = atoi(stringvec[1].c_str());
           n_rows = atoi(stringvec[2].c_str());
           n_layers = atoi(stringvec[3].c_str());
@@ -319,7 +319,7 @@ void LSDLithoCube::ingest_vo_file(string filename)
   }
 
   cout.precision(9);
-  cout << "Here are the vitalstatistix, cheif!" << endl;
+  cout << "Here are the vitalstatistix, chief!" << endl;
   cout << "NRows: " << n_rows << " NCols: " << n_cols << " NLayers: " << n_layers << endl;
   cout << "xdim: " << x_dim << " ydim: " << y_dim << " z_dim: " << z_dim << endl;
   cout << "x_min: " << x_min << " x_min: " << y_min << " z_min: " << z_min << endl; 

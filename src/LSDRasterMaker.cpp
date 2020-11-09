@@ -234,29 +234,19 @@ void LSDRasterMaker::impose_channels(LSDSpatialCSVReader& source_points_data)
   // Step one, create donor "stack" etc. via FlowInfo
   LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
 
-  // need to fill the raster to ensure there are no internal base level nodes
-  cout << "I am going to fill" << endl;
-  float slope_for_fill = 0.0001; 
-  cout << "Filling." << endl;
-  LSDRaster filled_topography = temp.fill(slope_for_fill);
-
-  vector <string> bc(4, "b");          // Initialise boundaries to baselevel
-
-
-  cout << "Getting the flow info. This might take some time." << endl;
-  LSDFlowInfo flow(bc, filled_topography);
-  // update the raster
-  zeta = filled_topography.get_RasterData();
-
-  // Get the local node index as well as the elevations
-  vector<int> ni = source_points_data.get_nodeindices_from_lat_long(flow);
+  // Get the local coordinate as well as the elevations
+  vector<float> UTME, UTMN;
+  source_points_data.get_x_and_y_from_latlong(UTME,UTMN);
   vector<float> elev = source_points_data.data_column_to_float(column_name);
+
+
   // make the map
   cout << "I am making an elevation map. This will not work if points in the raster lie outside of the csv channel points." << endl;
   int row,col;
-  for(int i = 0; i< int(ni.size()); i++)
+  for(int i = 0; i< int(elev.size()); i++)
   {
-    flow.retrieve_current_row_and_col( ni[i], row, col);
+
+    source_points_data.get_row_and_col_of_a_point(UTME[i],UTMN[i],row, col);
     zeta[row][col] = elev[i];
   }
 

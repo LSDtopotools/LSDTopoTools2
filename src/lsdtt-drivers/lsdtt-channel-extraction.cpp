@@ -148,6 +148,7 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["print_sources_to_csv"] = true;
   bool_default_map["print_channels_to_csv"] = true;
   bool_default_map["print_junctions_to_csv"] = false;
+  bool_default_map["use_extended_channel_data"] = false;
 
   bool_default_map["print_dinf_drainage_area_raster"] = false;
   bool_default_map["print_d8_drainage_area_raster"] = false;
@@ -325,7 +326,15 @@ int main (int nNumberofArgs,char *argv[])
     if( this_bool_map["print_channels_to_csv"])
     {
       string channel_csv_name = OUT_DIR+OUT_ID+"_FromCHF_CN";
-      ChanNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
+      if ( this_bool_map["use_extended_channel_data"])
+      {
+        cout << "I am going to use the extended channel network data outputs." << endl;
+        ChanNetwork.PrintChannelNetworkToCSV_WithElevation_WithDonorJunction(FlowInfo, channel_csv_name, filled_topography);
+      }
+      else
+      {
+        ChanNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
+      }
 
       if ( this_bool_map["convert_csv_to_geojson"])
       {
@@ -397,7 +406,15 @@ int main (int nNumberofArgs,char *argv[])
     if( this_bool_map["print_channels_to_csv"])
     {
       string channel_csv_name = OUT_DIR+OUT_ID+"_AT_CN";
-      ChanNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
+      if ( this_bool_map["use_extended_channel_data"])
+      {
+        cout << "I am going to use the extended channel network data outputs." << endl;
+        ChanNetwork.PrintChannelNetworkToCSV_WithElevation_WithDonorJunction(FlowInfo, channel_csv_name, filled_topography);
+      }
+      else
+      {
+        ChanNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
+      }
 
       if ( this_bool_map["convert_csv_to_geojson"])
       {
@@ -523,7 +540,15 @@ int main (int nNumberofArgs,char *argv[])
     if( this_bool_map["print_channels_to_csv"])
     {
       string channel_csv_name = OUT_DIR+OUT_ID+"_D_CN";
-      NewChanNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
+      if ( this_bool_map["use_extended_channel_data"])
+      {
+        cout << "I am going to use the extended channel network data outputs." << endl;
+        NewChanNetwork.PrintChannelNetworkToCSV_WithElevation_WithDonorJunction(FlowInfo, channel_csv_name, filled_topography);
+      }
+      else
+      {
+        NewChanNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
+      }
 
       if ( this_bool_map["convert_csv_to_geojson"])
       {
@@ -683,7 +708,15 @@ int main (int nNumberofArgs,char *argv[])
     if( this_bool_map["print_channels_to_csv"])
     {
       string channel_csv_name = OUT_DIR+OUT_ID+"_P_CN";
-      NewChanNetwork.PrintChannelNetworkToCSV(FilterFlowInfo, channel_csv_name);
+      if ( this_bool_map["use_extended_channel_data"])
+      {
+        cout << "I am going to use the extended channel network data outputs." << endl;
+        NewChanNetwork.PrintChannelNetworkToCSV_WithElevation_WithDonorJunction(FlowInfo, channel_csv_name, filled_topography);
+      }
+      else
+      {
+        NewChanNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
+      }
 
       if ( this_bool_map["convert_csv_to_geojson"])
       {
@@ -798,7 +831,16 @@ int main (int nNumberofArgs,char *argv[])
     if( this_bool_map["print_channels_to_csv"])
     {
       string channel_csv_name = OUT_DIR+OUT_ID+"_W_CN";
-      ChanNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
+      if ( this_bool_map["use_extended_channel_data"])
+      {
+        cout << "I am going to use the extended channel network data outputs." << endl;
+        ChanNetwork.PrintChannelNetworkToCSV_WithElevation_WithDonorJunction(FlowInfo, channel_csv_name, topography_raster);
+      }
+      else
+      {
+        ChanNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
+      }
+
 
       if ( this_bool_map["convert_csv_to_geojson"])
       {

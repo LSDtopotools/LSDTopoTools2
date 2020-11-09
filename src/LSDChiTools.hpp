@@ -1129,12 +1129,35 @@ class LSDChiTools
     /// @brief This prints a csv file with chi data from the data maps
     ///  the columns are:
     ///  latitude,longitude,chi,elevation,flow distance,drainage area,
+    ///  source_key,basin_key,stream_order,receiver_junction,upstream_junction
     /// @param FlowInfo an LSDFlowInfo object
     /// @param filename The name of the filename to print to (should have full
     ///   path and the extension .csv
     /// @author SMM
     /// @date 05/06/2017
     void print_chi_data_map_to_csv(LSDFlowInfo& FlowInfo, string filename);
+
+    /// @brief This prints a csv file with chi data from the data maps
+    ///  the columns are:
+    ///  latitude,longitude,ni,chi,elevation,flow distance,drainage area, 
+    ///  source_key,basin_key,stream_order,receiver_junction,upstream_junction,node_index
+    /// @param FlowInfo an LSDFlowInfo object
+    /// @param filename The name of the filename to print to (should have full
+    ///   path and the extension .csv
+    /// @author SMM
+    /// @date 05/06/2017
+    void print_chi_data_map_to_csv_with_ni(LSDFlowInfo& FlowInfo, string filename);
+
+    /// @brief This prints a csv file with chi data from the data maps
+    ///  the columns are:
+    ///  latitude,longitude,ni,receiver_ni,chi,elevation,flow distance,drainage area,
+    ///  source_key,basin_key,stream_order,receiver_junction,upstream_junction
+    /// @param FlowInfo an LSDFlowInfo object
+    /// @param filename The name of the filename to print to (should have full
+    ///   path and the extension .csv
+    /// @author SMM
+    /// @date 05/06/2017
+    void print_chi_data_map_to_csv_with_junction_information(LSDFlowInfo& FlowInfo, LSDJunctionNetwork& JN, string filename);
 
 
     /// @brief This prints a csv file with chi data from the data maps for a specific basin

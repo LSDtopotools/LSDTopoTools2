@@ -11879,6 +11879,139 @@ void LSDChiTools::print_chi_data_map_to_csv(LSDFlowInfo& FlowInfo, string filena
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+
+void LSDChiTools::print_chi_data_map_to_csv_with_ni(LSDFlowInfo& FlowInfo, string filename)
+{
+
+  // these are for extracting element-wise data from the channel profiles.
+  int this_node, row,col;
+  double latitude,longitude;
+  LSDCoordinateConverterLLandUTM Converter;
+
+  // find the number of nodes
+  int n_nodes = (node_sequence.size());
+
+  // open the data file
+  ofstream  chi_data_out;
+  chi_data_out.open(filename.c_str());
+  chi_data_out << "latitude,longitude,NI,chi,elevation,flow_distance,drainage_area,source_key,basin_key" << endl;
+  if (n_nodes <= 0)
+  {
+    cout << "Cannot print since you have not calculated channel properties yet." << endl;
+  }
+  else
+  {
+    for (int n = 0; n< n_nodes; n++)
+    {
+      this_node = node_sequence[n];
+      FlowInfo.retrieve_current_row_and_col(this_node,row,col);
+      get_lat_and_long_locations(row, col, latitude, longitude, Converter);
+
+      chi_data_out.precision(9);
+      chi_data_out << latitude << ","
+                   << longitude << ","
+                   << this_node << ",";
+      chi_data_out.precision(5);
+      chi_data_out << chi_data_map[this_node] << ","
+                   << elev_data_map[this_node] << ","
+                   << flow_distance_data_map[this_node] << ","
+                   << drainage_area_data_map[this_node] << ","
+                   << source_keys_map[this_node] << ","
+                   << baselevel_keys_map[this_node];
+
+      chi_data_out << endl;
+    }
+  }
+
+  chi_data_out.close();
+
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+void LSDChiTools::print_chi_data_map_to_csv_with_junction_information(LSDFlowInfo& FlowInfo, LSDJunctionNetwork& JN, string filename)
+{
+
+  // these are for extracting element-wise data from the channel profiles.
+  int this_node, row,col;
+  double latitude,longitude;
+  LSDCoordinateConverterLLandUTM Converter;
+
+  // find the number of nodes
+  int n_nodes = (node_sequence.size());
+
+
+  // Get vectors for making the maps
+  vector<int> NIvec;
+  vector<int> SOvec;
+  vector<int> JIvec;
+  JN.GetChannelNodesAndJunctions(FlowInfo, NIvec, JIvec, SOvec);  
+
+  // Turn these into maps
+  map<int,int> SO_map;
+  map<int,int> JI_map;
+
+  int n_NI = int(NIvec.size());
+  for(int i = 0; i<n_NI; i++)
+  {
+    SO_map[ NIvec[i] ] = SOvec[i];
+    JI_map[ NIvec[i] ] = JIvec[i];
+  }
+
+  // open the data file
+  int RJ,UJ,receiver_NI,SO;
+  ofstream chi_data_out;
+  chi_data_out.open(filename.c_str());
+  chi_data_out << "latitude,longitude,NI,receiver_NI,chi,elevation,flow_distance,drainage_area,source_key,basin_key,stream_order,receiver_junction,upstream_junction" << endl;
+  if (n_nodes <= 0)
+  {
+    cout << "Cannot print since you have not calculated channel properties yet." << endl;
+  }
+  else
+  {
+    for (int n = 0; n< n_nodes; n++)
+    {
+      this_node = node_sequence[n];
+      FlowInfo.retrieve_current_row_and_col(this_node,row,col);
+      get_lat_and_long_locations(row, col, latitude, longitude, Converter);
+
+      // Now get a bunch of information from the junction network
+      FlowInfo.retrieve_receiver_information(this_node, receiver_NI);
+      RJ = JN.get_Receiver_of_Junction(JI_map[this_node]);
+      UJ = JN.find_upstream_junction_from_channel_nodeindex(this_node,FlowInfo);
+      SO = SO_map[ this_node ];
+
+
+
+
+      chi_data_out.precision(9);
+      chi_data_out << latitude << ","
+                   << longitude << ","
+                   << this_node << ","
+                   << receiver_NI << ",";
+      chi_data_out.precision(5);
+      chi_data_out << chi_data_map[this_node] << ","
+                   << elev_data_map[this_node] << ","
+                   << flow_distance_data_map[this_node] << ","
+                   << drainage_area_data_map[this_node] << ","
+                   << source_keys_map[this_node] << ","
+                   << baselevel_keys_map[this_node] << ","
+                   << SO << ","
+                   << RJ << ","
+                   << UJ;
+
+      chi_data_out << endl;
+    }
+  }
+
+  chi_data_out.close();
+
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // Print chi maps to file
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-

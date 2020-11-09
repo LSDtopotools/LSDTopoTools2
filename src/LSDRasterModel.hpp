@@ -244,6 +244,15 @@ class LSDRasterModel: public LSDRasterSpectral
   void raise_and_fill_raster();
   void raise_and_fill_raster(float min_slope_for_fill);
 
+  /// @brief Looks at another raster, checks to see if it the same dimensions as the 
+  ///  model data, and then replaces any pixel in the model data with nodata
+  ///  if it is nodata in the other raster. 
+  /// @param OtherRaster the other raster
+  /// @author SMM
+  /// @date 9/10/2020
+  void mask_to_nodata_impose_nodata(LSDRaster& OtherRaster);
+
+
   /// @brief create a normal fault horizontally across the raster.
   /// @author FJC
   /// @date 06/07/18
@@ -400,12 +409,19 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @date 04/03/2020
   void impose_channels(LSDSpatialCSVReader& source_points_data);
 
+  /// @brief This fixes a channel, derived from source points data
+  ///  onto the model DEM. It also lifts the raster so no pixels in the raster are lower than
+  /// @param source_points_data an LSDSpatialCSVReader object. It needs lat and long and elevation columns
+  /// @author SMM
+  /// @date 09//2020
+  void impose_channels_and_lift_raster(LSDSpatialCSVReader& source_points_data);
+
   /// @brief Takes a model step and gets an LSDSpatialCSVReader object for later use
   /// @param contributing_pixels for the channel network
   /// @return source_points_data an LSDSpatialCSVReader object. It needs lat and long and elevation columns
   /// @author SMM
   /// @date 04/03/2020
-  LSDSpatialCSVReader  get_channels_for_burning(int contributing_pixels);
+  LSDSpatialCSVReader  get_channels_for_burning(int contributing_pixels, string temp_channel_path, string temp_channel_fname);
 
   /// @brief Caps elevations using the initial raster
   ///  WARNING no testing if the raster is the correct shape!

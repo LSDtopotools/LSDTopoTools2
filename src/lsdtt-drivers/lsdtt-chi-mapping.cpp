@@ -148,6 +148,7 @@ int main (int nNumberofArgs,char *argv[])
 
   bool_default_map["print_stream_order_raster"] = false;
   bool_default_map["print_channels_to_csv"] = false;
+  bool_default_map["use_extended_channel_data"] = false;
   bool_default_map["print_junction_index_raster"] = false;
   bool_default_map["print_junctions_to_csv"] = false;
   bool_default_map["print_fill_raster"] = false;
@@ -772,7 +773,15 @@ int main (int nNumberofArgs,char *argv[])
   {
     cout << "I am going to print the channel network." << endl;
     string channel_csv_name = OUT_DIR+OUT_ID+"_CN";
-    JunctionNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
+    if ( this_bool_map["use_extended_channel_data"])
+    {
+      cout << "I am going to use the extended channel network data outputs." << endl;
+      JunctionNetwork.PrintChannelNetworkToCSV_WithElevation_WithDonorJunction(FlowInfo, channel_csv_name, filled_topography);
+    }
+    else
+    {
+      JunctionNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
+    }
 
     // convert to geojson if that is what the user wants
     // It is read more easily by GIS software but has bigger file size
@@ -1441,7 +1450,14 @@ int main (int nNumberofArgs,char *argv[])
     if(this_bool_map["use_precipitation_raster_for_chi"])
     {
       string chiQ_data_maps_string = OUT_DIR+OUT_ID+"_chi_data_mapQ.csv";
-      ChiTool_chi_checker.print_chi_data_map_to_csv(FlowInfo, chiQ_data_maps_string);
+      if(this_bool_map["use_extended_channel_data"])
+      {
+        ChiTool_chi_checker.print_chi_data_map_to_csv_with_junction_information(FlowInfo, JunctionNetwork,chiQ_data_maps_string);  
+      }
+      else
+      {
+        ChiTool_chi_checker.print_chi_data_map_to_csv(FlowInfo, chiQ_data_maps_string);
+      }
 
 
       // if this gets burned, do it
@@ -1530,8 +1546,14 @@ int main (int nNumberofArgs,char *argv[])
     else
     {
       string chi_data_maps_string = OUT_DIR+OUT_ID+"_chi_data_map.csv";
-      ChiTool_chi_checker.print_chi_data_map_to_csv(FlowInfo, chi_data_maps_string);
-
+      if(this_bool_map["use_extended_channel_data"])
+      {
+        ChiTool_chi_checker.print_chi_data_map_to_csv_with_junction_information(FlowInfo, JunctionNetwork,chi_data_maps_string);  
+      }
+      else
+      {
+        ChiTool_chi_checker.print_chi_data_map_to_csv(FlowInfo, chi_data_maps_string);
+      }
 
       // if this gets burned, do it
       if(this_bool_map["burn_raster_to_csv"])
