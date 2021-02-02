@@ -1070,6 +1070,74 @@ void get_nodeindices_from_csv(string csv_filename, vector<int>& NIs, vector<floa
 
   void HilltopFlowRoutingOriginal(LSDRaster Elevation, LSDRaster Hilltops, LSDRaster Slope, LSDRaster Aspect, LSDIndexRaster StreamNetwork);
 
+
+
+
+  /// @brief Hilltop flow routing.
+  ///
+  /// @details Hilltop flow routing code built around original code from Martin Hurst. Based on
+  /// Lea (1992), with improvements discussed by Tarboton (1997) and a solution to the
+  /// problem of looping flow paths implemented.
+  ///
+  /// This is the **REFACTORED** version!! It is still slow but hopefully not as slow as before. 
+  ///
+  /// The algorithm now checks for local uphill flows and in the case of identifying one,
+  /// D8 flow path is used to push the flow into the centre of the steepest downslope
+  /// cell, at which point the trace is restarted. The same technique is used to cope
+  /// with self intersections of the flow path. These problems are not solved in the
+  /// original paper and I think they are caused at least in part by the high resolution
+  /// topogrpahy we are using.
+  ///
+  /// The code is also now built to take a d infinity flow direction raster instead of an
+  /// aspect raster. See Tarboton (1997) for discussions on why this is the best solution.
+  ///
+  /// The Basins input raster is used to code each hilltop into a basin to allow basin
+  /// averaging to take place.
+  ///
+  /// The final 5 parameters are used to set up printing flow paths to files for visualisation,
+  /// if this is not needed simply pass in false to the two boolean switches and empty variables for the
+  /// others, and the code will run as normal.
+  ///
+  /// The structure of the returned vector< Array2D<float> > is as follows: \n\n
+  /// [0] Hilltop Network coded with stream ID \n
+  /// [1] Hillslope Lengths \n
+  /// [2] Slope \n
+  /// [3] Relief \n
+  ///
+  /// @param Elevation LSDRaster of elevation values.
+  /// @param Slope LSDRaster of slope values.
+  /// @param Hilltops LSDRaster of hilltops.
+  /// @param StreamNetwork LSDIndexRaster of the stream network.
+  /// @param Aspect LSDRaster of Aspect.
+  /// @param Prefix String Prefix for output data filename.
+  /// @param Basins LSDIndexRaster of basin outlines.
+  /// @param PlanCurvature LSDRaster of planform curvature.
+  /// @param print_paths_switch If true paths will be printed.
+  /// @param thinning Thinning factor, value used to skip hilltops being printed, use 1 to print every hilltop.
+  /// @param trace_path The file path to be used to write the path files to, must end with a slash.
+  /// @param basin_filter_switch If this switch is true only basins in Target_Basin_Vector will have their paths printed.
+  /// @param Target_Basin_Vector Vector of Basin IDs that the user wants to print traces for.
+  /// @return Vector of Array2D<float> containing hillslope metrics.
+  /// @author SWDG, SMM
+  /// @date 12/2/14, 20/10/2021
+  vector< Array2D<float> > HilltopFlowRouting_Refactored(LSDRaster& Elevation, LSDRaster& Hilltop_ID, LSDRaster& Slope,
+               LSDRaster& Aspect, LSDRaster& HilltopCurv, LSDRaster& PlanCurvature, LSDIndexRaster& StreamNetwork, LSDIndexRaster& Basins,
+               string Prefix, bool print_paths_switch, int thinning, string trace_path, bool basin_filter_switch,
+               vector<int> Target_Basin_Vector);
+
+
+
+
+  /// @ brief a refactored HFR routine that is much more memory efficient
+  void HilltopFlowRouting_TerrifyingRefactored(LSDRaster& Elevation, LSDRaster& Aspect, LSDRaster& PlanCurvature,
+                                                LSDIndexRaster& StreamNetwork,
+                                                string ridges_csv_name,string Prefix,
+                                                bool print_paths_switch, int thinning, string trace_path, bool basin_filter_switch);
+
+
+
+
+
   /// @brief Hilltop flow routing.
   ///
   /// @details Hilltop flow routing code built around original code from Martin Hurst. Based on
@@ -1270,6 +1338,36 @@ void get_nodeindices_from_csv(string csv_filename, vector<int>& NIs, vector<floa
   /// @date 25/04/2017
   vector<int> basin_edge_extractor(int outlet_node, LSDRaster& Topography);
 
+  /// @brief This function takes an integer raster that has some tags
+  ///  and then tags all upstream nodes with that tag
+  ///  designed to help extract the main drainage divide of landscapes
+  /// @param tagged_raster an LSDIndexRaster containing the pixels from which we search upstream
+  /// @return An index raster that has all pixels upslope of the tagged regions taking the tagged value
+  /// @author SMM
+  /// @date 11/11/2020
+  LSDIndexRaster tag_nodes_upstream_of_baselevel(LSDIndexRaster& tagged_raster);
+
+  /// @brief This function takes an integer raster that has some tags
+  ///  and then tags all upstream nodes with that tag
+  ///  designed to help extract the main drainage divide of landscapes
+  /// @param tagged_raster an LSDIndexRaster containing the pixels from which we search upstream
+  /// @param crit_downslope_distance The distance beyond which we don't tag the raster. 
+  /// @return An index raster that has all pixels upslope of the tagged regions taking the tagged value
+  /// @author SMM
+  /// @date 11/11/2020
+  LSDIndexRaster tag_upstream_nodes(LSDIndexRaster& tagged_raster, float crit_downslope_distance);
+
+
+  /// @brief This function takes an integer raster that has some tags
+  ///  and then tags all downstream nodes with that tag. It stops when you have got too far downstream
+  /// @param tagged_raster an LSDIndexRaster containing the pixels from which we search upstream
+  /// @param crit_downslope_distance The distance beyond which we don't tag the raster. 
+  /// @return An index raster that has all pixels downstream of the tagged regions taking the tagged value
+  ///   within a flow distance window
+  /// @author SMM
+  /// @date 11/12/2020
+  LSDIndexRaster tag_downstream_nodes(LSDIndexRaster& tagged_raster, float crit_downslope_distance);
+
 
   /// @brief This function returns all the values from a raster for a corresponding
   /// input vector of node indices.
@@ -1394,12 +1492,21 @@ void get_nodeindices_from_csv(string csv_filename, vector<int>& NIs, vector<floa
   map<string, vector< vector<int> > > get_map_of_vectors();
 
 
-  ///@brief This return an LSDRaster draining to a specific node, this only fill it with the node ctually in the basin
-  ///@brief And fill the rest with nodata. To be used with test_edge deactivated
-  ///@param int node, the node index of the outlet
-  ///@param LSDRaster the base elevation raster
-  ///@return a LSDRater trimmed to the closest extents
+  /// @brief This return an LSDRaster draining to a specific node, this only fill it with the node ctually in the basin
+  /// @brief And fill the rest with nodata. To be used with test_edge deactivated
+  /// @param int node, the node index of the outlet
+  /// @param LSDRaster the base elevation raster
+  /// @return a LSDRater trimmed to the closest extents
   LSDRaster get_raster_draining_to_node(int node, LSDRaster& elevation_raster);
+
+  /// @brief This takes a node list and returns true if the node is surrounded by
+  ///  other nodes in the node list. 
+  /// @param node_list, a vector of nodes. This will almost always be a basin derived from get_upslope_nodes
+  /// @return a vector of bools. True if an internal node
+  /// @author SMM
+  /// @date 11/01/2021
+  vector<bool> internal_nodes(vector<int> node_list);
+
 
 
   protected:

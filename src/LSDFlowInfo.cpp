@@ -92,10 +92,13 @@
 #include <queue>
 #include <algorithm>
 #include <math.h>
+#include <unordered_set>
 #include "TNT/tnt.h"
 #include "LSDFlowInfo.hpp"
 #include "LSDIndexRaster.hpp"
 #include "LSDStatsTools.hpp"
+#include "LSDRasterInfo.hpp"
+#include "LSDSpatialCSVReader.hpp"
 //#include "LSDRaster.hpp"
 using namespace std;
 using namespace TNT;
@@ -247,19 +250,19 @@ void LSDFlowInfo::create(vector<string>& temp_BoundaryConditions,
 
   // loop through the topo data finding places where there is actually data
   for (row = 0; row<NRows; row++)
-    {
-      for (col = 0; col<NCols; col++)
   {
-    // only do calcualtions if there is data
-    if(TopoRaster.RasterData[row][col] != NoDataValue)
+    for (col = 0; col<NCols; col++)
+    {
+      // only do calcualtions if there is data
+      if(TopoRaster.RasterData[row][col] != NoDataValue)
       {
         RowIndex.push_back(row);
         ColIndex.push_back(col);
         NodeIndex[row][col] = NDataNodes;
         NDataNodes++;
       }
-  }
     }
+  }
 
   //cout << "3" << endl;
 
@@ -280,11 +283,11 @@ void LSDFlowInfo::create(vector<string>& temp_BoundaryConditions,
 
   // this vector starts out empty and then base level nodes are added to it
   for (row = 0; row<NRows; row++)
-    {
-      for (col = 0; col<NCols; col++)
   {
-    // only do calcualtions if there is data
-    if(TopoRaster.RasterData[row][col] != NoDataValue)
+    for (col = 0; col<NCols; col++)
+    {
+      // only do calcualtions if there is data
+      if(TopoRaster.RasterData[row][col] != NoDataValue)
       {
         // calcualte 8 slopes
         // no slopes mean get NoDataValue entries
@@ -315,134 +318,134 @@ void LSDFlowInfo::create(vector<string>& temp_BoundaryConditions,
 
         // check for periodic boundary conditions
         if( BoundaryConditions[0].find("P") == 0 || BoundaryConditions[0].find("p") == 0 )
-    {
-      if( BoundaryConditions[2].find("P") != 0 && BoundaryConditions[2].find("p") != 0 )
         {
-          cout << "WARNING!!! North boundary is periodic! Changing South boundary to periodic" << endl;
-          BoundaryConditions[2] = "P";
+          if( BoundaryConditions[2].find("P") != 0 && BoundaryConditions[2].find("p") != 0 )
+          {
+            cout << "WARNING!!! North boundary is periodic! Changing South boundary to periodic" << endl;
+            BoundaryConditions[2] = "P";
+          }
         }
-    }
         if( BoundaryConditions[1].find("P") == 0 || BoundaryConditions[1].find("p") == 0 )
-    {
-      if( BoundaryConditions[3].find("P") != 0 && BoundaryConditions[3].find("p") != 0 )
         {
-          cout << "WARNING!!! East boundary is periodic! Changing West boundary to periodic" << endl;
-          BoundaryConditions[3] = "P";
+          if( BoundaryConditions[3].find("P") != 0 && BoundaryConditions[3].find("p") != 0 )
+          {
+            cout << "WARNING!!! East boundary is periodic! Changing West boundary to periodic" << endl;
+            BoundaryConditions[3] = "P";
+          }
         }
-    }
         if( BoundaryConditions[2].find("P") == 0 || BoundaryConditions[2].find("p") == 0 )
-    {
-      if( BoundaryConditions[0].find("P") != 0 && BoundaryConditions[0].find("p") != 0 )
         {
-          cout << "WARNING!!! South boundary is periodic! Changing North boundary to periodic" << endl;
-          BoundaryConditions[0] = "P";
+          if( BoundaryConditions[0].find("P") != 0 && BoundaryConditions[0].find("p") != 0 )
+          {
+            cout << "WARNING!!! South boundary is periodic! Changing North boundary to periodic" << endl;
+            BoundaryConditions[0] = "P";
+          }
         }
-    }
         if( BoundaryConditions[3].find("P") == 0 || BoundaryConditions[3].find("p") == 0 )
-    {
-      if( BoundaryConditions[1].find("P") != 0 && BoundaryConditions[1].find("p") != 0 )
         {
-          cout << "WARNING!!! West boundary is periodic! Changing East boundary to periodic" << endl;
-          BoundaryConditions[1] = "P";
+          if( BoundaryConditions[1].find("P") != 0 && BoundaryConditions[1].find("p") != 0 )
+          {
+            cout << "WARNING!!! West boundary is periodic! Changing East boundary to periodic" << endl;
+            BoundaryConditions[1] = "P";
+          }
         }
-    }
 
         // reset baselevel switch for boundaries
         one_if_a_baselevel_node = 0;
 
         // NORTH BOUNDARY
         if (row == 0)
-    {
-      if( BoundaryConditions[0].find("B") == 0 || BoundaryConditions[0].find("b") == 0 )
         {
-          one_if_a_baselevel_node = 1;
-        }
-      else
-        {
-          // if periodic, reflect across to south boundary
-          if( BoundaryConditions[0].find("P") == 0 || BoundaryConditions[0].find("p") == 0 )
-      {
-        row_kernal[0] = NRows-1;
-        row_kernal[1] = NRows-1;
-        row_kernal[7] = NRows-1;
-      }
+          if( BoundaryConditions[0].find("B") == 0 || BoundaryConditions[0].find("b") == 0 )
+          {
+            one_if_a_baselevel_node = 1;
+          }
           else
-      {
-        row_kernal[0] = ndv;
-        row_kernal[1] = ndv;
-        row_kernal[7] = ndv;
-      }
+          {
+            // if periodic, reflect across to south boundary
+            if( BoundaryConditions[0].find("P") == 0 || BoundaryConditions[0].find("p") == 0 )
+            {
+              row_kernal[0] = NRows-1;
+              row_kernal[1] = NRows-1;
+              row_kernal[7] = NRows-1;
+            }
+            else
+            {
+              row_kernal[0] = ndv;
+              row_kernal[1] = ndv;
+              row_kernal[7] = ndv;
+            }
+          }
         }
-    }
         // EAST BOUNDAY
         if (col == NCols-1)
-    {
-      if( BoundaryConditions[1].find("B") == 0 || BoundaryConditions[1].find("b") == 0 )
         {
-          one_if_a_baselevel_node = 1;
-        }
-      else
-        {
-          if( BoundaryConditions[1].find("P") == 0 || BoundaryConditions[1].find("p") == 0)
-      {
-        col_kernal[1] = 0;
-        col_kernal[2] = 0;
-        col_kernal[3] = 0;
-      }
+          if( BoundaryConditions[1].find("B") == 0 || BoundaryConditions[1].find("b") == 0 )
+          {
+            one_if_a_baselevel_node = 1;
+          }
           else
-      {
-        col_kernal[1] = ndv;
-        col_kernal[2] = ndv;
-        col_kernal[3] = ndv;
-      }
+          {
+            if( BoundaryConditions[1].find("P") == 0 || BoundaryConditions[1].find("p") == 0)
+            {
+              col_kernal[1] = 0;
+              col_kernal[2] = 0;
+              col_kernal[3] = 0;
+            }
+            else
+            {
+              col_kernal[1] = ndv;
+              col_kernal[2] = ndv;
+              col_kernal[3] = ndv;
+            }
+          }
         }
-    }
         // SOUTH BOUNDARY
         if (row == NRows-1)
-    {
-      if( BoundaryConditions[2].find("B") == 0 || BoundaryConditions[2].find("b") == 0 )
         {
-          one_if_a_baselevel_node = 1;
-        }
-      else
-        {
-          if( BoundaryConditions[2].find("P") == 0 || BoundaryConditions[2].find("p") == 0)
-      {
-        row_kernal[3] = 0;
-        row_kernal[4] = 0;
-        row_kernal[5] = 0;
-      }
+          if( BoundaryConditions[2].find("B") == 0 || BoundaryConditions[2].find("b") == 0 )
+          {
+            one_if_a_baselevel_node = 1;
+          }
           else
-      {
-        row_kernal[3] = ndv;
-        row_kernal[4] = ndv;
-        row_kernal[5] = ndv;
-      }
+          {
+            if( BoundaryConditions[2].find("P") == 0 || BoundaryConditions[2].find("p") == 0)
+            {
+              row_kernal[3] = 0;
+              row_kernal[4] = 0;
+              row_kernal[5] = 0;
+            }
+            else
+            {
+              row_kernal[3] = ndv;
+              row_kernal[4] = ndv;
+              row_kernal[5] = ndv;
+            }
+          }
         }
-    }
         // WEST BOUNDARY
         if (col == 0)
-    {
-      if( BoundaryConditions[3].find("B") == 0 || BoundaryConditions[3].find("b") == 0 )
         {
-          one_if_a_baselevel_node = 1;
-        }
-      else
-        {
-          if( BoundaryConditions[3].find("P") == 0 || BoundaryConditions[3].find("p") == 0)
-      {
-        col_kernal[5] = NCols-1;
-        col_kernal[6] = NCols-1;
-        col_kernal[7] = NCols-1;
-      }
+          if( BoundaryConditions[3].find("B") == 0 || BoundaryConditions[3].find("b") == 0 )
+          {
+            one_if_a_baselevel_node = 1;
+          }
           else
-      {
-        col_kernal[5] = ndv;
-        col_kernal[6] = ndv;
-        col_kernal[7] = ndv;
-      }
+          {
+            if( BoundaryConditions[3].find("P") == 0 || BoundaryConditions[3].find("p") == 0)
+            {
+              col_kernal[5] = NCols-1;
+              col_kernal[6] = NCols-1;
+              col_kernal[7] = NCols-1;
+            }
+            else
+            {
+              col_kernal[5] = ndv;
+              col_kernal[6] = ndv;
+              col_kernal[7] = ndv;
+            }
+          }
         }
-    }
 
         // now loop through the surrounding nodes, calculating the slopes
         // slopes with NoData get NoData slopes
@@ -452,86 +455,86 @@ void LSDFlowInfo::create(vector<string>& temp_BoundaryConditions,
         // 5 4 3
         // first logic for baselevel node
         if (one_if_a_baselevel_node == 1)
-    {
-      // get receiver index
-      FlowDirection[row][col] = -1;
-      ReceiverVector.push_back(NodeIndex[row][col]);
-      FlowLengthCode[row][col] = 0;
-    }
+        {
+          // get receiver index
+          FlowDirection[row][col] = -1;
+          ReceiverVector.push_back(NodeIndex[row][col]);
+          FlowLengthCode[row][col] = 0;
+        }
         // now the rest of the nodes
         else
-    {
-      FlowLengthCode[row][col] = 0;    // set flow length code to 0, this gets reset
-      // if there is a maximum slope
-      max_slope = 0;
-      max_slope_index = -1;
-      receive_row = row;
-      receive_col = col;
-      for (int slope_iter = 0; slope_iter<8; slope_iter++)
         {
-          if (row_kernal[slope_iter] == ndv || col_kernal[slope_iter] == ndv)
-      {
-        slopes[slope_iter] = NoDataValue;
-      }
-          else
-      {
-        target_elev = TopoRaster.RasterData[ row_kernal[slope_iter] ][ col_kernal[slope_iter] ];
-        if(target_elev == NoDataValue)
+          FlowLengthCode[row][col] = 0;    // set flow length code to 0, this gets reset
+          // if there is a maximum slope
+          max_slope = 0;
+          max_slope_index = -1;
+          receive_row = row;
+          receive_col = col;
+          for (int slope_iter = 0; slope_iter<8; slope_iter++)
           {
-            slopes[slope_iter] = NoDataValue;
-          }
-        else
-          {
-            if(slope_iter%2 == 0)
-        {
-          //cout << "LINE 988, cardinal direction, slope iter = " << slope_iter << endl;
-          slope = TopoRaster.RasterData[row][col]-target_elev;
-        }
+            if (row_kernal[slope_iter] == ndv || col_kernal[slope_iter] == ndv)
+            {
+              slopes[slope_iter] = NoDataValue;
+            }
             else
-        {
-          slope = one_ov_root2*(TopoRaster.RasterData[row][col]-target_elev);
-        }
+            {
+              target_elev = TopoRaster.RasterData[ row_kernal[slope_iter] ][ col_kernal[slope_iter] ];
+              if(target_elev == NoDataValue)
+              {
+                slopes[slope_iter] = NoDataValue;
+              }
+              else
+              {
+                if(slope_iter%2 == 0)
+                {
+                  //cout << "LINE 988, cardinal direction, slope iter = " << slope_iter << endl;
+                  slope = TopoRaster.RasterData[row][col]-target_elev;
+                }
+                else
+                {
+                  slope = one_ov_root2*(TopoRaster.RasterData[row][col]-target_elev);
+                }
 
-            if (slope > max_slope)
-        {
-          max_slope_index = slope_iter;
-          receive_row = row_kernal[slope_iter];
-          receive_col = col_kernal[slope_iter];
-          max_slope = slope;
-          if(slope_iter%2 == 0)
-            {
-              FlowLengthCode[row][col] = 1;
+                if (slope > max_slope)
+                {
+                  max_slope_index = slope_iter;
+                  receive_row = row_kernal[slope_iter];
+                  receive_col = col_kernal[slope_iter];
+                  max_slope = slope;
+                  if(slope_iter%2 == 0)
+                  {
+                    FlowLengthCode[row][col] = 1;
+                  }
+                  else
+                  {
+                    FlowLengthCode[row][col] = 2;
+                  }
+                }
+              }
             }
-          else
-            {
-              FlowLengthCode[row][col] = 2;
-            }
-        }
           }
-      }
-        }
-      // get receiver index
-      FlowDirection[row][col] = max_slope_index;
-      ReceiverVector.push_back(NodeIndex[receive_row][receive_col]);
-    }    // end if baselevel boundary  conditional
+          // get receiver index
+          FlowDirection[row][col] = max_slope_index;
+          ReceiverVector.push_back(NodeIndex[receive_row][receive_col]);
+        }    // end if baselevel boundary  conditional
 
         // if the node is a base level node, add it to the base level node list
         if (FlowLengthCode[row][col] == 0)
-    {
-      BaseLevelNodeList.push_back(NodeIndex[row][col]);
-    }
+        {
+          BaseLevelNodeList.push_back(NodeIndex[row][col]);
+        }
       }      // end if there is data conditional
-  }        // end col loop
-    }          // end row loop
+    }        // end col loop
+  }          // end row loop
 
 
 
   // first create the number of donors vector
   // from braun and willett eq. 5
   for(int i = 0; i<NDataNodes; i++)
-    {
-      NDonorsVector[ ReceiverVector[i] ]++;
-    }
+  {
+    NDonorsVector[ ReceiverVector[i] ]++;
+  }
 
 
   // now create the delta vector
@@ -539,9 +542,9 @@ void LSDFlowInfo::create(vector<string>& temp_BoundaryConditions,
   // from Braun and Willett eq 7 and 8
   DeltaVector[NDataNodes] = NDataNodes;
   for(int i = NDataNodes; i>0; i--)
-    {
-      DeltaVector[i-1] = DeltaVector[i] -  NDonorsVector[i-1];
-    }
+  {
+    DeltaVector[i-1] = DeltaVector[i] -  NDonorsVector[i-1];
+  }
 
 
   // now the DonorStack and the r vectors. These come from Braun and Willett
@@ -553,14 +556,14 @@ void LSDFlowInfo::create(vector<string>& temp_BoundaryConditions,
   int w_index;
   int delta_index;
   for (int i = 0; i<NDataNodes; i++)
-    {
-      r_index = ReceiverVector[i];
-      delta_index = DeltaVector[ r_index ];
-      w_index = w_vector[ r_index ];
-      DonorStackVector[  delta_index+w_index ] = i;
-      w_vector[r_index] += 1;
-      //cout << "i: " << i << " r_i: " << r_index << " delta_i: " << delta_index << " w_index: " << w_index << endl;
-    }
+  {
+    r_index = ReceiverVector[i];
+    delta_index = DeltaVector[ r_index ];
+    w_index = w_vector[ r_index ];
+    DonorStackVector[  delta_index+w_index ] = i;
+    w_vector[r_index] += 1;
+    //cout << "i: " << i << " r_i: " << r_index << " delta_i: " << delta_index << " w_index: " << w_index << endl;
+  }
 
 
   // now go through the base level node list, building the drainage tree for each of these nodes as one goes along
@@ -574,42 +577,42 @@ void LSDFlowInfo::create(vector<string>& temp_BoundaryConditions,
 
   j_index = 0;
   for (int i = 0; i<n_base_level_nodes; i++)
-    {
-      k = BaseLevelNodeList[i];      // set k to the base level node
-
-      // This doesn't seem to be in Braun and Willet but to get the ordering correct you
-      // need to make sure that the base level node appears first in the donorstack
-      // of nodes contributing to the baselevel node.
-      // For example, if base level node is 4, with 4 donors
-      // and the donor stack has 3 4 8 9
-      // the code has to put the 4 first.
-      if (DonorStackVector[ DeltaVector[k] ] != k)
   {
-    int this_index = DonorStackVector[ DeltaVector[k] ];
-    int bs_node = k;
+    k = BaseLevelNodeList[i];      // set k to the base level node
 
-    for(int ds_node = 1; ds_node < NDonorsVector[k]; ds_node++)
+    // This doesn't seem to be in Braun and Willet but to get the ordering correct you
+    // need to make sure that the base level node appears first in the donorstack
+    // of nodes contributing to the baselevel node.
+    // For example, if base level node is 4, with 4 donors
+    // and the donor stack has 3 4 8 9
+    // the code has to put the 4 first.
+    if (DonorStackVector[ DeltaVector[k] ] != k)
+    {
+      int this_index = DonorStackVector[ DeltaVector[k] ];
+      int bs_node = k;
+
+      for(int ds_node = 1; ds_node < NDonorsVector[k]; ds_node++)
       {
         if( DonorStackVector[ DeltaVector[k] + ds_node ] == bs_node )
-    {
-      DonorStackVector[ DeltaVector[k] ] = k;
-      DonorStackVector[ DeltaVector[k] + ds_node ] = this_index;
-    }
+        {
+          DonorStackVector[ DeltaVector[k] ] = k;
+          DonorStackVector[ DeltaVector[k] + ds_node ] = this_index;
+        }
       }
-  }
-
-      // now run recursive algorithm
-      begin_delta_index = DeltaVector[k];
-      end_delta_index = DeltaVector[k+1];
-
-      //cout << "base_level_node is: " << k << " begin_index: " << begin_delta_index << " end: " << end_delta_index << endl;
-
-      for (int delta_index = begin_delta_index; delta_index<end_delta_index; delta_index++)
-  {
-    l_index = DonorStackVector[delta_index];
-    add_to_stack(l_index, j_index, k);
-  }
     }
+
+    // now run recursive algorithm
+    begin_delta_index = DeltaVector[k];
+    end_delta_index = DeltaVector[k+1];
+
+    //cout << "base_level_node is: " << k << " begin_index: " << begin_delta_index << " end: " << end_delta_index << endl;
+
+    for (int delta_index = begin_delta_index; delta_index<end_delta_index; delta_index++)
+    {
+      l_index = DonorStackVector[delta_index];
+      add_to_stack(l_index, j_index, k);
+    }
+  }
 
   // now calcualte the indices
   calculate_upslope_reference_indices();
@@ -2805,9 +2808,9 @@ vector<int> LSDFlowInfo::get_upslope_nodes(int node_number_outlet)
   int end_SVector_node = start_SVector_node+NContributingNodes[node_number_outlet];
 
   for(int node = start_SVector_node; node < end_SVector_node; node++)
-    {
-      us_nodes.push_back(SVector[node]);
-    }
+  {
+    us_nodes.push_back(SVector[node]);
+  }
 
   return us_nodes;
 }
@@ -2828,18 +2831,18 @@ vector<int> LSDFlowInfo::get_upslope_nodes_include_outlet(int node_number_outlet
   us_nodes.push_back(node_number_outlet);
 
   if(node_number_outlet < 0 || node_number_outlet > NDataNodes-1)
-    {
-      cout << "the node index does not exist" << endl;
-      exit(EXIT_FAILURE);
-    }
+  {
+    cout << "the node index does not exist" << endl;
+    exit(EXIT_FAILURE);
+  }
 
   int start_SVector_node = SVectorIndex[node_number_outlet];
   int end_SVector_node = start_SVector_node+NContributingNodes[node_number_outlet];
 
   for(int node = start_SVector_node; node < end_SVector_node; node++)
-    {
-      us_nodes.push_back(SVector[node]);
-    }
+  {
+    us_nodes.push_back(SVector[node]);
+  }
 
   return us_nodes;
 }
@@ -5858,6 +5861,1375 @@ vector< Array2D<float> > LSDFlowInfo::HilltopFlowRouting(LSDRaster Elevation, LS
   return OutputArrays;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// Hilltop flow routing code built around original code from Martin Hurst. Based on
+// Lea (1992), with improvements discussed by Tarboton (1997) and a solution to the
+// problem of looping flow paths implemented.
+//
+// This code is SLOW but robust, a refactored version may appear, but there may not be
+// enough whisky in Scotland to support that endeavour.
+//
+// The algorithm now checks for local uphill flows and in the case of identifying one,
+// D8 flow path is used to push the flow into the centre of the steepest downslope
+// cell, at which point the trace is restarted. The same technique is used to cope
+// with self intersections of the flow path. These problems are not solved in the
+// original paper and I think they are caused at least in part by the high resolution
+// topogrpahy we are using.
+//
+// The code is also now built to take a d infinity flow direction raster instead of an
+// aspect raster. See Tarboton (1997) for discussions on why this is the best solution.
+//
+// The Basins input raster is used to code each hilltop into a basin to allow basin
+// averaging to take place.
+//
+// The final 5 parameters are used to set up printing flow paths to files for visualisation,
+// if this is not needed simply pass in false to the two boolean switches and empty variables for the
+// others, and the code will run as normal.
+//
+// The structure of the returned vector< Array2D<float> > is as follows:
+// [0] Hilltop Network coded with stream ID
+// [1] Hillslope Lengths
+// [2] Slope
+// [3] Relief
+//
+// SWDG 12/2/14
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+vector< Array2D<float> > LSDFlowInfo::HilltopFlowRouting_Refactored(LSDRaster& Elevation, LSDRaster& Hilltop_ID, LSDRaster& Slope, 
+                                                         LSDRaster& Aspect, LSDRaster& HilltopCurv, LSDRaster& PlanCurvature,
+                                                         LSDIndexRaster& StreamNetwork, LSDIndexRaster& Basins,
+                                                         string Prefix,
+                                                         bool print_paths_switch, int thinning, string trace_path, bool basin_filter_switch,
+                                                         vector<int> Target_Basin_Vector)
+{
+  //Declare parameters
+  int i,j;
+  int a = 0;
+  int b = 0;
+  float X,Y;
+  float mean_slope, relief;
+  float length, d;
+  int flag;
+  int count = 0;
+  int DivergentCountFlag = 0; //Flag used to count the number of divergent cells encountered in a trace
+  int PlanarCountFlag;
+  float PI = 3.14159265;
+  float degs, degs_new, theta;
+  //float s_local;
+  //float s_edge;
+  float xo, yo, xi, yi, temp_yo1, temp_yo2, temp_xo1, temp_xo2;
+  bool skip_trace; //flag used to skip traces where no path to a stream can be found. Will only occur on noisy, raw topography
+  float E_Star = 0;
+  float R_Star = 0;
+  float EucDist = 0;
+
+  //debugging counters
+  int ns_count = 0;
+  int s_count = 0;
+  int neg_count = 0;
+  int edge_count = 0;
+  int ht_count = 0;
+
+  // a direction flag numbered 1,2,3,4 for E,S,W,N respectively
+  int dir;
+
+  float ymax = YMinimum + NRows*DataResolution;
+
+
+  // The array of slopes. Hopefully this will save some sime
+  Array2D<float> tangent_raster = Aspect.get_RasterData();
+
+  //Get data arrays from LSDRasters
+  // SMM Not sure why we need these
+  Array2D<float> zeta = Elevation.get_RasterData(); //elevation
+  Array2D<int> stnet = StreamNetwork.get_RasterData(); // stream network
+  Array2D<float> aspect = Aspect.get_RasterData(); //aspect
+  Array2D<float> hilltop_ID = Hilltop_ID.get_RasterData(); //hilltops
+  Array2D<float> CHT = HilltopCurv.get_RasterData(); //hilltop curv
+  Array2D<float> slope = Slope.get_RasterData(); //hilltop slope
+  Array2D<int> basin = Basins.get_RasterData(); //basins
+
+  //empty arrays for data to be stored in
+  Array2D<float> rads(NRows,NCols,NoDataValue);
+  Array2D<float> tangents(NRows,NCols,NoDataValue);
+  Array2D<float> one_over_tangents(NRows,NCols,NoDataValue);
+
+
+
+  Array2D<float> path(NRows, NCols, 0.0);
+  Array2D<float> blank(NRows, NCols, 0.0);
+  Array2D<float> RoutedHilltops(NRows,NCols,NoDataValue);
+  Array2D<float> HillslopeLength_Array(NRows,NCols,NoDataValue);
+  Array2D<float> Slope_Array(NRows,NCols,NoDataValue);
+  Array2D<float> Relief_Array(NRows,NCols,NoDataValue);
+
+  //vector to store the output data arrays in one vector that can be returned
+  vector< Array2D<float> > OutputArrays;
+  vector<double> easting, northing, east_vec, north_vec, zeta_vec, length_vec, empty_vec;
+
+  ofstream ofs;
+
+  //create the output filename from the user supplied filename prefix
+  stringstream ss_filename;
+  ss_filename << Prefix << "_HilltopData.csv";
+
+  ofs.open(ss_filename.str().c_str());
+
+  if( ofs.fail() )
+  {
+    cout << "\nFATAL ERROR: unable to write to " << ss_filename.str() << endl;
+    exit(EXIT_FAILURE);
+  }
+  ofs << "easting,northing,i,j,hilltop_id,Cht,S,R,Lh,BasinID,a,b,StreamID,HilltopSlope,DivergentCount,PlanarCountFlag,E_Star,R_Star,EucDist\n";
+
+  //calculate northing and easting
+  cout << "XMinimum is " << XMinimum << endl;
+  cout << "YMinimum is " << YMinimum << endl;
+  cout << "ymax is " << ymax << endl;
+
+  for (i=0;i<NRows;++i) northing.push_back(ymax - DataResolution*(i - 0.5));
+  for (j=0;j<NCols;++j) easting.push_back(XMinimum + DataResolution*(j + 0.5));
+
+
+  //convert aspects to radians with east as theta = 0/2*pi
+  // also converts tangents. This saves time later
+  for (i=0; i<NRows; ++i)
+  {
+    for (j=0; j<NCols; ++j)
+    {
+      //convert aspects to radians with east as theta = 0/2*pi
+      if (aspect[i][j] != NoDataValue)
+      { 
+        rads[i][j] = BearingToRad(aspect[i][j]);
+        tangents[i][j] = tan(rads[i][j]);
+        one_over_tangents[i][j] = 1/tan(rads[i][j]);
+      }
+    }
+  }
+
+  // some time saving parameters
+  float half_datares = 0.5*DataResolution;
+  float pi_over_two = M_PI*0.5;
+
+
+  // cycle through study area, find hilltops and trace downstream
+  for (i=1; i<NRows-1; ++i)
+  {
+    cout << flush <<  "\tRow: " << i << " of = " << NRows-1 << "              \r";
+    for (j=1; j<NCols-1; ++j)
+    {
+
+      // ignore edge cells and non-hilltop cells
+      // route initial node by aspect and get outlet coordinates
+      if (hilltop_ID[i][j] != NoDataValue)
+      {
+
+        length = 0;
+        flag = true;
+        count = 1;
+        path = blank.copy();
+        DivergentCountFlag = 0; //initialise count of divergent cells in trace
+        PlanarCountFlag = 0;
+        skip_trace = false; //initialise skip trace flag as false, will only be switched if no path to stream can be found. Very rare.
+
+        E_Star = 0;
+        R_Star = 0;
+        EucDist = 0;
+
+        ++ht_count;
+
+        degs = aspect[i][j];
+        theta = rads[i][j];
+        a = i;
+        b = j;
+        path[a][b] += 1;
+        east_vec = empty_vec;
+        north_vec = empty_vec;
+        east_vec.push_back(easting[b]);
+        north_vec.push_back(northing[a]);
+        zeta_vec.push_back(zeta[a][b]);
+        length_vec.push_back(length);
+
+        //s_local = slope[a][b];
+
+        //test direction, calculate outlet coordinates and update indicies
+        // easterly
+        if (degs >= 45 && degs < 135)
+        {
+          //cout << "\neasterly" << endl;
+          xo = 1, yo = (1+tangents[i][j])*0.5;
+          d = abs(1/(2*cos(theta)));
+          xi = 0, yi = yo;
+          dir = 1;
+          east_vec.push_back(easting[b] + half_datares);
+          north_vec.push_back(northing[a] + (yo - 0.5)*DataResolution);
+          ++b;
+          if (yi == 0) yi = 0.00001;
+          else if (yi == 1) yi = 1 - 0.00001;
+        }
+        //southerly
+        else if (degs >= 135 && degs < 225)
+        {
+          //cout << "\nsoutherly" << endl;
+          xo = (1-one_over_tangents[i][j])*0.5, yo = 0;
+          d = abs(1/(2*cos((pi_over_two)-theta)));
+          xi = xo, yi = 1;
+          dir = 2;
+          east_vec.push_back(easting[b] + (xo - 0.5)*DataResolution);
+          north_vec.push_back(northing[a] - half_datares);
+          ++a;
+          if (xi == 0) xi = 0.00001;
+          else if (xi == 1) xi = 1 - 0.00001;
+        }
+        // westerly
+        else if (degs >= 225 && degs < 315)
+        {
+          xo = 0, yo = (1-tangents[i][j])*0.5;
+          d = abs(1/(2*cos(theta)));
+          xi = 1,  yi = yo;
+          dir = 3;
+          east_vec.push_back(easting[b] -half_datares);
+          north_vec.push_back(northing[a] + (yo - 0.5)*DataResolution);
+          --b;
+          if (yi == 0) yi = 0.00001;
+          else if (yi == 1) yi = 1 - 0.00001;
+        }
+        //northerly
+        else if (degs >= 315 || degs < 45)
+        {
+          xo = (1+one_over_tangents[i][j])*0.5, yo = 1;
+          d = abs(1/(2*cos((pi_over_two) - theta)));
+          xi = xo, yi = 0;
+          dir = 4;
+          east_vec.push_back(easting[b] + (xo - 0.5)*DataResolution);
+          north_vec.push_back(northing[a] + half_datares);
+          --a;
+          if (xi == 0) xi = 0.00001;
+          else if (xi == 1) xi = 1 - 0.00001;
+        }
+        else
+        {
+          cout << "FATAL ERROR, Kinematic routing algorithm enountered null aspect value" << endl;
+          exit(EXIT_FAILURE);
+        }
+
+        //collect slopes and totals weighted by path length
+        length += d;
+        //s_local = slope[a][b];
+
+        //update elevation length vectors
+        zeta_vec.push_back(zeta[a][b]);
+        length_vec.push_back(length*DataResolution);
+
+        //continue trace until a stream node is encountered
+        while (flag == true && a > 0 && a < NRows-1 && b > 0 && b < NCols-1)
+        {   //added boudary checking to catch cells which flow off the  edge of the DEM tile.
+
+          path[a][b] += 1;
+
+          degs_new = aspect[a][b];
+          theta = rads[a][b];
+          ++count;
+
+          //Test for perimeter flow paths
+          if ((dir == 1 && degs_new > 0 && degs_new < 180)
+              || (dir == 2 && degs_new > 90 && degs_new < 270)
+              || (dir == 3 && degs_new > 180 && degs_new < 360)
+              || ((dir == 4 && degs_new > 270) || (dir == 4 && degs_new < 90)))
+          {
+
+            //DO NORMAL FLOW PATH
+            //set xo, yo to 0 and 1 in turn and test for true outlet (xi || yi == 0 || 1)
+            temp_yo1 = yi + (1-xi)*tangents[a][b];     // xo = 1
+            temp_xo1 = xi + (1-yi)*(one_over_tangents[a][b]);   // yo = 1
+            temp_yo2 = yi - xi*tangents[a][b];      // xo = 0
+            temp_xo2 = xi - yi*(one_over_tangents[a][b]);    // yo = 0
+
+            // can't outlet at same point as inlet
+            if (dir == 1) temp_yo2 = -1;
+            else if (dir == 2) temp_xo1 = -1;
+            else if (dir == 3) temp_yo1 = -1;
+            else if (dir == 4) temp_xo2 = -1;
+
+            //s_local = slope[a][b];
+
+            if (temp_yo1 <= 1 && temp_yo1 > 0)
+            {
+              xo = 1, yo = temp_yo1;
+              d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+              xi = 0, yi = yo,
+              dir = 1;
+              east_vec.push_back(easting[b] + half_datares);
+              north_vec.push_back(northing[a] + (yo - 0.5)*DataResolution);
+              ++b;
+              if (xi== 0 && yi == 0) yi = 0.00001;
+              else if (xi== 0 && yi == 1) yi = 1 - 0.00001;
+            }
+            else if (temp_xo2 <= 1 && temp_xo2 > 0)
+            {
+              xo = temp_xo2, yo = 0;
+              d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+              xi = xo, yi = 1,
+              dir = 2;
+              east_vec.push_back(easting[b] + (xo - 0.5)*DataResolution);
+              north_vec.push_back(northing[a] - half_datares);
+              ++a;
+              if (xi== 0 && yi == 1) xi = 0.00001;
+              else if (xi== 1 && yi == 1) xi = 1 - 0.00001;
+            }
+            else if (temp_yo2 <= 1 && temp_yo2 > 0)
+            {
+              xo = 0, yo = temp_yo2;
+              d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+              xi = 1, yi = yo,
+              dir = 3;
+              east_vec.push_back(easting[b] -half_datares);
+              north_vec.push_back(northing[a] + (yo - 0.5)*DataResolution);
+              --b;
+              if (xi== 1 && yi == 0) yi = 0.00001;
+              else if (xi== 1 && yi == 1) yi = 1 - 0.00001;
+            }
+            else if (temp_xo1 <= 1 && temp_xo1 > 0)
+            {
+              xo = temp_xo1, yo = 1;
+              d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+              xi = xo, yi = 0,
+              dir = 4;
+              east_vec.push_back(easting[b] + (xo - 0.5)*DataResolution);
+              north_vec.push_back(northing[a] + half_datares);
+              --a;
+              if (xi == 0 && yi == 0) xi = 0.00001;
+              else if (xi== 1 && yi == 0) xi = 1 - 0.00001;
+            }
+          }
+          else
+          {
+            // ROUTE ALONG EDGES
+            if (dir  == 1)
+            {
+              if (degs_new <= 90 || degs_new >= 270)
+              {
+                //secondary compenent of flow is north
+                xo = 0.00001, yo = 1;
+                //s_edge = abs(s_local*sin(theta));
+                d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+                xi = xo, yi = 1-yo;
+                dir = 4;
+                east_vec.push_back(easting[b] + (xo - 0.5)*DataResolution);
+                north_vec.push_back(northing[a] + half_datares);
+                --a;
+              }
+              else if (degs_new > 90 && degs_new < 270) {  //secondary component is south
+                xo = 0.00001, yo = 0;
+                //s_edge = abs(s_local*sin((PI/2)-theta));
+                d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+                xi = xo, yi = 1-yo;
+                dir = 2;
+                east_vec.push_back(easting[b] + (xo - 0.5)*DataResolution);
+                north_vec.push_back(northing[a] - half_datares);
+                ++a;
+              }
+              else
+              {
+                cout << "Flow unable to route N or S " << endl; //something has gone very wrong...
+                cout << "Trace skipped.\n" << endl;
+                skip_trace = true;
+                //exit(EXIT_FAILURE);
+              }
+            }
+            else if (dir == 2)
+            {
+              if (degs_new >= 0 && degs_new <= 180)
+              {
+                //secondary component is East
+                xo = 1, yo = 1-0.00001;
+                //s_edge = abs(s_local*sin((2/PI)-theta));
+                d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+                xi = 1-xo, yi = yo;
+                dir = 1;
+                east_vec.push_back(easting[b] + half_datares);
+                north_vec.push_back(northing[a] + (yo - 0.5)*DataResolution);
+                ++b;
+              }
+              else if (degs_new > 180 && degs_new <= 360)
+              {
+                //secondary component is West
+                xo = 0, yo = 1-0.00001;
+                //s_edge = abs(s_local*sin(theta));
+                d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+                xi = 1-xo, yi = yo;
+                dir = 3;
+                east_vec.push_back(easting[b] -half_datares);
+                north_vec.push_back(northing[a] + (yo - 0.5)*DataResolution);
+                --b;
+              }
+              else
+              {
+                cout << "Flow unable to route E or W" << endl; //something has gone very wrong...
+                cout << "Trace skipped.\n" << endl;
+                skip_trace = true;
+                            //exit(EXIT_FAILURE);
+              }
+            }
+            else if (dir == 3)
+            {
+              if   (degs_new >= 90 && degs_new <= 270)
+              {
+                //secondary component is South
+                xo = 1-0.00001, yo = 0;
+                //s_edge = abs(s_local*sin(theta));
+                d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+                xi = xo, yi = 1-yo;
+                dir = 2;
+                east_vec.push_back(easting[b] + (xo - 0.5)*DataResolution);
+                north_vec.push_back(northing[a] - half_datares);
+                ++a;
+              }
+              else if (degs_new > 270 || degs_new < 90)
+              {
+                //secondary component is North
+                xo = 1-0.00001, yo = 1;
+                //s_edge = abs(s_local*sin((2/PI) - theta));
+                d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+                xi = xo, yi = 1- yo;
+                dir = 4;
+                east_vec.push_back(easting[b] + (xo - 0.5)*DataResolution);
+                north_vec.push_back(northing[a] + half_datares);
+                --a;
+              }
+              else
+              {
+                cout << "Flow unable to route N or S" << endl;  //something has gone very wrong...
+                cout << "Trace skipped.\n" << endl;
+                skip_trace = true;
+                          //exit(EXIT_FAILURE);
+              }
+            }
+            else if (dir == 4)
+            {
+              if   (degs_new >= 180 && degs_new <= 360)
+              {
+                //secondary component is West
+                xo = 0, yo = 0.00001;
+                //s_edge = abs(s_local*sin((PI/2) - theta));
+                d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+                xi = 1-xo, yi = yo;
+                dir = 3;
+                east_vec.push_back(easting[b] -half_datares);
+                north_vec.push_back(northing[a] + (yo - 0.5)*DataResolution);
+                --b;
+              }
+              else if (degs_new >= 0 && degs_new < 180)
+              {
+                //secondary component is East
+                xo = 1, yo = 0.00001;
+                //s_edge = abs(s_local*sin(theta));
+                d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+                xi = 1-xo, yi = yo;
+                dir = 1;
+                east_vec.push_back(easting[b] + half_datares);
+                north_vec.push_back(northing[a] + (yo - 0.5)*DataResolution);
+                ++b;
+              }
+              else
+              {
+                cout << "Flow unable to route E or W" << endl; //something has gone very wrong...
+                cout << "Trace skipped.\n" << endl;
+                skip_trace = true;
+                            //exit(EXIT_FAILURE);
+              }
+            }
+          }
+
+          if (path[a][b] < 1)
+          {  // only update length on 'first slosh'
+            length += d;
+          }
+          else if (path[a][b] >= 3)
+          { //update the skip trace flag so we can categorise each trace
+             skip_trace = true;
+          }
+          degs = degs_new;
+
+          zeta_vec.push_back(zeta[a][b]);
+          length_vec.push_back(length*DataResolution);
+
+          // test for plan curvature here and set a flag if flow is divergent or convergent but continue trace regardless
+          // The larger the counter the more convergent or divergent the trace is
+          if (abs(PlanCurvature.get_data_element(a,b)) > (0.001))
+          {
+            ++DivergentCountFlag;
+          }
+          else
+          {
+            ++PlanarCountFlag;
+          }
+
+          if (a == 0 || b == 0 ||  a == NRows-1 || b == NCols-1 || stnet[a][b] != NoDataValue || path[a][b] >= 3 || skip_trace == true) flag = false;
+        }
+
+        if (a == 0 || b == 0 ||  a == NRows-1 || b == NCols-1 )
+        {
+          // avoid going out of bounds.
+
+          // this is caused by having a hilltop on the first row or col away from the border
+          // eg i or j == 1 or nrows/ncols - 2 and flowing towards the edge.
+          // can fix with a test here for if streamnet[a][b] != NDV otherwise trace will fail *correctly*
+
+          ++edge_count;
+
+        }
+        else
+        {
+        //if trace finished at a stream, print hillslope info.
+          if (stnet[a][b] != NoDataValue) // || stnet[a-1][b-1] != NoDataValue || stnet[a][b-1] != NoDataValue || stnet[a+1][b-1] != NoDataValue || stnet[a+1][b] != NoDataValue || stnet[a+1][b+1] != NoDataValue || stnet[a][b+1] != NoDataValue || stnet[a-1][b+1] != NoDataValue || stnet[a-1][b] != NoDataValue)
+          {
+            path[a][b] = 1;
+
+            ++s_count;
+
+            X = easting[j];
+            Y = northing[i];
+            relief = zeta[i][j] - zeta[a][b];
+            mean_slope = relief/(length * DataResolution);
+
+            // update arrays with the current metrics
+            RoutedHilltops[i][j] = 1;
+            HillslopeLength_Array[i][j] = (length * DataResolution);
+            Slope_Array[i][j] = mean_slope;
+            Relief_Array[i][j] = relief;
+
+            //calculate an E* and R* Value assuming S_c of 0.8
+            E_Star = (2.0 * abs(CHT[i][j])*(length*DataResolution))/0.8;
+            R_Star = relief/((length*DataResolution)*0.8);
+
+            //calulate the Euclidean distance between the start and end points of the trace
+            EucDist = sqrt((pow(((i+0.5)-(a+yo)),2) + pow(((j+0.5)-(b+xo)),2))) * DataResolution;
+
+            if (relief > 0)
+            {
+              ofs << X << "," << Y << "," << i << "," << j << "," << hilltop_ID[i][j] << "," << CHT[i][j] << "," << mean_slope << "," << relief << "," << length*DataResolution << "," << basin[a][b] << "," << a << "," << b << "," << stnet[a][b] << "," << slope[i][j] << "," << DivergentCountFlag << "," << PlanarCountFlag << "," << E_Star << "," << R_Star << "," << EucDist << "\n";
+            }
+            else
+            {
+              ++neg_count;
+            }
+          }
+          else
+          {
+            //unable to route using aspects
+            //this will encompass skipped traces
+            //ofs << "fail: " << a << " " << b << " " << i << " " << j << endl;
+            ++ns_count;
+          }
+        }
+
+        //This block checks the various path printing options and writes the data out accordingly
+        if (print_paths_switch == true)
+        {
+          if (ht_count % thinning == 0)
+          {
+            if (hilltop_ID[i][j] != NoDataValue) // && skip_trace == false)
+            { //check that the current i,j tuple corresponds to a hilltop, ie there is actually a trace to write to file, and check that the trace was valid.
+
+              //declare some params for lat long conversion
+              double latitude,longitude;
+              LSDCoordinateConverterLLandUTM Converter;
+
+	            //create the output filename from the user supplied path
+              ofstream pathwriter;
+              string OutputFileName = Prefix+"_hillslope_traces.csv";
+	            ifstream oftest(OutputFileName.c_str());
+	            bool FileExists = false;
+	            if (oftest) FileExists = true;
+	            oftest.close();
+
+	            //open the output filestream and write headers
+	            ofstream WriteTracesFile;
+	            if (FileExists == 0)
+	            {
+		            WriteTracesFile.open(OutputFileName.c_str());
+                //write headers to allow pandas dataframe reading
+                if (WriteTracesFile.is_open()) WriteTracesFile << "HilltopID,Easting,Northing,Latitude,Longitude,Distance,Elevation" << endl;
+	            }
+	            WriteTracesFile.close();
+
+              //open output filestream again to  coastline data
+	            WriteTracesFile.open(OutputFileName.c_str(), fstream::app|fstream::out);
+
+	            //Check if file exists if not open a new one and write headers
+	            if (WriteTracesFile.is_open())
+	            {
+		            for (int v = 0; v < count+1; ++v)
+		            {
+                  //get lat long for printing to file
+                  get_lat_and_long_locations(east_vec[v], north_vec[v], latitude, longitude, Converter);
+
+                  if (basin_filter_switch == false)
+                  {
+                    WriteTracesFile << ht_count << "," << setiosflags(ios::fixed) << setprecision(10) << east_vec[v] << "," << north_vec[v] << "," << latitude << "," << longitude << "," << length_vec[v] << "," << zeta_vec[v] << endl;
+                  }
+                  else if (basin_filter_switch == true && find(Target_Basin_Vector.begin(), Target_Basin_Vector.end(), basin[a][b]) != Target_Basin_Vector.end() && find(Target_Basin_Vector.begin(), Target_Basin_Vector.end(), basin[i][j]) != Target_Basin_Vector.end())
+                  {  //is this correct? evaulating to not equal one past the end of the vector should equal that the value is found
+                    WriteTracesFile << ht_count << "," << setiosflags(ios::fixed) << setprecision(10) << east_vec[v] << "," << north_vec[v] << "," << latitude << "," << longitude << "," << length_vec[v] << "," << zeta_vec[v] << endl;
+                  }
+                }
+              }
+              WriteTracesFile.close();
+            }
+          }
+        } // End of path printing logic
+      }
+    } //for loop i,j
+  }
+
+  ofs.close();
+
+  //add the data arrays to the output vector
+  OutputArrays.push_back(RoutedHilltops);
+  OutputArrays.push_back(HillslopeLength_Array);
+  OutputArrays.push_back(Slope_Array);
+  OutputArrays.push_back(Relief_Array);
+
+  //Print debugging info to screen
+  cout << endl; //push output onto new line
+  cout << "Hilltop count: " << ht_count << endl;
+  cout << "Stream count: " << s_count << endl;
+  cout << "Fail count: " << ns_count << endl;
+  cout << "Uphill count: " << neg_count << endl;
+  cout << "Edge count: " << edge_count << endl;
+
+  return OutputArrays;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// Hilltop flow routing code built around original code from Martin Hurst. Based on
+// Lea (1992), with improvements discussed by Tarboton (1997) and a solution to the
+// problem of looping flow paths implemented.
+//
+// This code is SLOW but robust, a refactored version may appear, but there may not be
+// enough whisky in Scotland to support that endeavour.
+//
+// The algorithm now checks for local uphill flows and in the case of identifying one,
+// D8 flow path is used to push the flow into the centre of the steepest downslope
+// cell, at which point the trace is restarted. The same technique is used to cope
+// with self intersections of the flow path. These problems are not solved in the
+// original paper and I think they are caused at least in part by the high resolution
+// topogrpahy we are using.
+//
+// The code is also now built to take a d infinity flow direction raster instead of an
+// aspect raster. See Tarboton (1997) for discussions on why this is the best solution.
+//
+// The Basins input raster is used to code each hilltop into a basin to allow basin
+// averaging to take place.
+//
+// The final 5 parameters are used to set up printing flow paths to files for visualisation,
+// if this is not needed simply pass in false to the two boolean switches and empty variables for the
+// others, and the code will run as normal.
+//
+//
+// SWDG 12/2/14
+// SMM refactored to be more memory efficient 28/01/2021
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDFlowInfo::HilltopFlowRouting_TerrifyingRefactored(LSDRaster& Elevation, LSDRaster& Aspect, LSDRaster& PlanCurvature,
+                                                         LSDIndexRaster& StreamNetwork, string ridges_csv_name,string Prefix,
+                                                         bool print_paths_switch, int thinning, string trace_path, bool basin_filter_switch)
+{
+  
+  // Load the ridges csv
+  LSDSpatialCSVReader RidgesData(Elevation, ridges_csv_name);
+
+  // Grab the data elements from the Ridges data
+  vector<int> ht_row_vec = RidgesData.data_column_to_int("row");
+  vector<int> ht_col_vec = RidgesData.data_column_to_int("col");
+  vector<int> basin_vec = RidgesData.data_column_to_int("basin_id");
+  vector<float> ht_slope_vec = RidgesData.data_column_to_float("slope");
+  vector<float> ht_curv_vec = RidgesData.data_column_to_float("curvature");
+
+  vector<double> ht_lat_vec = RidgesData.get_latitude();
+  vector<double> ht_long_vec = RidgesData.get_longitude();
+
+
+  LSDCoordinateConverterLLandUTM Converter;
+  
+  //Declare parameters
+  int i,j;
+  int a = 0;
+  int b = 0;
+  float X,Y;
+  float mean_slope, relief;
+  float length, d;
+  int flag;
+  int count = 0;
+  int DivergentCountFlag = 0; //Flag used to count the number of divergent cells encountered in a trace
+  int PlanarCountFlag;
+  float PI = 3.14159265;
+  float degs, degs_new, theta;
+  //float s_local;
+  //float s_edge;
+  float xo, yo, xi, yi, temp_yo1, temp_yo2, temp_xo1, temp_xo2;
+  bool skip_trace; //flag used to skip traces where no path to a stream can be found. Will only occur on noisy, raw topography
+  float E_Star = 0;
+  float R_Star = 0;
+  float EucDist = 0;
+
+  float CHT,HT_slope,trace_length;
+  double HT_latitude, HT_longitude;
+  int basin_ID;
+
+  //debugging counters
+  int ns_count = 0;
+  int s_count = 0;
+  int neg_count = 0;
+  int edge_count = 0;
+  int ht_count = 0;
+
+  // a direction flag numbered 1,2,3,4 for E,S,W,N respectively
+  int dir;
+  float ymax = YMinimum + NRows*DataResolution;
+
+
+  //empty arrays for data to be stored in
+  Array2D<float> rads(NRows,NCols,NoDataValue);
+  Array2D<float> tangents(NRows,NCols,NoDataValue);
+  Array2D<float> one_over_tangents(NRows,NCols,NoDataValue);
+
+
+  Array2D<float> path(NRows, NCols, 0.0);
+  Array2D<float> blank(NRows, NCols, 0.0);
+  Array2D<float> RoutedHilltops(NRows,NCols,NoDataValue);
+
+  //vector to store the output data arrays in one vector that can be returned
+  vector< Array2D<float> > OutputArrays;
+  vector<double> easting, northing, east_vec, north_vec, zeta_vec, length_vec, empty_vec;
+
+  ofstream ofs;
+
+  //create the output filename from the user supplied filename prefix
+  stringstream ss_filename;
+  ss_filename << Prefix << "_HilltopData_TN.csv";
+
+  ofs.open(ss_filename.str().c_str());
+
+  if( ofs.fail() )
+  {
+    cout << "\nFATAL ERROR: unable to write to " << ss_filename.str() << endl;
+    exit(EXIT_FAILURE);
+  }
+  ofs << "latitude,longitude,easting,northing,row,col,Cht,S,R,Lh,BasinID,channel_row,channel_col,StreamID,HilltopSlope,DivergentCount,PlanarCountFlag,E_Star,R_Star,EucDist\n";
+
+  //calculate northing and easting
+  cout << "XMinimum is " << XMinimum << endl;
+  cout << "YMinimum is " << YMinimum << endl;
+  cout << "ymax is " << ymax << endl;
+
+  for (i=0;i<NRows;++i) northing.push_back(ymax - DataResolution*(i - 0.5));
+  for (j=0;j<NCols;++j) easting.push_back(XMinimum + DataResolution*(j + 0.5));
+
+
+  //convert aspects to radians with east as theta = 0/2*pi
+  // also converts tangents. This saves time later
+  for (i=0; i<NRows; ++i)
+  {
+    for (j=0; j<NCols; ++j)
+    {
+      //convert aspects to radians with east as theta = 0/2*pi
+      if (Aspect.get_data_element(i,j) != NoDataValue)
+      { 
+        rads[i][j] = BearingToRad(Aspect.get_data_element(i,j));
+        tangents[i][j] = tan(rads[i][j]);
+        one_over_tangents[i][j] = 1/tan(rads[i][j]);
+      }
+    }
+  }
+
+  // some time saving parameters
+  float half_datares = 0.5*DataResolution;
+  float pi_over_two = M_PI*0.5;
+
+
+  // cycle through the hilltops, find hilltops and trace downstream
+  bool trace_sucess;
+  for (int ht_node = 0; ht_node < int(ht_row_vec.size()); ht_node++)
+  {
+    cout << flush <<  "\tHilltop pixel: " << ht_node << " of = " << int(ht_row_vec.size()) << "              \r";
+
+    // resest the trace sucess. This only gets set to true if the trace worked. 
+
+    trace_sucess = false;
+    // Get the hilltop data
+    i =  ht_row_vec[ht_node];
+    j =  ht_col_vec[ht_node];
+    basin_ID = basin_vec[ht_node];
+
+    HT_slope = ht_slope_vec[ht_node];
+    CHT = ht_curv_vec[ht_node];
+
+    HT_latitude = ht_lat_vec[ht_node];
+    HT_longitude = ht_long_vec[ht_node];
+
+    length = 0;
+    flag = true;
+    count = 1;
+    path = blank.copy();
+    DivergentCountFlag = 0; //initialise count of divergent cells in trace
+    PlanarCountFlag = 0;
+    skip_trace = false; //initialise skip trace flag as false, will only be switched if no path to stream can be found. Very rare.
+
+    E_Star = 0;
+    R_Star = 0;
+    EucDist = 0;
+
+    ++ht_count;
+
+    degs = Aspect.get_data_element(i,j);
+    theta = rads[i][j];
+    a = i;
+    b = j;
+    path[a][b] += 1;
+    east_vec = empty_vec;
+    north_vec = empty_vec;
+    east_vec.push_back(easting[b]);
+    north_vec.push_back(northing[a]);
+    zeta_vec.push_back(Elevation.get_data_element(a,b));
+    length_vec.push_back(length);
+
+    //s_local = slope[a][b];
+
+    //test direction, calculate outlet coordinates and update indicies
+    // easterly
+    if (degs >= 45 && degs < 135)
+    {
+      //cout << "\neasterly" << endl;
+      xo = 1, yo = (1+tangents[i][j])*0.5;
+      d = abs(1/(2*cos(theta)));
+      xi = 0, yi = yo;
+      dir = 1;
+      east_vec.push_back(easting[b] + half_datares);
+      north_vec.push_back(northing[a] + (yo - 0.5)*DataResolution);
+      ++b;
+      if (yi == 0) yi = 0.00001;
+      else if (yi == 1) yi = 1 - 0.00001;
+    }
+    //southerly
+    else if (degs >= 135 && degs < 225)
+    {
+      //cout << "\nsoutherly" << endl;
+      xo = (1-one_over_tangents[i][j])*0.5, yo = 0;
+      d = abs(1/(2*cos((pi_over_two)-theta)));
+      xi = xo, yi = 1;
+      dir = 2;
+      east_vec.push_back(easting[b] + (xo - 0.5)*DataResolution);
+      north_vec.push_back(northing[a] - half_datares);
+      ++a;
+      if (xi == 0) xi = 0.00001;
+      else if (xi == 1) xi = 1 - 0.00001;
+    }
+    // westerly
+    else if (degs >= 225 && degs < 315)
+    {
+      xo = 0, yo = (1-tangents[i][j])*0.5;
+      d = abs(1/(2*cos(theta)));
+      xi = 1,  yi = yo;
+      dir = 3;
+      east_vec.push_back(easting[b] -half_datares);
+      north_vec.push_back(northing[a] + (yo - 0.5)*DataResolution);
+      --b;
+      if (yi == 0) yi = 0.00001;
+      else if (yi == 1) yi = 1 - 0.00001;
+    }
+    //northerly
+    else if (degs >= 315 || degs < 45)
+    {
+      xo = (1+one_over_tangents[i][j])*0.5, yo = 1;
+      d = abs(1/(2*cos((pi_over_two) - theta)));
+      xi = xo, yi = 0;
+      dir = 4;
+      east_vec.push_back(easting[b] + (xo - 0.5)*DataResolution);
+      north_vec.push_back(northing[a] + half_datares);
+      --a;
+      if (xi == 0) xi = 0.00001;
+      else if (xi == 1) xi = 1 - 0.00001;
+    }
+    else
+    {
+      cout << "FATAL ERROR, Kinematic routing algorithm enountered null aspect value" << endl;
+      exit(EXIT_FAILURE);
+    }
+
+    //collect slopes and totals weighted by path length
+    length += d;
+    //s_local = slope[a][b];
+
+    //update elevation length vectors
+    zeta_vec.push_back(Elevation.get_data_element(a,b));
+    length_vec.push_back(length*DataResolution);
+
+    //continue trace until a stream node is encountered
+    while (flag == true && a > 0 && a < NRows-1 && b > 0 && b < NCols-1)
+    {   //added boudary checking to catch cells which flow off the  edge of the DEM tile.
+
+      path[a][b] += 1;
+
+      degs_new = Aspect.get_data_element(a,b);
+      theta = rads[a][b];
+      ++count;
+
+      //Test for perimeter flow paths
+      if ((dir == 1 && degs_new > 0 && degs_new < 180)
+          || (dir == 2 && degs_new > 90 && degs_new < 270)
+          || (dir == 3 && degs_new > 180 && degs_new < 360)
+          || ((dir == 4 && degs_new > 270) || (dir == 4 && degs_new < 90)))
+      {
+
+        //DO NORMAL FLOW PATH
+        //set xo, yo to 0 and 1 in turn and test for true outlet (xi || yi == 0 || 1)
+        temp_yo1 = yi + (1-xi)*tangents[a][b];     // xo = 1
+        temp_xo1 = xi + (1-yi)*(one_over_tangents[a][b]);   // yo = 1
+        temp_yo2 = yi - xi*tangents[a][b];      // xo = 0
+        temp_xo2 = xi - yi*(one_over_tangents[a][b]);    // yo = 0
+
+        // can't outlet at same point as inlet
+        if (dir == 1) temp_yo2 = -1;
+        else if (dir == 2) temp_xo1 = -1;
+        else if (dir == 3) temp_yo1 = -1;
+        else if (dir == 4) temp_xo2 = -1;
+
+        //s_local = slope[a][b];
+
+        if (temp_yo1 <= 1 && temp_yo1 > 0)
+        {
+          xo = 1, yo = temp_yo1;
+          d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+          xi = 0, yi = yo,
+          dir = 1;
+          east_vec.push_back(easting[b] + half_datares);
+          north_vec.push_back(northing[a] + (yo - 0.5)*DataResolution);
+          ++b;
+          if (xi== 0 && yi == 0) yi = 0.00001;
+          else if (xi== 0 && yi == 1) yi = 1 - 0.00001;
+        }
+        else if (temp_xo2 <= 1 && temp_xo2 > 0)
+        {
+          xo = temp_xo2, yo = 0;
+          d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+          xi = xo, yi = 1,
+          dir = 2;
+          east_vec.push_back(easting[b] + (xo - 0.5)*DataResolution);
+          north_vec.push_back(northing[a] - half_datares);
+          ++a;
+          if (xi== 0 && yi == 1) xi = 0.00001;
+          else if (xi== 1 && yi == 1) xi = 1 - 0.00001;
+        }
+        else if (temp_yo2 <= 1 && temp_yo2 > 0)
+        {
+          xo = 0, yo = temp_yo2;
+          d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+          xi = 1, yi = yo,
+          dir = 3;
+          east_vec.push_back(easting[b] -half_datares);
+          north_vec.push_back(northing[a] + (yo - 0.5)*DataResolution);
+          --b;
+          if (xi== 1 && yi == 0) yi = 0.00001;
+          else if (xi== 1 && yi == 1) yi = 1 - 0.00001;
+        }
+        else if (temp_xo1 <= 1 && temp_xo1 > 0)
+        {
+          xo = temp_xo1, yo = 1;
+          d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+          xi = xo, yi = 0,
+          dir = 4;
+          east_vec.push_back(easting[b] + (xo - 0.5)*DataResolution);
+          north_vec.push_back(northing[a] + half_datares);
+          --a;
+          if (xi == 0 && yi == 0) xi = 0.00001;
+          else if (xi== 1 && yi == 0) xi = 1 - 0.00001;
+        }
+      }
+      else
+      {
+        // ROUTE ALONG EDGES
+        if (dir  == 1)
+        {
+          if (degs_new <= 90 || degs_new >= 270)
+          {
+            //secondary compenent of flow is north
+            xo = 0.00001, yo = 1;
+            //s_edge = abs(s_local*sin(theta));
+            d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+            xi = xo, yi = 1-yo;
+            dir = 4;
+            east_vec.push_back(easting[b] + (xo - 0.5)*DataResolution);
+            north_vec.push_back(northing[a] + half_datares);
+            --a;
+          }
+          else if (degs_new > 90 && degs_new < 270) {  //secondary component is south
+            xo = 0.00001, yo = 0;
+            //s_edge = abs(s_local*sin((PI/2)-theta));
+            d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+            xi = xo, yi = 1-yo;
+            dir = 2;
+            east_vec.push_back(easting[b] + (xo - 0.5)*DataResolution);
+            north_vec.push_back(northing[a] - half_datares);
+            ++a;
+          }
+          else
+          {
+            cout << "Flow unable to route N or S " << endl; //something has gone very wrong...
+            cout << "Trace skipped.\n" << endl;
+            skip_trace = true;
+            //exit(EXIT_FAILURE);
+          }
+        }
+        else if (dir == 2)
+        {
+          if (degs_new >= 0 && degs_new <= 180)
+          {
+            //secondary component is East
+            xo = 1, yo = 1-0.00001;
+            //s_edge = abs(s_local*sin((2/PI)-theta));
+            d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+            xi = 1-xo, yi = yo;
+            dir = 1;
+            east_vec.push_back(easting[b] + half_datares);
+            north_vec.push_back(northing[a] + (yo - 0.5)*DataResolution);
+            ++b;
+          }
+          else if (degs_new > 180 && degs_new <= 360)
+          {
+            //secondary component is West
+            xo = 0, yo = 1-0.00001;
+            //s_edge = abs(s_local*sin(theta));
+            d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+            xi = 1-xo, yi = yo;
+            dir = 3;
+            east_vec.push_back(easting[b] -half_datares);
+            north_vec.push_back(northing[a] + (yo - 0.5)*DataResolution);
+            --b;
+          }
+          else
+          {
+            cout << "Flow unable to route E or W" << endl; //something has gone very wrong...
+            cout << "Trace skipped.\n" << endl;
+            skip_trace = true;
+                        //exit(EXIT_FAILURE);
+          }
+        }
+        else if (dir == 3)
+        {
+          if   (degs_new >= 90 && degs_new <= 270)
+          {
+            //secondary component is South
+            xo = 1-0.00001, yo = 0;
+            //s_edge = abs(s_local*sin(theta));
+            d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+            xi = xo, yi = 1-yo;
+            dir = 2;
+            east_vec.push_back(easting[b] + (xo - 0.5)*DataResolution);
+            north_vec.push_back(northing[a] - half_datares);
+            ++a;
+          }
+          else if (degs_new > 270 || degs_new < 90)
+          {
+            //secondary component is North
+            xo = 1-0.00001, yo = 1;
+            //s_edge = abs(s_local*sin((2/PI) - theta));
+            d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+            xi = xo, yi = 1- yo;
+            dir = 4;
+            east_vec.push_back(easting[b] + (xo - 0.5)*DataResolution);
+            north_vec.push_back(northing[a] + half_datares);
+            --a;
+          }
+          else
+          {
+            cout << "Flow unable to route N or S" << endl;  //something has gone very wrong...
+            cout << "Trace skipped.\n" << endl;
+            skip_trace = true;
+                      //exit(EXIT_FAILURE);
+          }
+        }
+        else if (dir == 4)
+        {
+          if   (degs_new >= 180 && degs_new <= 360)
+          {
+            //secondary component is West
+            xo = 0, yo = 0.00001;
+            //s_edge = abs(s_local*sin((PI/2) - theta));
+            d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+            xi = 1-xo, yi = yo;
+            dir = 3;
+            east_vec.push_back(easting[b] -half_datares);
+            north_vec.push_back(northing[a] + (yo - 0.5)*DataResolution);
+            --b;
+          }
+          else if (degs_new >= 0 && degs_new < 180)
+          {
+            //secondary component is East
+            xo = 1, yo = 0.00001;
+            //s_edge = abs(s_local*sin(theta));
+            d = sqrt((xo-xi)*(xo-xi) + (yo-yi)*(yo-yi));
+            xi = 1-xo, yi = yo;
+            dir = 1;
+            east_vec.push_back(easting[b] + half_datares);
+            north_vec.push_back(northing[a] + (yo - 0.5)*DataResolution);
+            ++b;
+          }
+          else
+          {
+            cout << "Flow unable to route E or W" << endl; //something has gone very wrong...
+            cout << "Trace skipped.\n" << endl;
+            skip_trace = true;
+                        //exit(EXIT_FAILURE);
+          }
+        }
+      }
+
+      if (path[a][b] < 1)
+      {  // only update length on 'first slosh'
+        length += d;
+      }
+      else if (path[a][b] >= 3)
+      { //update the skip trace flag so we can categorise each trace
+          skip_trace = true;
+      }
+      degs = degs_new;
+
+      zeta_vec.push_back(Elevation.get_data_element(a,b));
+      length_vec.push_back(length*DataResolution);
+
+      // test for plan curvature here and set a flag if flow is divergent or convergent but continue trace regardless
+      // The larger the counter the more convergent or divergent the trace is
+      if (abs(PlanCurvature.get_data_element(a,b)) > (0.001))
+      {
+        ++DivergentCountFlag;
+      }
+      else
+      {
+        ++PlanarCountFlag;
+      }
+
+      if (a == 0 || b == 0 ||  a == NRows-1 || b == NCols-1 
+                 || StreamNetwork.get_data_element(a,b) != NoDataValue 
+                 || path[a][b] >= 3 || skip_trace == true)
+      {
+        flag = false;
+      } 
+    }
+
+    if (a == 0 || b == 0 ||  a == NRows-1 || b == NCols-1 )
+    {
+      // avoid going out of bounds.
+
+      // this is caused by having a hilltop on the first row or col away from the border
+      // eg i or j == 1 or nrows/ncols - 2 and flowing towards the edge.
+      // can fix with a test here for if streamnet[a][b] != NDV otherwise trace will fail *correctly*
+
+      ++edge_count;
+    }
+    else
+    {
+    //if trace finished at a stream, print hillslope info.
+      if (StreamNetwork.get_data_element(a,b) != NoDataValue)
+      {
+        path[a][b] = 1;
+
+        ++s_count;
+
+        X = easting[j];
+        Y = northing[i];
+        relief = Elevation.get_data_element(i,j) - Elevation.get_data_element(a,b);
+        trace_length = length * DataResolution;
+        mean_slope = relief/(trace_length);
+        
+
+        //calculate an E* and R* Value assuming S_c of 0.8
+        E_Star = (2.0 * abs(CHT)*(length*DataResolution))/0.8;
+        R_Star = relief/((length*DataResolution)*0.8);
+
+        //calulate the Euclidean distance between the start and end points of the trace
+        EucDist = sqrt( ((i+0.5)-(a+yo))*((i+0.5)-(a+yo)) + ((j+0.5)-(b+xo))*((j+0.5)-(b+xo)) ) * DataResolution;
+
+        if (relief > 0)
+        {
+          trace_sucess = true;
+          ofs.precision(9);
+          ofs << HT_latitude << "," << HT_longitude << ",";
+          ofs.precision(6);
+          ofs << X << "," << Y << "," << i << "," << j << "," << CHT 
+              << "," << mean_slope << "," << relief << "," << length*DataResolution << "," 
+              << basin_ID << "," << a << "," << b << "," << StreamNetwork.get_data_element(a,b) 
+              << "," << HT_slope << "," << DivergentCountFlag << "," << PlanarCountFlag << "," 
+              << E_Star << "," << R_Star << "," << EucDist << "\n";
+        }
+        else
+        {
+          ++neg_count;
+        }
+      }
+      else
+      {
+        //unable to route using aspects
+        //this will encompass skipped traces
+        //ofs << "fail: " << a << " " << b << " " << i << " " << j << endl;
+        ++ns_count;
+      }
+    }
+
+    //This block checks the various path printing options and writes the data out accordingly
+    if (print_paths_switch == true)
+    {
+      if (ht_count % thinning == 0)
+      {
+        if (trace_sucess) // && skip_trace == false)
+        { //check that the current i,j tuple corresponds to a hilltop, ie there is actually a trace to write to file, and check that the trace was valid.
+
+          //declare some params for lat long conversion
+          double latitude,longitude;
+
+          //create the output filename from the user supplied path
+          ofstream pathwriter;
+          string OutputFileName = Prefix+"_hillslope_traces.csv";
+          ifstream oftest(OutputFileName.c_str());
+          bool FileExists = false;
+          if (oftest) FileExists = true;
+          oftest.close();
+
+          //open the output filestream and write headers
+          ofstream WriteTracesFile;
+          if (FileExists == 0)
+          {
+            WriteTracesFile.open(OutputFileName.c_str());
+            //write headers to allow pandas dataframe reading
+            if (WriteTracesFile.is_open()) WriteTracesFile << "HilltopID,Easting,Northing,Latitude,Longitude,Distance,Elevation" << endl;
+          }
+          WriteTracesFile.close();
+
+          //open output filestream again to  coastline data
+          WriteTracesFile.open(OutputFileName.c_str(), fstream::app|fstream::out);
+
+          //Check if file exists if not open a new one and write headers
+          if (WriteTracesFile.is_open())
+          {
+            for (int v = 0; v < count+1; ++v)
+            {
+              //get lat long for printing to file
+              get_lat_and_long_locations(east_vec[v], north_vec[v], latitude, longitude, Converter);
+
+              WriteTracesFile << ht_count << "," << setiosflags(ios::fixed) << setprecision(10) << east_vec[v] << "," 
+                              << north_vec[v] << "," << latitude << "," << longitude << "," << length_vec[v] << "," 
+                              << zeta_vec[v] << endl;
+
+            }
+          }
+          WriteTracesFile.close();
+        }
+      }
+    } 
+  }
+
+  ofs.close();
+
+
+  //Print debugging info to screen
+  cout << endl; //push output onto new line
+  cout << "Hilltop count: " << ht_count << endl;
+  cout << "Stream count: " << s_count << endl;
+  cout << "Fail count: " << ns_count << endl;
+  cout << "Uphill count: " << neg_count << endl;
+  cout << "Edge count: " << edge_count << endl;
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Hilltop flow routing code built around original code from Martin Hurst. Based on
 // Lea (1992), with improvements discussed by Tarboton (1997) and a solution to the
@@ -7202,6 +8574,239 @@ vector< Array2D<float> > LSDFlowInfo::HilltopFlowRouting_Profile(LSDRaster Eleva
 
   return OutputArrays;
 }
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This function takes an integer raster that has nodata and classification
+// codes. These are then propagated upslope, so all upslope nodes have
+// this code. Nodes that have recieves a classification do not reclassify:
+// the downstream node classification "wins"
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDIndexRaster LSDFlowInfo::tag_nodes_upstream_of_baselevel(LSDIndexRaster& tagged_raster)
+{
+  // We just double check if the dimensions are the same
+  int NRows_ir = tagged_raster.get_NRows();
+  int NCols_ir = tagged_raster.get_NCols();
+  int NDV = tagged_raster.get_NoDataValue();
+
+  Array2D<int> output_array(NRows_ir,NCols_ir,NDV);
+
+  if ( (NRows_ir != NRows) || (NCols_ir != NCols) )
+  {
+    cout << "Fatal error. You are trying to make a tagged raster using LSDFlowInfo::tag_nodes_upstream_of_baselevel" << endl;
+    cout << "but the raster and the flow info object do not have the same rows and columns." << endl;
+    exit(0);
+  }
+
+  // Okay, now we go through the stack and tag the upstream nodes
+  int row,col;
+  int this_tag;
+  int s_node = 0;
+  int this_node = SVector[s_node];
+
+
+  vector<int> bln = get_BaseLevelNodeList();
+  vector<int> upslope_nodes;
+
+  for (int bl = 0; bl< int(bln.size()); bl++)
+  {
+    this_node = bln[bl];
+    retrieve_current_row_and_col(this_node, row, col);
+    this_tag = tagged_raster.get_data_element(row,col);
+
+    cout << "baselevel: " << bl << endl;
+
+    if(this_tag != NDV)
+    {
+      upslope_nodes = get_upslope_nodes(this_node);
+      for (int n = 0; n< int(upslope_nodes.size()); n++)
+      {
+        retrieve_current_row_and_col(upslope_nodes[n], row, col);
+        output_array[row][col] = this_tag;
+      }
+    }
+  }
+
+
+  // now write the mask as an LSDIndexRaster
+  LSDIndexRaster final_tagged(NRows,NCols,XMinimum,YMinimum,
+          DataResolution,int(NoDataValue),output_array,GeoReferencingStrings);
+  return final_tagged;
+
+
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This function takes an integer raster that has nodata and classification
+// codes. These are then propagated upslope, so all upslope nodes have
+// this code. Nodes that have recieves a classification do not reclassify:
+// the downstream node classification "wins"
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDIndexRaster LSDFlowInfo::tag_upstream_nodes(LSDIndexRaster& tagged_raster, float crit_upslope_distance)
+{
+  // We just double check if the dimensions are the same
+  int NRows_ir = tagged_raster.get_NRows();
+  int NCols_ir = tagged_raster.get_NCols();
+  int NDV = tagged_raster.get_NoDataValue();
+
+  Array2D<int> output_array(NRows_ir,NCols_ir,NDV);
+
+  if ( (NRows_ir != NRows) || (NCols_ir != NCols) )
+  {
+    cout << "Fatal error. You are trying to make a tagged raster using LSDFlowInfo::tag_upslope_nodes" << endl;
+    cout << "but the raster and the flow info object do not have the same rows and columns." << endl;
+    exit(0);
+  }
+
+  // get the flow distance and contributing pixel rasters
+  LSDRaster fd = distance_from_outlet();
+
+  // Loop through the stack, collecting tagged pixels. 
+  // This should have the effect of ordering the pixels
+  vector<int> tagged_node_list;
+  int row,col;
+  for (int si = 0; si<NDataNodes; si++)
+  {
+    retrieve_current_row_and_col(SVector[si], row, col);
+
+    if( tagged_raster.get_data_element(row,col) != NDV)
+    {
+      tagged_node_list.push_back(SVector[si]);
+    }
+  }
+
+  // Now loop through the tagged node list. 
+  int NTN = int(tagged_node_list.size());
+  float tagged_node_FD;
+  float node_FD;
+  float FD_diff;
+  int this_tag;
+  vector<int> upslope_nodes;
+  for(int tn = 0; tn< NTN; tn++)
+  {   
+    // get the flow distance of this node
+    retrieve_current_row_and_col(tagged_node_list[tn], row, col); 
+    tagged_node_FD = fd.get_data_element(row,col);
+
+    // get the tag
+    this_tag = tagged_raster.get_data_element(row,col);
+
+    upslope_nodes = get_upslope_nodes(tagged_node_list[tn]);
+    for (int n = 0; n< int(upslope_nodes.size()); n++)
+    {
+      retrieve_current_row_and_col(upslope_nodes[n], row, col);
+
+      node_FD = fd.get_data_element(row,col);
+
+      FD_diff = node_FD - tagged_node_FD;
+
+      if (FD_diff < crit_upslope_distance)
+      {
+        output_array[row][col] = this_tag;
+      }
+    }
+  }
+
+  // now write the mask as an LSDIndexRaster
+  LSDIndexRaster final_tagged(NRows,NCols,XMinimum,YMinimum,
+          DataResolution,int(NoDataValue),output_array,GeoReferencingStrings);
+  return final_tagged;
+
+}
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This function takes an integer raster that has nodata and classification
+// codes. These are then propagated downslope, so all downslope nodes have
+// this code. Nodes that have receives a classification do not reclassify:
+// the downstream node classification "wins"
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDIndexRaster LSDFlowInfo::tag_downstream_nodes(LSDIndexRaster& tagged_raster, float crit_downslope_distance)
+{
+  // We just double check if the dimensions are the same
+  int NRows_ir = tagged_raster.get_NRows();
+  int NCols_ir = tagged_raster.get_NCols();
+  int NDV = tagged_raster.get_NoDataValue();
+
+  Array2D<int> output_array(NRows_ir,NCols_ir,NDV);
+
+  if ( (NRows_ir != NRows) || (NCols_ir != NCols) )
+  {
+    cout << "Fatal error. You are trying to make a tagged raster using LSDFlowInfo::tag_downstream_nodes" << endl;
+    cout << "but the raster and the flow info object do not have the same rows and columns." << endl;
+    exit(0);
+  }
+
+  // get the flow distance and contributing pixel rasters
+  LSDRaster fd = distance_from_outlet();
+
+  // Loop through the stack, collecting tagged pixels. 
+  // This should have the effect of ordering the pixels
+  vector<int> tagged_node_list;
+  int row,col;
+  for (int si = 0; si<NDataNodes; si++)
+  {
+    retrieve_current_row_and_col(SVector[si], row, col);
+
+    if( tagged_raster.get_data_element(row,col) != NDV)
+    {
+      tagged_node_list.push_back(SVector[si]);
+    }
+  }
+
+  // Now loop through the tagged node list. 
+  int NTN = int(tagged_node_list.size());
+  int this_node;
+  float tagged_node_FD;
+  float receiver_FD;
+  int reciever_node;
+  float FD_diff;
+  int this_tag;
+  for(int tn = 0; tn< NTN; tn++)
+  {   
+    // get the flow distance of this node
+    retrieve_current_row_and_col(tagged_node_list[tn], row, col); 
+    tagged_node_FD = fd.get_data_element(row,col);
+
+    // get the tag
+    this_tag = tagged_raster.get_data_element(row,col);
+
+    this_node = tagged_node_list[tn];
+    retrieve_receiver_information(this_node,reciever_node,row,col);
+    receiver_FD = fd.get_data_element(row,col);
+
+    FD_diff = tagged_node_FD-receiver_FD;
+    while( this_node != reciever_node && FD_diff < crit_downslope_distance )
+    {
+      this_node = reciever_node;
+      retrieve_receiver_information(this_node,reciever_node,row,col);
+      receiver_FD = fd.get_data_element(row,col); 
+
+      output_array[row][col] = this_tag;
+
+
+
+      FD_diff = tagged_node_FD-receiver_FD;
+    }
+  }
+
+  // now write the mask as an LSDIndexRaster
+  LSDIndexRaster final_tagged(NRows,NCols,XMinimum,YMinimum,
+          DataResolution,int(NoDataValue),output_array,GeoReferencingStrings);
+  return final_tagged;
+
+}
+
 
 
 
@@ -9407,7 +11012,106 @@ LSDRaster LSDFlowInfo::get_raster_draining_to_node(int node, LSDRaster& elevatio
 
 }
 
-  // map<string, vector<int> > burn_raster_to_
+// This function takes a nodelist and determines which of the nodes in the 
+// nodelist are internal nodes
+// Used to get basin outlines
+vector<bool> LSDFlowInfo::internal_nodes(vector<int> node_list)
+{
+  int n_nodes = int(node_list.size());
+
+  // this speeds up the searching
+  unordered_set<int> node_set(node_list.begin(),node_list.end());
+  vector<bool> is_internal(n_nodes,false);
+
+  //for(int i = 0; i<n_nodes; i++)
+  //{
+    //node_set.push_back(node_list[i]);
+  //  is_internal.push_back(false);
+  //}
+
+  // okay, now loop through all the nodes, looking for internal nodes. 
+  int row,col,trow,tcol,tni;
+  bool this_node_internal;
+  for(int i = 0; i<n_nodes; i++)
+  {
+    retrieve_current_row_and_col(node_list[i],row,col);
+    this_node_internal = true;
+
+    if (row != 0 && row != NRows-1 && col != 0 && col != NCols -1)
+    {
+      // check all the adjacent nodes
+      trow = row+1;
+      tcol = col+1;
+      tni = NodeIndex[trow][tcol];
+      if(node_set.find(tni) == node_set.end())
+      {
+        this_node_internal = false;
+      }
+
+      trow = row+1;
+      tcol = col;
+      tni = NodeIndex[trow][tcol];
+      if(node_set.find(tni) == node_set.end())
+      {
+        this_node_internal = false;
+      }
+
+      trow = row+1;
+      tcol = col-1;
+      tni = NodeIndex[trow][tcol];
+      if(node_set.find(tni) == node_set.end())
+      {
+        this_node_internal = false;
+      }      
+
+      trow = row;
+      tcol = col+1;
+      tni = NodeIndex[trow][tcol];
+      if(node_set.find(tni) == node_set.end())
+      {
+        this_node_internal = false;
+      }
+
+      trow = row;
+      tcol = col-1;
+      tni = NodeIndex[trow][tcol];
+      if(node_set.find(tni) == node_set.end())
+      {
+        this_node_internal = false;
+      }
+
+      trow = row-1;
+      tcol = col+1;
+      tni = NodeIndex[trow][tcol];
+      if(node_set.find(tni) == node_set.end())
+      {
+        this_node_internal = false;
+      }
+
+      trow = row-1;
+      tcol = col;
+      tni = NodeIndex[trow][tcol];
+      if(node_set.find(tni) == node_set.end())
+      {
+        this_node_internal = false;
+      }
+
+      trow = row-1;
+      tcol = col-1;
+      tni = NodeIndex[trow][tcol];
+      if(node_set.find(tni) == node_set.end())
+      {
+        this_node_internal = false;
+      }
+      
+      if(this_node_internal)
+      {
+        is_internal[i] = true;
+      }
+    }
+  }  
+  return is_internal;
+}
 
 
 #endif

@@ -2564,7 +2564,7 @@ void LSDRaster::AdjustElevation(float elevation_change)
         RasterData[row][col] = RasterData[row][col]+elevation_change;
       }
     }
-  }  
+  }
 }
 
 
@@ -9945,9 +9945,9 @@ LSDRaster LSDRaster::RasterTrimmerPadded(int padding_pixels)
 // This is a raster trimmer that gets a rectangular DEM that doesn't have NoData
 // around the edges.
 // That is, it finds the biggest possible raster from your data that is entirely
-// covered in data with no nodata nodes around the edge. 
+// covered in data with no nodata nodes around the edge.
 // This means that it will cut out valid data points if there are nodata
-// values sitting in the middle. 
+// values sitting in the middle.
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 LSDRaster LSDRaster::RasterTrimmerSpiral()
 {
@@ -10274,6 +10274,152 @@ LSDRaster LSDRaster::BufferRasterData(float window_radius)
   return BufferedRaster;
 }
 
+// This gets the nearest data value. If the pixel has data, it just returns that pixel
+void LSDRaster::find_nearest_data(int this_row,int this_col, float& distance, float& value)
+{
+  int offset_counter = 1;
+  int max_offset_counter;
+  float nearest_value = NoDataValue;
+  float nearest_distance = NoDataValue;
+
+  if (NRows>NCols)
+  {
+    max_offset_counter = NCols/2;
+  }
+  else
+  {
+    max_offset_counter = NRows/2;
+  }
+
+
+  //cout << "Finding the nearest data value to the nodata pixels. The max offset is " << max_offset_counter << endl;
+
+  bool havent_found_nearest = true;
+  int row,col;
+  int data_row,data_col;
+  while(offset_counter <= max_offset_counter && havent_found_nearest)
+  {
+    //cout << "The offset counter is " << offset_counter << endl;
+    if (RasterData[this_row][this_col] != NoDataValue)
+    {
+      //cout << "This pixel has data " << endl;
+      nearest_value = RasterData[this_row][this_col];
+      nearest_distance = 0;
+      havent_found_nearest = false;
+    }
+    else
+    {
+      vector<int> row_vec;
+      vector<int> col_vec;
+
+      // left column
+      col = -offset_counter;
+      for (row = -offset_counter; row<= offset_counter; row++)
+      {
+        row_vec.push_back(this_row+row);
+        col_vec.push_back(this_col+col);
+      }
+      // right column
+      col = offset_counter;
+      for (row = -offset_counter; row<= offset_counter; row++)
+      {
+        row_vec.push_back(this_row+row);
+        col_vec.push_back(this_col+col);
+      }
+      // top row
+      row = offset_counter;
+      for (col = -offset_counter+1; col<= offset_counter-1; col++)
+      {
+        row_vec.push_back(this_row+row);
+        col_vec.push_back(this_col+col);
+      }
+      // bottom row
+      row = -offset_counter;
+      for (col = -offset_counter+1; col<= offset_counter-1; col++)
+      {
+        row_vec.push_back(this_row+row);
+        col_vec.push_back(this_col+col);
+      }
+
+      // now find the closet neighbour
+      nearest_value = NoDataValue;
+      nearest_distance = NoDataValue;
+      int n_nodes = int(row_vec.size());
+      //cout << "looping though adjacent pixels" << endl;
+      //cout << "This pixel at: " << this_row << "," << this_col << endl;
+      for(int n = 0; n<n_nodes; n++)
+      {
+
+        row = row_vec[n];
+        col = col_vec[n];
+        //cout << "r: " << row << ", c: " << col << endl;
+
+
+        if (row >= 0 && row < NRows && col >= 0 && col < NCols)
+        {
+          if (RasterData[row][col] != NoDataValue)
+          {
+            //cout << "Found a pixel with some data! ";
+            float radial_dist = sqrt(pow(((row-this_row)*DataResolution),2) + pow(((col-this_col)*DataResolution),2));
+            //cout << "dist: " << radial_dist << " val: " << RasterData[row][col] << endl;
+            if(nearest_distance == NoDataValue)
+            {
+              nearest_distance = radial_dist;
+              nearest_value = RasterData[row][col];
+            }
+            else if (nearest_distance > radial_dist)
+            {
+              nearest_distance = radial_dist;
+              nearest_value = RasterData[row][col];
+            }
+            havent_found_nearest = false;
+          }
+        }
+      }
+      offset_counter++;
+    }
+  }
+  distance = nearest_distance;
+  value = nearest_value;
+}
+
+// This returns two raster that are the nearest value and nearest distance to nodata nodes
+vector<LSDRaster> LSDRaster::get_nearest_distance_and_value_masks()
+{
+  Array2D<float> Distances(NRows, NCols, NoDataValue);
+  Array2D<float> Values(NRows, NCols, NoDataValue);
+
+  float distance,value;
+  for(int row = 0; row<NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      if (RasterData[row][col] == NoDataValue)
+      {
+        find_nearest_data(row,col, distance, value);
+
+        //cout << row << "," << col << "; v: " << value << ", d: " << distance <<endl;
+
+        Distances[row][col] = distance;
+        Values[row][col] = value;
+      }
+    }
+  }
+
+  LSDRaster DRaster(NRows,NCols, XMinimum, YMinimum, DataResolution,
+                            NoDataValue, Distances, GeoReferencingStrings);
+  LSDRaster VRaster(NRows,NCols, XMinimum, YMinimum, DataResolution,
+                            NoDataValue, Values, GeoReferencingStrings);
+
+  vector<LSDRaster> R_vec;
+  R_vec.push_back(DRaster);
+  R_vec.push_back(VRaster);
+
+  return R_vec;
+
+}
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // THis pads a smaller index raster to the same extent as a bigger raster by adding
 // no data values
@@ -10365,8 +10511,12 @@ LSDIndexRaster LSDRaster::PadSmallerRaster(LSDIndexRaster& smaller_raster)
   NewRaster.Update_GeoReferencingStrings();
 
   return NewRaster;
-
 }
+
+
+
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // THis clips to a smaller raster. The smaller raster does not need
 // to have the same data resolution as the old raster
@@ -10971,9 +11121,9 @@ LSDRaster LSDRaster::GaussianFilter(float sigma, int kr)
   // This is the default setting
   if(kr==0) kr = int(ceil(3*sigma/DataResolution));  // Set radius of kernel (default if not specified)
   int kw=2*kr+1;                                     // width of kernel
-  
+
   cout << "Smoothing, kernal size is: " << kr << endl;
-  
+
   Array2D<float> filtered = RasterData.copy();
   Array2D<float> gaussian_kernel_weights(kw,kw,0.0);
 
@@ -11392,6 +11542,217 @@ LSDRaster LSDRaster::neighbourhood_statistics_spatial_average(float window_radiu
   LSDRaster SpatialAverage(NRows,NCols,XMinimum,YMinimum,DataResolution,
                       NoDataValue,SpatialAverageArray,GeoReferencingStrings);
   return SpatialAverage;
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// spatial_average
+// Calculates a spatial average using a specified moving window.  Uses a neighbourhood
+// switch to select circular (1) vs square window (0)
+// DTM 19/06/2014
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+LSDRaster LSDRaster::neighbourhood_statistics_local_min_max(float window_radius, int neighbourhood_switch, bool find_maximum)
+{
+  Array2D<float> SpatialMinMaxArray(NRows,NCols,NoDataValue);
+//   Array2D<float> StandardDeviationArray(NRows,NCols,NoDataValue);
+
+  // catch if the supplied window radius is less than the data resolution and
+  // set it to equal the data resolution - SWDG
+  if (window_radius < DataResolution)
+  {
+    cout << "Supplied window radius: " << window_radius << " is less than the data resolution: " <<
+    DataResolution << ".\nWindow radius has been set to data resolution." << endl;
+    window_radius = DataResolution;
+  }
+
+  // Prepare kernel
+  int kr = int(ceil(window_radius/DataResolution));  // Set radius of kernel
+  int kw=2*kr+1;                                     // width of kernel
+  Array2D<float> data_kernel(kw,kw,NoDataValue);
+  Array2D<int> mask = create_mask(window_radius, neighbourhood_switch);
+
+  // Move window over DEM and extract neighbourhood pixels
+  cout << "\n\tRunning neighbourhood statistics..." << endl;
+  cout << "\t\tDEM size = " << NRows << " x " << NCols << endl;
+
+
+  float extreme;
+  float value;
+  int k_row,k_col;
+
+
+  vector<float> data;
+  for(int i=0;i<NRows;++i)
+  {
+    cout << "\tRow = " << i+1 << " / " << NRows << "    \r";
+    for(int j=0;j<NCols;++j)
+    {
+      // only find the minimum if the point has data
+      if (RasterData[i][j] != NoDataValue)
+      {
+
+        // Reset the extreme value
+        if (find_maximum)
+        {
+          extreme = -10e13;
+        }
+        else
+        {
+          extreme = 10e13;
+        }
+
+        // Sample DEM
+        for(int i_kernel=0;i_kernel<kw;++i_kernel)
+        {
+          for(int j_kernel=0;j_kernel<kw;++j_kernel)
+          {
+            k_row = i-kr+i_kernel;
+            k_col = j-kr+j_kernel;
+
+            // avoid edges
+            if (k_row >= 0 && k_row < NRows && k_col >=0 && k_col < NCols)
+            {
+              value = RasterData[k_row][k_col];
+              if(value!=NoDataValue && mask[i_kernel][j_kernel]==1)
+              {
+                //cout << "Value here." << endl;
+                if (find_maximum)
+                {
+                  if (value > extreme)
+                  {
+                    extreme = value;
+                  }
+                }
+                else
+                {
+                  // get the minimum
+                  if (value < extreme)
+                  {
+                    extreme = value;
+                  }
+                }
+
+                // sedt the value in this pixel after going through the kernal
+                //cout << "Value is: " <<    extreme << endl;
+                SpatialMinMaxArray[i][j]=extreme;
+              }
+            }
+          }
+        }
+        //cout << "And this extreme is: " << SpatialMinMaxArray[i][j] << endl;
+      }
+    }
+  }
+
+  LSDRaster SpatialMinMax(NRows,NCols,XMinimum,YMinimum,DataResolution,
+                      NoDataValue,SpatialMinMaxArray,GeoReferencingStrings);
+  return SpatialMinMax;
+}
+
+//------------------------------------------------------------------------------
+// Function to return an array with the location of the pixel with the minimum or
+// maximum value in a neighbourhood
+// FJC 30/01/21
+//------------------------------------------------------------------------------
+LSDRaster LSDRaster::neighbourhood_statistics_local_min_max_location(Array2D<float>& TargetRasterData, float window_radius, int neighbourhood_switch, bool find_maximum)
+{
+  Array2D<float> SpatialMinMaxArray(NRows,NCols,NoDataValue);
+//   Array2D<float> StandardDeviationArray(NRows,NCols,NoDataValue);
+
+  // catch if the supplied window radius is less than the data resolution and
+  // set it to equal the data resolution - SWDG
+  if (window_radius < DataResolution)
+  {
+    cout << "Supplied window radius: " << window_radius << " is less than the data resolution: " <<
+    DataResolution << ".\nWindow radius has been set to data resolution." << endl;
+    window_radius = DataResolution;
+  }
+
+  // Prepare kernel
+  int kr = int(ceil(window_radius/DataResolution));  // Set radius of kernel
+  int kw=2*kr+1;                                     // width of kernel
+  Array2D<float> data_kernel(kw,kw,NoDataValue);
+  Array2D<int> mask = create_mask(window_radius, neighbourhood_switch);
+
+  // Move window over DEM and extract neighbourhood pixels
+  cout << "\n\tRunning neighbourhood statistics..." << endl;
+  cout << "\t\tDEM size = " << NRows << " x " << NCols << endl;
+
+
+  float extreme;
+  float value;
+  int k_row,k_col,extreme_row,extreme_col;
+
+
+  vector<float> data;
+  for(int i=0;i<NRows;++i)
+  {
+    cout << "\tRow = " << i+1 << " / " << NRows << "    \r";
+    for(int j=0;j<NCols;++j)
+    {
+      // only find the minimum if the point has data
+      if (RasterData[i][j] != NoDataValue)
+      {
+
+        // Reset the extreme value
+        if (find_maximum)
+        {
+          extreme = -10e13;
+        }
+        else
+        {
+          extreme = 10e13;
+        }
+
+        // Sample DEM
+        for(int i_kernel=0;i_kernel<kw;++i_kernel)
+        {
+          for(int j_kernel=0;j_kernel<kw;++j_kernel)
+          {
+            k_row = i-kr+i_kernel;
+            k_col = j-kr+j_kernel;
+
+            // avoid edges
+            if (k_row >= 0 && k_row < NRows && k_col >=0 && k_col < NCols)
+            {
+              value = TargetRasterData[k_row][k_col];
+              if(value!=NoDataValue && mask[i_kernel][j_kernel]==1)
+              {
+                //cout << "Value here." << endl;
+                if (find_maximum)
+                {
+                  if (value > extreme)
+                  {
+                    extreme = value;
+                    extreme_row = k_row;
+                    extreme_col = k_col;
+                  }
+                }
+                else
+                {
+                  // get the minimum
+                  if (value < extreme)
+                  {
+                    extreme = value;
+                    extreme_row = k_row;
+                    extreme_col = k_col;
+                  }
+                }
+              }
+            }
+          }
+        }
+        // set the value in the pixel. We use the pixel that the value is taken from,
+        // rather than the centre of the kernal.
+        //cout << "Value is: " <<    extreme << endl;
+        SpatialMinMaxArray[extreme_row][extreme_col]=extreme;
+        //cout << "And this extreme is: " << SpatialMinMaxArray[i][j] << endl;
+      }
+    }
+  }
+
+  LSDRaster SpatialMinMax(NRows,NCols,XMinimum,YMinimum,DataResolution,
+                      NoDataValue,SpatialMinMaxArray,GeoReferencingStrings);
+  return SpatialMinMax;
 }
 
 
@@ -14167,7 +14528,7 @@ LSDRaster LSDRaster::Breaching_Lindsay2016()
   Array2D<uint32_t> backlinks(NRows,NCols, NO_BACK_LINK);
   // Visited represent the stage of all cells
   // 0-> Unprocessed
-  // 1-> EDGE 
+  // 1-> EDGE
   Array2D<uint8_t> visited(NRows,NCols);
   Array2D<uint8_t> pits(NRows,NCols);
   // cout << "1" << endl;
@@ -14214,7 +14575,7 @@ LSDRaster LSDRaster::Breaching_Lindsay2016()
 
     //Determine if this is an edge cell, gather information used to determine if
     //it is a pit cell
-    float lowest_neighbour = std::numeric_limits<float>::max();    
+    float lowest_neighbour = std::numeric_limits<float>::max();
     for(int n=-1;n<=1;n++)
     for(int n2=-1;n2<=1;n2++)
     {
@@ -14223,12 +14584,12 @@ LSDRaster LSDRaster::Breaching_Lindsay2016()
 
       //const int nx = x+n;
       //const int ny = y+n2;
-      
+
       //No need for an inGrid check here because edge cells are filtered above
       // TOCHECK -> BG
 
       //Cells which can drain into NoData go on priority-queue as edge cells
-      if(tRasterData[y][x]==NoDataValue){        
+      if(tRasterData[y][x]==NoDataValue){
         pq.push(guest);
         visited[y][x] = 1;
         goto nextcell;                //VELOCIRAPTOR
@@ -14291,7 +14652,7 @@ LSDRaster LSDRaster::Breaching_Lindsay2016()
 
     //Looks for neighbours which are either unvisited or pits
     for(int n=-1;n<=1;n++)
-    for(int n2=-1;n2<=1;n2++)    
+    for(int n2=-1;n2<=1;n2++)
     {
       if(n==0 && n2==0)
         continue;

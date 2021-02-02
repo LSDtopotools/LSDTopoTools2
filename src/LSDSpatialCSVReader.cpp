@@ -569,7 +569,14 @@ void LSDSpatialCSVReader::data_column_add_float(string column_name, float add_va
   }
   for(int i = 0; i<N_data_elements; i++)
   {
+
     this_value = atof(string_vec[i].c_str())+add_value;
+
+    //if (i< 10)
+    //{
+    // cout << "Orig: " << atof(string_vec[i].c_str()) << " final " << this_value << endl;
+    //}
+
     new_string_vec.push_back(to_string(this_value));
   }
   data_map[column_name] = new_string_vec;
@@ -616,15 +623,25 @@ void LSDSpatialCSVReader::enforce_slope(string fd_column_name, string elevation_
     
     min_elev = dist*min_slope+new_elevation[i+1];
     //cout << "dist: " << dist << " z[i+1]: " << new_elevation[i+1] << " z[i]: " << elevation[i] << " min_elev: " << min_elev << endl;
-    if (elevation[i] < min_elev)
+    if (dist < 0 || fabs(dist) >128)
     {
-      //cout << "Found something where I need to increase slope!" << endl;
-      new_elevation[i] = min_elev;
+      cout << "There seems to be a big changes in flow distance (greater than a diagonal pixel at 90m resolution" << endl;
+      cout << "I am considering this a new channel and resetting the elevation values to this pixel" << endl;
+      new_elevation[i] = elevation[i];
     }
     else
     {
-      new_elevation[i] = elevation[i];
+      if (elevation[i] < min_elev)
+      {
+        //cout << "Found something where I need to increase slope!" << endl;
+        new_elevation[i] = min_elev;
+      }
+      else
+      {
+        new_elevation[i] = elevation[i];
+      }
     }
+
   }
 
   vector<string> new_elev_string;

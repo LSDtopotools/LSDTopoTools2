@@ -72,6 +72,16 @@ void Get_Relief_of_Nearest_Channel(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo&
 	/// @date 26/10/16
 	void get_distance_upstream_along_main_stem(int junction_number, LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, LSDRaster& DistFromOutlet);
 
+  /// @brief This function gets the valley centreline as a raster
+	/// @author FJC
+	/// @date 30/01/21
+  LSDRaster get_valley_centreline(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, int threshold_SO, float window_radius, int neighbourhood_switch);
+
+  /// @brief This function gets the information about the valley walls
+	/// @author FJC
+	/// @date 29/01/21
+  vector<LSDRaster> get_valley_walls(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, LSDRaster& ElevationRaster, LSDRaster& DistFromOutlet, int threshold_SO);
+
 	/// FUNCTIONS TO GENERATE RASTERS
 
 	/// @brief This function prints the connected components array to a raster
@@ -85,6 +95,12 @@ void Get_Relief_of_Nearest_Channel(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo&
 	/// @author FJC
 	/// @date 24/11/16
 	LSDIndexRaster print_BinaryRaster();
+
+  /// @brief This function gets a raster of floodplain locations where the floodplain is no data and the surrounding landscape has a value of 1.
+	/// @return BinaryRaster binary raster
+	/// @author FJC
+	/// @date 29/01/21
+  LSDRaster get_NoData_FloodplainRaster();
 
 	/// @brief This function prints the channel relief compared to the main stem to a raster
 	/// @return ChannelRelief LSDRaster of channel relief

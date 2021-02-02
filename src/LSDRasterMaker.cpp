@@ -181,6 +181,66 @@ void LSDRasterMaker::set_to_constant_value(float new_value)
 }
 
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function add strips of a given value.
+// This happily overwrites NoData
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterMaker::add_strip(int start_row_or_col, int end_row_or_col, bool horizontal, float value)
+{
+  if (start_row_or_col < 0)
+  {
+    start_row_or_col = 0;
+  }
+
+  if (horizontal)
+  {
+    if(start_row_or_col >= NRows)
+    {
+      start_row_or_col = NRows-1;
+    }
+    if(end_row_or_col > NRows)
+    {
+      end_row_or_col = NRows-1;
+    }
+  }
+  else
+  {
+    if(start_row_or_col >= NCols)
+    {
+      start_row_or_col = NCols-1;
+    }
+    if(end_row_or_col > NCols)
+    {
+      end_row_or_col = NCols-1;
+    }
+  }
+
+  if (horizontal)
+  {
+    for (int row = start_row_or_col; row <= end_row_or_col; row++)
+    {
+      for (int col = 0; col < NCols; col++)
+      {
+        RasterData[row][col] = value;
+      }
+    }
+  }
+  else
+  {
+     for (int row = 0; row < NRows; row++)
+    {
+      for (int col = start_row_or_col; end_row_or_col<= NCols; col++)
+      {
+        RasterData[row][col] = value;
+      }
+    }   
+  }
+
+  
+
+
+
+}
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This function takes the existing raster data and then linearly scales it
@@ -256,7 +316,124 @@ void LSDRasterMaker::impose_channels(LSDSpatialCSVReader& source_points_data)
   RasterData = zeta.copy();
 }
 
+////------------------------------------------------------------------------------
+//// impose_channels: this imposes channels onto the landscape
+//// You need to print a channel to csv and then load the data
+////------------------------------------------------------------------------------
+void LSDRasterMaker::impose_channels_with_buffer(LSDSpatialCSVReader& source_points_data, float slope)
+{
 
+  string column_name = "elevation(m)";
+
+  float elev_diff = DataResolution*sqrt(2)*slope;
+
+
+  Array2D<float> zeta=RasterData.copy();
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
+
+  // Get the local coordinate as well as the elevations
+  vector<float> UTME, UTMN;
+  source_points_data.get_x_and_y_from_latlong(UTME,UTMN);
+  vector<float> elev = source_points_data.data_column_to_float(column_name);
+
+
+  // make the map
+  cout << "I am making an elevation map. This will not work if points in the raster lie outside of the csv channel points." << endl;
+  int row,col;
+  int rp1,rm1,cp1,cm1;
+  for(int i = 0; i< int(elev.size()); i++)
+  {
+
+    source_points_data.get_row_and_col_of_a_point(UTME[i],UTMN[i],row, col);
+    zeta[row][col] = elev[i];
+
+    // now search neighbouring nodes for nodata
+    rp1 = row+1;
+    if(rp1 == NRows)
+    {
+      rp1 = row;
+    }
+    rm1 = row-1;
+    if (rm1 == -1)
+    {
+      rm1 = 0;
+    }
+    cp1 = col+1;
+    if (cp1 == NCols)
+    {
+      cp1 = col;
+    }
+    cm1 = col-1;
+    if (cm1 == -1)
+    {
+      cm1 = 0;
+    }
+
+    // now search all adjacent nodes
+    if ( zeta[rp1][cp1] == NoDataValue)
+    {
+      zeta[rp1][cp1] = elev[i]+elev_diff;
+    }
+    if ( zeta[rp1][col] == NoDataValue)
+    {
+      zeta[rp1][col] = elev[i]+elev_diff;
+    }
+    if ( zeta[rp1][cm1] == NoDataValue)
+    {
+      zeta[rp1][cm1] = elev[i]+elev_diff;
+    }
+    if ( zeta[row][cp1] == NoDataValue)
+    {
+      zeta[row][cp1] = elev[i]+elev_diff;
+    }
+    if ( zeta[row][cm1] == NoDataValue)
+    {
+      zeta[row][cm1] = elev[i]+elev_diff;
+    }
+    if ( zeta[rm1][cp1] == NoDataValue)
+    {
+      zeta[rm1][cp1] = elev[i]+elev_diff;
+    }
+    if ( zeta[rm1][col] == NoDataValue)
+    {
+      zeta[rm1][col] = elev[i]+elev_diff;
+    }
+    if ( zeta[rm1][cm1] == NoDataValue)
+    {
+      zeta[rm1][cm1] = elev[i]+elev_diff;
+    }
+  }
+
+
+  this->RasterData = zeta.copy();
+
+  RasterData = zeta.copy();
+}
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Cap elevations using an initial raster
+//------------------------------------------------------------------------------
+void LSDRasterMaker::cap_elevations(LSDRaster& InitialRaster)
+{
+  cout << "Capping elevations. WARNING: no checking rasters are same dimension" << endl;
+  for(int row=0; row<NRows; ++row)
+  {
+    for(int col=0; col<NCols; ++col)
+    {
+      if(RasterData[row][col]!=NoDataValue)
+      {
+        if (RasterData[row][col] > InitialRaster.get_data_element(row,col))
+        {
+          RasterData[row][col] = InitialRaster.get_data_element(row,col);
+        }
+      }
+    }
+  }  
+}
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This smooths the raster by taking a weighted average of the given pixel

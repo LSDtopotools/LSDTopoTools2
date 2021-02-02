@@ -109,6 +109,15 @@ class LSDRasterMaker: public LSDRaster
     /// @date 18/11/2018
     void set_to_constant_value(float new_value);
 
+    /// @brief Adds a strip of values to the raster
+    /// @param start_row_or_col the starting row or column
+    /// @param end_row_or_col the ending row or column
+    /// @param use_rows if true this creates horizontal strips
+    /// @param value the new value of the strip
+    /// @author SMM
+    /// @date 11/11/2020
+    void add_strip(int start_row_or_col, int end_row_or_col, bool horizontal, float value);
+
     /// @brief This linearly scales the raster to new minimum and maximum values
     /// @param new_minimum does what it says on the tin.
     /// @param new_maxuimum does what it says on the tin
@@ -123,6 +132,14 @@ class LSDRasterMaker: public LSDRaster
     /// @date 04/03/2020
     void impose_channels(LSDSpatialCSVReader& source_points_data);
 
+    /// @brief This fixes a channel, derived from source points data. It also makes sure none of these nodes is 
+    ///   adjacent to a nodata pixel
+    /// @param source_points_data an LSDSpatialCSVReader object. It needs lat and long and elevation columns
+    /// @param slope the slope between the data point and the adjacent pixel
+    /// @author SMM
+    /// @date 21/11/2020
+    void impose_channels_with_buffer(LSDSpatialCSVReader& source_points_data, float slope);
+
 
     /// @brief This smooths the raster. At some point in the future I'll
     ///  add more options but at the moment it just uses 4 neighbours and has
@@ -133,6 +150,12 @@ class LSDRasterMaker: public LSDRaster
     /// @date 03/09/2017
     void smooth(int boundary_type);
 
+    /// @brief Caps elevations using the initial raster
+    ///  WARNING no testing if the raster is the correct shape!
+    /// @param InitialRaster The initial raster above which the new surface cannot rise.
+    /// @author SMM
+    /// @date 31/08/2020
+    void cap_elevations(LSDRaster& InitialRaster);
 
     //void random_horizontal_strips(int minimum_strip_size, int maximum_strip_size, float minimum_value, float maximum_value);
 

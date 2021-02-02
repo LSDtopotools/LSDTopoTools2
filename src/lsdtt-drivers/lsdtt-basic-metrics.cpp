@@ -61,6 +61,7 @@
 #include "../LSDShapeTools.hpp"
 #include "../LSDRasterSpectral.hpp"
 #include "../LSDChiTools.hpp"
+#include "../LSDRasterMaker.hpp"
 #include "../LSDBasin.hpp"
 
 int main (int nNumberofArgs,char *argv[])
@@ -116,10 +117,21 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["isolate_pixels_draining_to_fixed_channel"] = false;
   string_default_map["fixed_channel_csv_name"] = "single_channel_nodes";
 
+  // some tools for punching out polygons and then getting distance to nearest nodata
+  // used for creating rivers in noisy DEMs
+  bool_default_map["punch_nodata"] = false;
+  bool_default_map["print_nearest_to_nodata_rasters"] = false; 
+  string_default_map["punch_raster_prefix"] = "DEM_punch";
+  bool_default_map["belowthresholdisnodata"] = true;
+  float_default_map["punch_threshold"] = 1000;
+  float_default_map["minimum_bank_elevation_window_radius"] = 20;
+  float_default_map["river_depth"] = 1.0;
 
   // raster trimming, to take care of rasters that have a bunch of nodata at the edges
   bool_default_map["print_trimmed_raster"] = false;
   int_default_map["trimming_buffer_pixels"] = 0;
+
+
 
   // Calculate the basic relief within a window in a raster
   bool_default_map["print_relief_raster"] = false;
@@ -162,7 +174,7 @@ int main (int nNumberofArgs,char *argv[])
 
 
 
-  // filling and drainage area
+  // drainage area
   bool_default_map["print_dinf_drainage_area_raster"] = false;
   bool_default_map["print_d8_drainage_area_raster"] = false;
   bool_default_map["print_QuinnMD_drainage_area_raster"] = false;
@@ -174,6 +186,20 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["extract_single_channel"] = false;
   bool_default_map["use_dinf_for_single_channel"] = false;
   string_default_map["channel_source_fname"] = "single_channel_source";
+
+  // imposing a single channel
+  bool_default_map["impose_single_channel"] = false;
+  string_default_map["fixed_channel_csv_name"] = "NULL";
+  bool_default_map["buffer_single_channel"] = true;
+  bool_default_map["force_single_channel_slope"] = false;
+  bool_default_map["fixed_channel_dig_and_slope"] = false;
+  float_default_map["single_channel_drop"] = 0;
+  float_default_map["single_channel_dig"] = 0.01;
+  string_default_map["single_channel_fd_string"] = "flow distance(m)";
+  string_default_map["single_channel_elev_string"] = "elevation(m)";
+  string_default_map["test_single_channel_name"] = "test_single_channel";
+
+  
 
 
   // Basic channel network
@@ -195,6 +221,22 @@ int main (int nNumberofArgs,char *argv[])
   string_default_map["basin_outlet_csv"] = "NULL";
   bool_default_map["extend_channel_to_node_before_receiver_junction"] = true;
   bool_default_map["print_basin_raster"] = false;
+
+  // finding major drainage divides
+  bool_default_map["divide_finder"] = false;
+  bool_default_map["horizontal_strips"] = true;
+  int_default_map["n_row_or_col_for_strips"] = 10;
+
+  // Getting all the ridges
+  bool_default_map["extract_ridges"] = false;
+
+
+  // Tagging pixels
+  bool_default_map["tag_nodes"] = false;
+  string_default_map["tagged_raster_input_name"] = "NULL";
+  bool_default_map["tag_downslope_nodes"] = false;
+  float_default_map["downslope_tagging_distance"] = 100;
+  float_default_map["upslope_tagging_distance"] = 100;
 
   // Some chi coordinate settings
   float_default_map["A_0"] = 1.0;
@@ -250,6 +292,13 @@ int main (int nNumberofArgs,char *argv[])
     // check to see if the raster exists
   LSDRasterInfo RI((DATA_DIR+DEM_ID), raster_ext);
 
+  // A little switch to find basins if you supply an outlet file
+  if( this_bool_map["get_basins_from_outlets"] )
+  {
+    this_bool_map["find_basins"] = true;
+  }
+
+
   // load the  DEM
   LSDRaster topography_raster;
   if (this_bool_map["remove_seas"])
@@ -298,6 +347,79 @@ int main (int nNumberofArgs,char *argv[])
     LSDRaster trimmed_raster = topography_raster.RasterTrimmerPadded(this_int_map["trimming_buffer_pixels"]);
     string this_raster_name = OUT_DIR+OUT_ID+"_TRIM";
     trimmed_raster.write_raster(this_raster_name,raster_ext);
+  }
+
+
+  // Some tools for punching out some nodata using a secondary raster that we can use to make river
+  // pathways in noisy DEMs. 
+  if(this_bool_map["punch_nodata"])
+  {
+    cout << "I am going to punch out some nodata. " << endl;
+    
+    string punch_R_in = DATA_DIR+this_string_map["punch_raster_prefix"];
+    cout << "The name of the raster I will use to punch out the nodata is " << punch_R_in+raster_ext << endl;
+    cout << "I will change to nodata any pixels in your raster that have a value in the punching raster";
+    if (this_bool_map["belowthresholdisnodata"])
+    {
+      cout << " below ";
+    }
+    else
+    {
+      cout << " above ";
+    }
+    cout << " the threshold " << this_float_map["punch_threshold"] << endl;
+    
+    LSDRaster punch_raster_in(punch_R_in,raster_ext);
+
+    LSDRaster Punched = topography_raster.mask_to_nodata_using_threshold_using_other_raster(this_float_map["punch_threshold"],this_bool_map["belowthresholdisnodata"], punch_raster_in);
+
+    string punch_name = OUT_DIR+OUT_ID+"_Punched";
+    Punched.write_raster(punch_name,raster_ext);
+
+  }
+
+  if(this_bool_map["print_nearest_to_nodata_rasters"])
+  {
+    cout << "I am going to find the nearest value to any nodata pixels, and the distance to those pixels. " << endl;
+    vector<LSDRaster> nearest_rs = topography_raster.get_nearest_distance_and_value_masks();
+
+    string distance_R_name = OUT_DIR+OUT_ID+"_DistToND";
+    string value_R_name = OUT_DIR+OUT_ID+"_ValueToND";
+
+    nearest_rs[0].write_raster(distance_R_name,raster_ext);
+    nearest_rs[1].write_raster(value_R_name,raster_ext);
+
+    // now get the lowest value in a window
+    float window_radius = this_float_map["minimum_bank_elevation_window_radius"];
+    int window_type = 1;
+    bool find_maximum = false;
+
+    LSDRaster minimum_river_elev = nearest_rs[1].neighbourhood_statistics_local_min_max(window_radius, window_type, find_maximum);
+    string minelev_R_name = OUT_DIR+OUT_ID+"_MinBankElev";
+    minimum_river_elev.write_raster(minelev_R_name,raster_ext);
+
+    // drop the river by the river depth
+    minimum_river_elev.AdjustElevation(this_float_map["river_depth"]);
+
+    // Now merge the rasters
+    LSDRaster topo_copy = topography_raster;
+    topo_copy.OverwriteRaster(minimum_river_elev);
+
+    string imposedriver_R_name = OUT_DIR+OUT_ID+"_ImposedRiver";
+    topo_copy.write_raster(imposedriver_R_name,raster_ext);    
+
+    if(this_bool_map["write_hillshade"])
+    {
+      cout << "Let me print the hillshade for you. " << endl;
+      float hs_azimuth = 315;
+      float hs_altitude = 45;
+      float hs_z_factor = 1;
+      LSDRaster hs_raster = topo_copy.hillshade(hs_altitude,hs_azimuth,hs_z_factor);
+
+      string hs_fname = OUT_DIR+OUT_ID+"_ImposedRiver_hs";
+      hs_raster.write_raster(hs_fname,raster_ext);
+    }
+
   }
 
 
@@ -622,7 +744,38 @@ int main (int nNumberofArgs,char *argv[])
     topo_test_wiener.write_raster(wiener_name,raster_ext);
   }
 
+  if (this_bool_map["impose_single_channel"])
+  {
+    cout << "I am going to impose a channel on your DEM." << endl;
+    cout << "This will overwrite these pixels. It also fills nodata." << endl;
+    LSDRasterInfo RI(topography_raster);
+    cout << "I am reading points from the file: "+ this_string_map["fixed_channel_csv_name"] << endl;
+    LSDSpatialCSVReader single_channel_data( RI, (DATA_DIR+this_string_map["fixed_channel_csv_name"]) );
+    single_channel_data.print_data_map_keys_to_screen();
 
+    cout << "Subtracting " << this_float_map["single_channel_drop"] << " m elevation from the single channel" << endl;
+    single_channel_data.data_column_add_float(this_string_map["single_channel_elev_string"], -this_float_map["single_channel_drop"]);
+
+    if (this_bool_map["force_single_channel_slope"])
+    {
+      single_channel_data.enforce_slope(this_string_map["single_channel_fd_string"], this_string_map["single_channel_elev_string"], this_float_map["min_slope_for_fill"]);
+    }
+
+    LSDRasterMaker RM(topography_raster);
+    if(this_bool_map["buffer_single_channel"])
+    {
+      RM.impose_channels_with_buffer(single_channel_data, this_float_map["min_slope_for_fill"]*2);
+    }
+    else
+    {
+      RM.impose_channels(single_channel_data);
+    }
+    LSDRaster imposed_topography = RM.return_as_raster();
+
+    cout << "Let me print the fill raster for you."  << endl;
+    string filled_raster_name = OUT_DIR+OUT_ID+"_imposed_channels";
+    imposed_topography.write_raster(filled_raster_name,raster_ext);       
+  }
 
   //============================================================================
   //
@@ -649,7 +802,10 @@ int main (int nNumberofArgs,char *argv[])
         || this_bool_map["extract_single_channel"]
         || this_bool_map["remove_nodes_influenced_by_edge"]
         || this_bool_map["isolate_pixels_draining_to_fixed_channel"]
-        || this_bool_map["calculate_basin_statistics"])
+        || this_bool_map["calculate_basin_statistics"]
+        || this_bool_map["divide_finder"]
+        || this_bool_map["tag_nodes"]
+        || this_bool_map["extract_ridges"])
   {
     cout << "I will need to compute flow information, because you are getting drainage area or channel networks." << endl;
     //==========================================================================
@@ -714,6 +870,93 @@ int main (int nNumberofArgs,char *argv[])
       NodesRemovedRaster.write_raster(remove_raster_name,raster_ext);
 
     }
+
+    // Now some logic for looking for upslope influenced pixels, used in the divide finder
+    if (this_bool_map["tag_nodes"])
+    {
+      cout << "I am going to do some pixel tagging!" << endl;
+      cout << "My upslope tagging distance is " << this_float_map["upslope_tagging_distance"] << " metres." << endl;
+      LSDIndexRaster tagged_raster(DATA_DIR+this_string_map["tagged_raster_input_name"],raster_ext);
+
+      // Now get the uplsope tags
+      LSDIndexRaster tr = FlowInfo.tag_upstream_nodes(tagged_raster,this_float_map["upslope_tagging_distance"]);
+      string tag_raster_name = OUT_DIR+OUT_ID+"_upslope_tagged_pixels";
+      tr.write_raster(tag_raster_name,raster_ext);
+
+      if (this_bool_map["tag_downslope_nodes"])
+      {
+        cout << "I am tagging downslope pixels." << endl;
+        LSDIndexRaster tr_down = FlowInfo.tag_downstream_nodes(tagged_raster,this_float_map["downslope_tagging_distance"]);
+
+        string tag_raster_name = OUT_DIR+OUT_ID+"_downslope_tagged_pixels";
+        tr_down.write_raster(tag_raster_name,raster_ext);
+
+      }
+    }
+
+
+
+
+
+    // Now some logic for looking for upslope influenced pixels, used in the divide finder
+    if (this_bool_map["divide_finder"])
+    {
+      // First set up the strips
+      LSDRasterMaker RM(filled_topography);
+
+      int NCols = filled_topography.get_NCols();
+      int NRows = filled_topography.get_NRows();
+
+      float NDV = filled_topography.get_NoDataValue();
+      RM.set_to_constant_value(NDV);
+
+      // E or N strip
+      int start_row_or_col, end_row_or_col;
+      if(this_bool_map["horizontal_strips"])
+      {
+        start_row_or_col = 0;
+        end_row_or_col = this_int_map["n_row_or_col_for_strips"];
+
+        RM.add_strip(start_row_or_col, end_row_or_col, this_bool_map["horizontal_strips"], 0);
+        cout << "Got N strip" << endl;
+
+        start_row_or_col = NRows - 1 -this_int_map["n_row_or_col_for_strips"];
+        end_row_or_col = NRows - 1;    
+
+        RM.add_strip(start_row_or_col, end_row_or_col, this_bool_map["horizontal_strips"], 1);
+        cout << "Got S strip" << endl;
+      }
+      else
+      {
+        start_row_or_col = 0;
+        end_row_or_col = this_int_map["n_row_or_col_for_strips"];
+
+        RM.add_strip(start_row_or_col, end_row_or_col, this_bool_map["horizontal_strips"], 0);
+        cout << "Got E strip" << endl;
+
+        start_row_or_col = NCols - 1-this_int_map["n_row_or_col_for_strips"];
+        end_row_or_col =  NCols - 1;    
+
+        RM.add_strip(start_row_or_col, end_row_or_col, this_bool_map["horizontal_strips"], 1);        
+        cout << "Got W strip" << endl;
+      }    
+
+      LSDRaster strip = RM.return_as_raster();
+      LSDIndexRaster tagged_raster(strip);
+
+      cout << "Printing raster" << endl;
+      string tag_raster_name = OUT_DIR+OUT_ID+"_tagged";
+      tagged_raster.write_raster(tag_raster_name,raster_ext);
+
+      // Now get the uplsope tags
+      LSDIndexRaster tr = FlowInfo.tag_nodes_upstream_of_baselevel(tagged_raster);
+      tag_raster_name = OUT_DIR+OUT_ID+"_tagged_basins";
+      tr.write_raster(tag_raster_name,raster_ext);
+
+    }
+
+
+
 
     //=================================================================
     // Now, if you want, calculate drainage areas
@@ -838,7 +1081,8 @@ int main (int nNumberofArgs,char *argv[])
         || this_bool_map["print_sources_to_csv"]
         || this_bool_map["find_basins"]
         || this_bool_map["print_chi_data_maps"]
-        || this_bool_map["print_junction_angles_to_csv"])
+        || this_bool_map["print_junction_angles_to_csv"]
+        || this_bool_map["extract_ridges"])
     {
       // calculate the flow accumulation
       cout << "\t Calculating flow accumulation (in pixels)..." << endl;
@@ -866,6 +1110,25 @@ int main (int nNumberofArgs,char *argv[])
 
       // now get the junction network
       LSDJunctionNetwork JunctionNetwork(sources, FlowInfo);
+
+
+      // Extract all the ridges
+      if(this_bool_map["extract_ridges"])
+      {
+        string RN_csv_name = OUT_DIR+OUT_ID+"_Ridges.csv";
+        map<int, int > RidgeNetwork_nodes = JunctionNetwork.ExtractAllRidges(FlowInfo,RN_csv_name);
+
+        // convert to geojson if that is what the user wants
+        // It is read more easily by GIS software but has bigger file size
+        if ( this_bool_map["convert_csv_to_geojson"])
+        {
+          cout << "Let me convert that data to json." << endl;
+          string gjson_name = OUT_DIR+OUT_ID+"_Ridges.geojson";
+          LSDSpatialCSVReader thiscsv(OUT_DIR+OUT_ID+"_Ridges.csv");
+          thiscsv.print_data_to_geojson(gjson_name);
+        }
+      }
+
 
       // Print channels and junctions if you want them.
       if( this_bool_map["print_channels_to_csv"])

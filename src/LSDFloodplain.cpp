@@ -261,6 +261,120 @@ void LSDFloodplain::get_distance_upstream_along_main_stem(int junction_number, L
 	}
 }
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Function to get valley centreline
+// for each point in the channel network, use a local neighbourhood to find the point
+// in the distance array with the maximum distance from the bank.
+// write to a centreline array
+// FJC 30/01/21
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDRaster LSDFloodplain::get_valley_centreline(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, int threshold_SO, float window_radius, int neighbourhood_switch)
+{
+	// create the floodplain raster - this will be used to calculate the distance to the nearest bank
+	// in this raster floodplain pixels are set to No Data and the rest of the landscape is set to 1
+	LSDRaster Floodplain = get_NoData_FloodplainRaster();
+
+	// get the distance and value of the nearest bank masks for each floodplain pixel
+	vector<LSDRaster> nearest_rs = Floodplain.get_nearest_distance_and_value_masks();
+
+	Array2D<float> DistanceArray = nearest_rs[0].get_RasterData();
+
+	// get the stream order array
+	Array2D<int> StreamOrders = ChanNetwork.get_StreamOrderArray();
+	Array2D<float> StreamOrders_thinned(NRows,NCols,NoDataValue);
+
+  // thin the stream order array to only include channels that are within the floodplain and have a stream order greater than or equal to the threshold.
+	for (int row = 0; row < NRows; row++)
+	{
+		for (int col = 0; col < NCols; col++)
+		{
+			// check if your stream order is greater to or equal than the threshold
+			if (StreamOrders[row][col] >= threshold_SO)
+			{
+				// find if this stream order is in the floodplain raster
+				if (BinaryArray[row][col] != 0)
+				{
+					StreamOrders_thinned[row][col] = StreamOrders[row][col];
+				}
+			}
+		}
+	}
+	LSDRaster StreamOrderRaster(NRows,NCols, XMinimum, YMinimum, DataResolution, NoDataValue, StreamOrders_thinned, GeoReferencingStrings);
+	// use the neighbourhood algorithm to find the maximum distance to bank within the search distance specified.
+	bool find_maximum = true;
+	LSDRaster Centreline = StreamOrderRaster.neighbourhood_statistics_local_min_max_location(DistanceArray, window_radius, neighbourhood_switch, find_maximum);
+	return Centreline;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Function to get valley walls - edge of floodplain raster
+// FJC 29/01/21
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<LSDRaster> LSDFloodplain::get_valley_walls(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, LSDRaster& ElevationRaster, LSDRaster& DistFromOutlet, int threshold_SO)
+{
+		//set up the arrays
+		Array2D<float> ValleyWallArray(NRows,NCols,NoDataValue);
+		Array2D<float> ValleyWallSigns_array(NRows,NCols,NoDataValue);
+
+	  // for each point in the floodplain, get the nodes of the nearest channel pixels
+		Get_Relief_of_Nearest_Channel(ChanNetwork, FlowInfo, ElevationRaster, DistFromOutlet, threshold_SO);
+
+	  // create the floodplain raster - this will be used to calculate the distance to the nearest bank
+		// in this raster floodplain pixels are set to No Data and the rest of the landscape is set to 1
+	  LSDRaster Floodplain = get_NoData_FloodplainRaster();
+
+		// get the distance and value of the nearest bank masks for each floodplain pixel
+		vector<LSDRaster> nearest_rs = Floodplain.get_nearest_distance_and_value_masks();
+
+		Array2D<float> DistanceArray = nearest_rs[0].get_RasterData();
+		int chan_node, ustream_node, dstream_node, ustream_junc, dstream_junc;
+		float wall_x, wall_y, ustream_x, ustream_y, dstream_x, dstream_y;
+		float det;
+		for (int row = 0; row < NRows; row++)
+		{
+			for (int col = 0; col < NCols; col++)
+			{
+				if (DistanceArray[row][col] == DataResolution)
+				{
+          // assign the valley wall to the array
+					ValleyWallArray[row][col] = 1;
+
+					// find the nearest channel pixel to that pixel
+					chan_node = NearestChannelNode_array[row][col];
+
+					// get the determinant of the vectors between the valley wall and the channel and between the ustream and dstream channel nodes.
+					// the determinant is calculated by:
+					// det = (wall_x - ustream_x)(dstream_y - ustream_y) - (wall_y - ustream_y)(dstream_x - ustream_x)
+					// If det is positive = right bank, negative = left bank (while looking downstream)
+					// https://stackoverflow.com/questions/1560492/how-to-tell-whether-a-point-is-to-the-right-or-left-side-of-a-line
+					// first get x and y locations of the wall pixel
+					Floodplain.get_x_and_y_locations(row, col, wall_x, wall_y);
+					// now get x and y locations of ustream and dstream channel nodes. We will just get the nearest upstream and downstream junctions to the node
+					ustream_junc = ChanNetwork.find_upstream_junction_from_channel_nodeindex(chan_node, FlowInfo);
+					dstream_junc = ChanNetwork.get_Receiver_of_Junction(ustream_junc);
+					ustream_node = ChanNetwork.get_Node_of_Junction(ustream_junc);
+					dstream_node = ChanNetwork.get_Node_of_Junction(dstream_junc);
+
+					FlowInfo.get_x_and_y_from_current_node(ustream_node, ustream_x, ustream_y);
+					FlowInfo.get_x_and_y_from_current_node(dstream_node, dstream_x, dstream_y);
+					cout << "ustream junc: " << ustream_junc << ", dstream_junc: " << dstream_junc << endl;
+
+					det = (wall_x - ustream_x)*(dstream_y - ustream_y) - (wall_y - ustream_y)*(dstream_x - ustream_x);
+					cout << det << endl;
+					ValleyWallSigns_array[row][col] = det;
+				}
+			}
+		}
+
+		LSDRaster ValleyWallRaster(NRows,NCols, XMinimum, YMinimum, DataResolution, NoDataValue, ValleyWallArray, GeoReferencingStrings);
+		LSDRaster ValleyWallSigns(NRows,NCols, XMinimum, YMinimum, DataResolution, NoDataValue, ValleyWallSigns_array, GeoReferencingStrings);
+		nearest_rs.push_back(ValleyWallRaster);
+		nearest_rs.push_back(ValleyWallSigns);
+
+		return  nearest_rs;
+}
+
 //----------------------------------------------------------------------------------------
 // FUNCTIONS TO GENERATE RASTERS
 //----------------------------------------------------------------------------------------
@@ -281,22 +395,34 @@ LSDIndexRaster LSDFloodplain::print_ConnectedComponents_to_Raster()
 //----------------------------------------------------------------------------------------
 LSDIndexRaster LSDFloodplain::print_BinaryRaster()
 {
-	Array2D<int> BinaryArray (NRows,NCols,NoDataValue);
+	LSDIndexRaster BinaryRaster(NRows,NCols, XMinimum, YMinimum, DataResolution, NoDataValue, BinaryArray, GeoReferencingStrings);
+	return BinaryRaster;
+}
+
+//----------------------------------------------------------------------------------------
+// Get raster of floodplain locations where the floodplain is no data and the
+// surrounding landscape has a value of 1.
+// FJC 29/01/21
+//----------------------------------------------------------------------------------------
+LSDRaster LSDFloodplain::get_NoData_FloodplainRaster()
+{
+	Array2D<int> FloodplainArray = get_FloodplainArray();
+	Array2D<float> NoDataArray(NRows, NCols, 1);
 
 	for (int row = 0; row < NRows; row++)
 	{
 		for (int col = 0; col < NCols; col++)
 		{
-			if (FloodplainNodes_array[row][col] != NoDataValue)
+			if (FloodplainArray[row][col] != NoDataValue)
 			{
-				BinaryArray[row][col] = 1;
+				NoDataArray[row][col] = NoDataValue;
 			}
 		}
 	}
-	LSDIndexRaster BinaryRaster(NRows,NCols, XMinimum, YMinimum, DataResolution, NoDataValue, BinaryArray, GeoReferencingStrings);
-	return BinaryRaster;
-}
+	LSDRaster NoDataRaster(NRows,NCols, XMinimum, YMinimum, DataResolution, NoDataValue, NoDataArray, GeoReferencingStrings);
+	return NoDataRaster;
 
+}
 ////----------------------------------------------------------------------------------------
 //// Get the raster of channel relief relative to the nearest channel reach
 //// FJC 18/10/16

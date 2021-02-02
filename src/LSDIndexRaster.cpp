@@ -243,21 +243,31 @@ void LSDIndexRaster::create(LSDRaster& NonIntLSDRaster)
   XMinimum = NonIntLSDRaster.get_XMinimum();
   YMinimum = NonIntLSDRaster.get_YMinimum();
   DataResolution = NonIntLSDRaster.get_DataResolution();
-  NoDataValue = NonIntLSDRaster.get_NoDataValue();
+  NoDataValue = int(NonIntLSDRaster.get_NoDataValue());
   GeoReferencingStrings = NonIntLSDRaster.get_GeoReferencingStrings();
-  Array2D<float> RasterDataFloat = NonIntLSDRaster.get_RasterData();
   vector<int> list_unique_values;
 
   //Declarations
+  //cout << "NDV is: " << NoDataValue << endl;
   Array2D<int> RasterDataInt(NRows,NCols,NoDataValue);
 
-  for (int i=0; i<NRows; ++i)
+  //cout << "I am now casting the data to integer." << endl;
+  for (int row=0; row<NRows; row++)
   {
-    for (int j=0; j<NCols; ++j)
+    for (int col=0; col<NCols; col++)
     {
-      RasterDataInt[i][j] = int(RasterDataFloat[i][j]+0.5);
+      if (NonIntLSDRaster.get_data_element(row,col) != NonIntLSDRaster.get_NoDataValue())
+      {
+        RasterDataInt[row][col] = int(NonIntLSDRaster.get_data_element(row,col)+0.5);
+        //cout << RasterDataInt[row][col] << ",";
+      }
+      
     }
+    //cout << endl;
   }
+  //cout << "Finished casting" << endl;
+  RasterData = RasterDataInt.copy();
+
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 

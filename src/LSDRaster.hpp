@@ -622,6 +622,24 @@ class LSDRaster
   /// @date 10/02/17
   LSDRaster BufferRasterData(float window_radius);
 
+  /// @brief This finds the nearest value of a pixel that has data to a pixel in this_row,this_col;
+  ///  it is used to find the nearest value and distance to nodata nodes. Used in routines for
+  ///  masking then filling channels
+  /// @param this_row the row to be investigated
+  /// @param this_col the col to be investigated
+  /// @param distance the distance to the nearest occupied pixel (returned by value)
+  /// @param value the value of the nearest occupied pixel (returned by value)
+  /// @author SMM
+  /// @date 26/01/2021
+  void find_nearest_data(int this_row,int this_col, float& distance, float& value);
+
+  /// @brief Finds all nodata nodes and gets rasters of the nearest points value and
+  ///  its distance
+  /// @return a vector of two rasters, the first is the distance and the second is the value
+  /// @author SMM
+  /// @date 26/01/2021
+  vector<LSDRaster> get_nearest_distance_and_value_masks();
+
   /// @brief Pad one smaller raster to the same extent as a bigger raster by adding
   /// no data around the edges
   LSDIndexRaster PadSmallerRaster(LSDIndexRaster& smaller_raster);
@@ -1950,7 +1968,7 @@ class LSDRaster
   //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   ///@brief Wrapper Function to create a D-infinity flow accumulation and drainage area raster
   ///@return vector of LSDRaster (0 is acc, 1 is DA)
-  ///@author BG 
+  ///@author BG
   ///@date 09/01/2018
   //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   vector<LSDRaster> D_inf_flowacc_DA();
@@ -2057,7 +2075,7 @@ class LSDRaster
   vector<LSDRaster> neighbourhood_statistics_spatial_average_and_SD(float window_radius,
                                                     int neighbourhood_switch);
 
-  /// @brief gets relief within value specified circular neighbourhood
+  /// @brief gets relief within value specified neighbourhood
   ///
   /// @details The second argument (neighbourhood_switch) specifies the neighbourhood type:
   ///   0 Square neighbourhood
@@ -2069,6 +2087,32 @@ class LSDRaster
   /// @date 16/11/2014
   LSDRaster neighbourhood_statistics_local_relief(float window_radius,
                                                     int neighbourhood_switch);
+
+  /// @brief gets minimum or maximum value in a neighbourhood
+  ///
+  /// @details The second argument (neighbourhood_switch) specifies the neighbourhood type:
+  ///   0 Square neighbourhood
+  ///   1 Circular window
+  /// @param float window_radius -> radius of neighbourhood
+  /// @param int neighbourhood_switch -> see above
+  /// @param bool find_maximum -> if true, find the maximum, if false, find the minimum
+  /// @return LSDRaster contianing the maximum or minimum within a neighbourhood
+  /// @author SMM
+  /// @date 27/01/2021
+  LSDRaster neighbourhood_statistics_local_min_max(float window_radius, int neighbourhood_switch, bool find_maximum);
+
+  /// @brief Function to return an array with the location of the pixel with the minimum or
+  /// maximum value in a neighbourhood
+  /// @details The second argument (neighbourhood_switch) specifies the neighbourhood type:
+  ///   0 Square neighbourhood
+  ///   1 Circular window
+  /// @param float window_radius -> radius of neighbourhood
+  /// @param int neighbourhood_switch -> see above
+  /// @param bool find_maximum -> if true, find the maximum, if false, find the minimum
+  /// @return LSDRaster contianing the location and value of the maximum or minimum within a neighbourhood
+  /// @author FJC
+  /// @date 30/01/21
+  LSDRaster neighbourhood_statistics_local_min_max_location(Array2D<float>& TargetRasterData, float window_radius, int neighbourhood_switch, bool find_maximum);
 
   /// @brief tests neighbourhood for the fraction of values for which the specified
   /// condition is met.
