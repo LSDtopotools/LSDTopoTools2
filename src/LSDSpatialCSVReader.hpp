@@ -213,6 +213,17 @@ class LSDSpatialCSVReader
     /// @date 03/10/2019
     bool is_column_in_csv(string column_name);
 
+    /// @brief Adds a data column to the map. 
+    /// @detail Note this assumes you have the node ordering correct
+    /// @param column_name the column name, duh
+    /// @param column_data the data as a vector of strings. You need to convert 
+    ///   other kinds of data to string if you want it in the data map
+    /// @return a boolean that is true if the column was added
+    /// @author SMM
+    /// @date 09/02/2021
+    bool add_data_column(string column_name, vector<string> column_data);
+
+
     /// @brief This gets a data column from the csv file
     /// @param column_name a string that holds the column name
     /// @return a vector of strings: this holds the data.
@@ -279,6 +290,12 @@ class LSDSpatialCSVReader
     /// @date 13/11/2014
     void check_if_points_are_in_raster();
 
+    /// @brief Returns the points_in_raster_vector
+    /// @return is_in_raster a boolean telling if the point is in the raster
+    /// @author SMM
+    /// @date 14/02/2021
+    vector<bool> get_if_points_are_in_raster_vector();
+
     /// @brief This function gets vectors of x and y coordinates and node indices
     /// from these points
     /// @details This DOES NOT use latitude and longitude, instead
@@ -302,9 +319,18 @@ class LSDSpatialCSVReader
     /// @brief Function to extract the nodeindex
     ///  The nodeindex needs to be in the object, will take "node", "id", and "nodeindex" as columns
     /// @author SMM
-    /// @return A vectoe of the nodeindices
+    /// @return A vector of the nodeindices
     /// @date 08/10/2019
     vector<int> get_nodeindex_vector();
+
+    /// @brief Uses the lat-long in the csv information to get the nodeindex for a given flowinfo object
+    ///  Creates a new "nodeindex" column in the object
+    /// @param FlowInfo a flowinfo object
+    /// @author SMM
+    /// @return none, but updates the data_map
+    /// @date 09/02/2021
+    void add_nodeindex_vector_to_data_map_using_lat_long(LSDFlowInfo& FlowInfo);
+
 
     /// @brief Function to create a map with nodeindex as the key
     ///  The nodeindex needs to be in the object
@@ -374,6 +400,16 @@ class LSDSpatialCSVReader
     /// @author SMM
     /// @date 14/03/17
     void print_data_to_geojson(string json_outname);
+
+    // @brief Returns the data map
+    /// @author BG/ELSG
+    /// @date 01/03/21
+    map<string,vector<string> >& get_data_map();
+
+    // @brief Appends a value to a column
+    /// @author BG/ELSG
+    /// @date 02/03/21
+    void append_to_col(string colname, string val);
 
     /// Gets the various data members
     vector<double> get_latitude() const {return latitude;}

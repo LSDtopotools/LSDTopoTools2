@@ -308,7 +308,11 @@ int main (int nNumberofArgs,char *argv[])
   if (CHeads_file != "NULL" && CHeads_file != "Null" && CHeads_file != "null")
   {
     cout << "Loading channel heads from the file: " << DATA_DIR+CHeads_file << endl;
-    vector<int> sources = FlowInfo.Ingest_Channel_Heads((DATA_DIR+CHeads_file), 2);
+    cout << "The channel heads file *MUST* have a csv extension or this will crash!!" << endl;
+    LSDRasterInfo ThisRI(filled_topography);
+    string csv_filename = DATA_DIR+CHeads_file;
+    LSDSpatialCSVReader CHeadCSV(ThisRI,csv_filename);    
+    vector<int> sources = CHeadCSV.get_nodeindices_from_lat_long(FlowInfo);
     cout << "\t Got sources!" << endl;
 
     // now get the junction network

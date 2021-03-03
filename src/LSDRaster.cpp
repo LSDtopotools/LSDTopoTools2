@@ -10420,8 +10420,180 @@ vector<LSDRaster> LSDRaster::get_nearest_distance_and_value_masks()
 }
 
 
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// THis pads a smaller index raster to the same extent as a bigger raster by adding
+/// This takes a list of points. Then, for every pixel in the 
+///  raster it finds the point amongst that list that is closest to the given pixel. 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector< LSDRaster > LSDRaster::find_nearest_point_from_list_of_points(vector<float> Eastings, vector<float> Northings,
+                                              vector<float> values, float swath_width)
+{
+  Array2D<float> Distances(NRows, NCols, NoDataValue);
+  Array2D<float> Values(NRows, NCols, NoDataValue);
+  Array2D<float> Nodes(NRows, NCols, NoDataValue);
+
+  // Get the easting and northing vectors from the raster
+  vector<float> raster_eastings;
+  vector<float> raster_northings;
+  get_easting_and_northing_vectors(raster_eastings, raster_northings);
+
+  int n_nodes = int(Eastings.size());
+
+  float this_min_distance, this_value, this_node, this_distance; 
+  float x_0,y_0,x_1,y_1; 
+
+  // Now we loop through all pixels in the raster
+  cout << "I am going to find the closest point in a list of points to every pixel in your raster." << endl;
+  cout << "This has not been programmed in an efficient way," << endl;
+  cout << "so if this is a big DEM it will take a while" << endl;
+  for(int row = 0; row<NRows; row++)
+  {
+    for (int col = 0; col<NCols; col++)
+    {
+      if(RasterData[row][col] != NoDataValue)
+      {
+        
+        // reset the minimum distance
+        this_min_distance = 10000000000;
+        this_value = NoDataValue;
+        this_node = NoDataValue;
+
+        // now loop through all the points getting the minimum point
+        x_0 = raster_eastings[col];
+        y_0 = raster_northings[row];
+
+        for(int i = 0; i< n_nodes; i++)
+        {
+          x_1 = Eastings[i];
+          y_1 = Northings[i];
+
+          this_distance = distance_between_two_points(x_0,y_0,x_1,y_1);
+
+          if (this_distance < this_min_distance)
+          {
+            this_min_distance = this_distance;
+            this_value = values[i];
+            this_node = float(i);
+          }
+        }
+
+        //cout << "r: " << row << ", c: "<< col << " min dist: " << this_min_distance << endl;
+
+        // Finished looping through node, update the data 
+        // only record the nodes that are withing the swath width
+        if (this_min_distance<0.5*swath_width)
+        {
+          Distances[row][col] = this_min_distance;
+          Values[row][col] = this_value;
+          Nodes[row][col] = this_node;
+        }
+      }
+    }
+  }
+
+  LSDRaster DistRaster(NRows,NCols, XMinimum, YMinimum, DataResolution,
+                            NoDataValue, Distances, GeoReferencingStrings);
+  LSDRaster ValuesRaster(NRows,NCols, XMinimum, YMinimum, DataResolution,
+                            NoDataValue, Values, GeoReferencingStrings);                            
+  LSDRaster NodesRaster(NRows,NCols, XMinimum, YMinimum, DataResolution,
+                            NoDataValue, Nodes, GeoReferencingStrings);
+
+  vector<LSDRaster> return_rasters;
+  return_rasters.push_back(DistRaster);
+  return_rasters.push_back(ValuesRaster);
+  return_rasters.push_back(NodesRaster);
+
+  return return_rasters;
+
+}
+
+
+void LSDRaster::make_swath(vector<float> Eastings, vector<float> Northings,
+                                              vector<float> values, float swath_width, float bin_width,
+                                              string swath_data_prefix, bool print_swath_rasters)
+{
+  // first we get the swath rasters
+  vector< LSDRaster > swath_rasther_vec = find_nearest_point_from_list_of_points(Eastings, Northings,values, swath_width);
+
+  string swath_data_name = swath_data_prefix+"_swath.csv";
+  if (print_swath_rasters)
+  {
+    cout << "I am now going to print your swath rasters." << endl;
+    string dist_fname = swath_data_prefix+"_swathdist";
+    string val_fname = swath_data_prefix+"_swathval";
+    string node_fname = swath_data_prefix+"_swathnode";
+
+    swath_rasther_vec[0].write_raster(dist_fname,"bil");
+    swath_rasther_vec[1].write_raster(val_fname,"bil");
+    swath_rasther_vec[2].write_raster(node_fname,"bil");
+  }
+
+  // now we need to vectorize the data
+  vector<float> distance_vector;
+  vector<float> elevation_vector;
+  float this_distance;
+  for(int row = 0; row<NRows; row++)
+  {
+    for(int col = 0; col< NCols; col++)
+    {
+      this_distance = swath_rasther_vec[1].get_data_element(row,col);
+      if(this_distance != NoDataValue)
+      {
+        distance_vector.push_back(this_distance);
+        elevation_vector.push_back(RasterData[row][col]);
+      }
+    }
+  }
+
+
+
+
+
+  // the million data vectors that go into the binning
+  vector<float> midpoints_output;
+  vector<float>  MeanX_output;
+  vector<float>  MedianX_output;
+  vector<float> StandardDeviationX_output;
+  vector<float> StandardErrorX_output;
+  vector<float> MADX_output;
+  vector<float> MeanY_output;
+  vector<float> MinimumY_output;
+  vector<float> FirstQuartileY_output;
+  vector<float> MedianY_output;
+  vector<float> ThirdQuartileY_output;
+  vector<float> MaximumY_output;
+  vector<float> StandardDeviationY_output;
+  vector<float> StandardErrorY_output;
+  vector<float> MADY_output;
+  vector<int> number_observations_output;
+
+
+  bin_data(distance_vector, elevation_vector, bin_width, midpoints_output, MeanX_output,
+           MedianX_output, StandardDeviationX_output, StandardErrorX_output, MADX_output,
+           MeanY_output, MinimumY_output, FirstQuartileY_output, MedianY_output,
+           ThirdQuartileY_output, MaximumY_output, StandardDeviationY_output, StandardErrorY_output,
+           MADY_output, number_observations_output, NoDataValue);
+
+  
+  ofstream bin_data_out(swath_data_name);
+  bin_data_out << "distance,mean_elevation,minimum_z,first_quartile_z,median_z,third_quartile_z,max_z,n_samples"<< endl;
+  int n_bins = (midpoints_output.size());
+  // For some reason the last bin is always empty so I just don't print it
+  for(int i = 0; i<n_bins-1; i++)
+  {
+    bin_data_out << midpoints_output[i] << "," << MeanY_output[i] << "," << MinimumY_output[i] <<","
+                  << FirstQuartileY_output[i] << "," <<  MedianY_output[i] << "," << ThirdQuartileY_output[i] 
+                  << "," << MaximumY_output[i] << "," << number_observations_output[i] << endl;
+  }
+  bin_data_out.close();
+
+}
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This pads a smaller index raster to the same extent as a bigger raster by adding
 // no data values
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 LSDIndexRaster LSDRaster::PadSmallerRaster(LSDIndexRaster& smaller_raster)

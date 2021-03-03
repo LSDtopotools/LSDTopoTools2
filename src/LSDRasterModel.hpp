@@ -244,6 +244,14 @@ class LSDRasterModel: public LSDRasterSpectral
   void raise_and_fill_raster();
   void raise_and_fill_raster(float min_slope_for_fill);
 
+  /// @brief CHanges the elevation of all nodata nodes by adjustment
+  /// @param adjustment the elevation to change
+  /// @author SMM
+  /// @date 08/02/2021
+  void add_fixed_elevation(float adjustment);
+  
+
+
   /// @brief Looks at another raster, checks to see if it the same dimensions as the 
   ///  model data, and then replaces any pixel in the model data with nodata
   ///  if it is nodata in the other raster. 
@@ -306,6 +314,22 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @author SMM
   /// @date 18/06/2014
   void add_path_to_names( string pathname);
+
+
+  //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+  // @!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@
+  // TOOLS FOR TRANSIENT RUNS
+  // @!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@
+  //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+  /// @brief This takes some "phases" with rates and calculates the rate
+  ///  for a given phase of incision
+  /// @param phase_start A vector or starting times for each phase
+  /// @param phase_rates A vector of the base level drop rates
+  /// @return the rate for a given time (the time is withing the data member current_time)
+  /// @author SMM
+  /// @date 08/02/2021
+  float calculate_bl_drop_rate( vector<float> phase_start, vector<float> phase_rates);
+
 
   //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   // @!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@
@@ -649,6 +673,22 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @date 03/09/2017
   void run_components_combined( LSDRaster& URaster, LSDRaster& KRaster, bool use_adaptive_timestep );
 
+  /// @brief This is a wrapper similar to run_components but sends the
+  /// fluvial and uplfit fields to the nonlinear solver.
+  /// This one allows you to put in a base level
+  /// And include transience
+  /// @detail Variable U and K rasters can be used.
+  /// @param URaster A raster of uplift rates
+  /// @param KRaster A raster of K values
+  /// @param use_adaptive_timestep If true, an adaptive timestep is used
+  /// @param source_points_data some points to serve as base level nodes
+  /// @param phase_time a vector of times for different base level fall rates
+  /// @param phase_rates a vector of base level fall rates
+  /// @author SMM
+  /// @date 08/02/2021
+  void run_components_combined_imposed_baselevel( LSDRaster& URaster, LSDRaster& KRaster, 
+                                          bool use_adaptive_timestep, LSDSpatialCSVReader& source_points_data,
+                                          vector<float> phase_time, vector<float> phase_rates);
 
   /// @brief This is a wrapper that runs the model but includes CRN columns
   /// fluvial and uplfit fields to the nonlinear solver
@@ -842,6 +882,25 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @author SMM
   /// @date 06/09/2017
   void fluvial_incision_with_variable_uplift_and_variable_K_adaptive_timestep( LSDRaster& Uplift_rate, LSDRaster& K_raster );
+
+  /// @brief Fastscape, implicit finite difference solver for stream power equations
+  /// O(n)
+  /// Method takes the K value from a raster fed to it
+  /// and also take a raster of the uplift rates
+  /// and solves the stream power equation at a future timestep in linear time
+  /// This version includes the current uplift, so you do not need to call
+  /// uplift after this has finished. Uses an adaptive timestep.
+  /// This version allows you to impose a base level
+  /// @param K_raster the raster of K values.
+  /// @param Uplift_rate a raster of uplift rates in m/yr
+  /// @param source_points_data a spatial csv object that has the correct elevation input
+  /// @param the rate the basse level is falling. Need a rate rather than a fixed elevation because
+  ///  of the adaptive timestep
+  /// @author SMM
+  /// @date 08/02/2021
+  void fluvial_incision_with_variable_uplift_and_variable_K_adaptive_timestep_impose_baselevel( LSDRaster& Urate_raster, 
+                                 LSDRaster& K_raster, LSDSpatialCSVReader& source_points_data,
+                                 float bl_fall_rate );
 
   /// @brief This function is more or less identical to fluvial_incision above, but it
   /// Returns a raster with the erosion rate and takes arguments rather

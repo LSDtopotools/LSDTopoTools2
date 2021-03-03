@@ -1306,60 +1306,99 @@ LSDRaster LSDFlowInfo::find_nodes_not_influenced_by_edge_draining_to_nodelist(ve
   // The node list is loaded from another function. This can be a channel network or a
   // main stream channel. That channel can be generated using the LSDFlowInfo method LSDFlowInfo::get_flow_path
   int n_nodes = int(node_list.size());
+  bool problem_node = false;        // for debugging
   cout << "I am trying to isolate nodes draining to a fixed channel that are not influenced by nodata." << endl;
   cout << "I am programmed in a rather rudimentary, brute force way. It may take some time. " << endl;
   cout << "I need to process " << n_nodes << " nodes." << endl;
+
+  if(problem_node)
+  {
+    cout << "I am in debugging mode! To switch me back you need to go into FlowInfo line 1319" << endl;
+  }
+  
   for(int node = 0; node < n_nodes; node++)
   {
-    if (node % 500 == 0)
+    if ( node_list[node] != NoDataValue)
     {
-      cout << "Node " << node << " of " << n_nodes << endl;
-    }
-
-    // first get the current node
-    retrieve_current_row_and_col(node_list[node],row,col);
-    new_topography_data[row][col] = topography.get_data_element(row,col);
-
-    // now get the donors
-    vector<int> donors = retrieve_donors_to_node(  node_list[node]);
-
-    // Loop through all the donors to this particular node. We will look through the donors to
-    // find upslope influence of nodata.
-    int n_donors = int(donors.size());
-    for (int donor = 0; donor<n_donors; donor++)
-    {
-      int this_d_node = donors[donor];
-
-      // check to see if the donor is in the fixed channel. If it is, get rid of it.
-      bool donor_in_node_list = false;
-      for (int nl = 0; nl<n_nodes; nl++)
+      if (node % 500 == 0)
       {
-        if (node_list[nl] == this_d_node)
-        {
-          donor_in_node_list = true;
-        }
+        cout << "Node " << node << " of " << n_nodes << endl;
       }
 
-      if (donor_in_node_list == false)
-      {
-        bool is_influenced = is_upstream_influenced_by_nodata(this_d_node, topography);
+      // first get the current node
+      retrieve_current_row_and_col(node_list[node],row,col);
+      new_topography_data[row][col] = topography.get_data_element(row,col);
 
-        // If this donor is not influenced by nodata anywhere upstream, add all the pixels
-        // draining to this node to the data.
-        if (is_influenced == false)
+
+
+
+      // now get the donors
+      vector<int> donors = retrieve_donors_to_node(  node_list[node]);
+      int n_donors = int(donors.size());
+
+      if( problem_node)
+      {
+        cout << "=====================================================================" << endl;
+        cout << "Inspecting problem nodes: " << row << ", " << col << "," << new_topography_data[row][col] << endl;
+      }
+
+      // Loop through all the donors to this particular node. We will look through the donors to
+      // find upslope influence of nodata.
+      for (int donor = 0; donor<n_donors; donor++)
+      {
+        int this_d_node = donors[donor];
+
+        if (problem_node)
         {
-          vector<int> influenced_nodes = get_upslope_nodes_include_outlet(this_d_node);
-          int n_in_basin = int(influenced_nodes.size());
-          for (int in = 0; in < n_in_basin; in++)
+          retrieve_current_row_and_col(this_d_node,row,col);
+          cout << "donor " << this_d_node << " r: " << row << ", " << col << " ";
+        }
+
+        // check to see if the donor is in the fixed channel. If it is, get rid of it.
+        bool donor_in_node_list = false;
+        for (int nl = 0; nl<n_nodes; nl++)
+        {
+          if (node_list[nl] == this_d_node)
           {
-            current_node = influenced_nodes[in];
-            retrieve_current_row_and_col(current_node,row,col);
-            new_topography_data[row][col] = topography.get_data_element(row,col);
+            donor_in_node_list = true;
+
+            if (problem_node)
+            {
+              cout << "This donor is in the channel" << endl;
+            }
+          }
+        }
+
+        if (donor_in_node_list == false)
+        {
+          bool is_influenced = is_upstream_influenced_by_nodata(this_d_node, topography);
+
+          if (problem_node)
+          {
+            cout << "This donor is not in the channel, Is it influenced by nodata? " << is_influenced << endl;
+          }
+
+          // If this donor is not influenced by nodata anywhere upstream, add all the pixels
+          // draining to this node to the data.
+          if (is_influenced == false)
+          {
+            vector<int> influenced_nodes = get_upslope_nodes_include_outlet(this_d_node);
+            int n_in_basin = int(influenced_nodes.size());
+            for (int in = 0; in < n_in_basin; in++)
+            {
+              current_node = influenced_nodes[in];
+              retrieve_current_row_and_col(current_node,row,col);
+              new_topography_data[row][col] = topography.get_data_element(row,col);
+            }
           }
         }
       }
-
     }
+    else
+    {
+      cout << "This nodeindex has a nodata value" << endl;
+    }
+    
   }
 
   LSDRaster temp_topo(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,new_topography_data,GeoReferencingStrings);
@@ -2256,6 +2295,7 @@ vector<int> LSDFlowInfo::Ingest_Channel_Heads(string filename, int input_switch)
   }
   return Sources;
 }
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Method to ingest sources from OS MasterMap Water Network Layer (csv)
@@ -4111,12 +4151,13 @@ vector<int> LSDFlowInfo::sort_node_list_based_on_raster(vector<int> node_vec, LS
 int LSDFlowInfo::get_node_index_of_coordinate_point(float X_coordinate, float Y_coordinate)
 {
   // Shift origin to that of dataset
-  float X_coordinate_shifted_origin = X_coordinate - XMinimum - DataResolution*0.5;
-  float Y_coordinate_shifted_origin = Y_coordinate - YMinimum - DataResolution*0.5;
+  float X_coordinate_shifted_origin = X_coordinate - XMinimum;
+  float Y_coordinate_shifted_origin = Y_coordinate - YMinimum;
 
   // Get row and column of point
   int col_point = int(X_coordinate_shifted_origin/DataResolution);
-  int row_point = (NRows-1) - int(ceil(Y_coordinate_shifted_origin/DataResolution));
+  int row_point = (NRows - 1) - int(ceil(Y_coordinate_shifted_origin/DataResolution)-0.5);
+
 
   // Get node of point
   int CurrentNode;

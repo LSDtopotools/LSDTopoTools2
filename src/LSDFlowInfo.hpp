@@ -699,7 +699,7 @@ class LSDFlowInfo
 
   ///@brief This function tests whether one node is upstream of another node
   ///@param current_node
-  ///@param test_node
+  ///@param test_node The node which we want to test whether it is upstream or not
   ///@return Boolean indicating whether node is upstream or not
   ///@author FC
   ///@date 08/10/13

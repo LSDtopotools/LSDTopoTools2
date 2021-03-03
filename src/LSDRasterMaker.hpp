@@ -109,6 +109,12 @@ class LSDRasterMaker: public LSDRaster
     /// @date 18/11/2018
     void set_to_constant_value(float new_value);
 
+    /// @brief This just adds elevation to any non nodata pixel
+    /// @param value_to_add The value to add. To subtract, this will be negative. 
+    /// @author SMM
+    /// @date 09/02/2021
+    void add_value(float value_to_add);
+
     /// @brief Adds a strip of values to the raster
     /// @param start_row_or_col the starting row or column
     /// @param end_row_or_col the ending row or column
@@ -140,6 +146,22 @@ class LSDRasterMaker: public LSDRaster
     /// @date 21/11/2020
     void impose_channels_with_buffer(LSDSpatialCSVReader& source_points_data, float slope);
 
+    /// @brief This fixes a channel, derived from source points data. It also makes sure none of these nodes is 
+    ///   adjacent to a nodata pixel. Same as the above function, but uses XY data instead of lat-long
+    /// @param source_points_data an LSDSpatialCSVReader object. It needs XY and elevation columns
+    /// @param slope the slope between the data point and the adjacent pixel
+    /// @author ELSG
+    /// @date 23/02/2021
+    void impose_channels_with_buffer_use_XY(LSDSpatialCSVReader& source_points_data, float slope);
+
+
+    /// @brief This function adds elevation to the nodata pixels around the edge of a DEM
+    ///  it is used on a DEM derived from a basin and ensured internal drainage to 
+    ///  a single outlet
+    /// @param slope the slope between the data point and the adjacent pixel
+    /// @author SMM
+    /// @date 10/02/2020
+    void buffer_basin_to_single_outlet(float slope);
 
     /// @brief This smooths the raster. At some point in the future I'll
     ///  add more options but at the moment it just uses 4 neighbours and has

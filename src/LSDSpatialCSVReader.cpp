@@ -57,6 +57,7 @@
 #include <sstream>
 #include <algorithm>
 #include <vector>
+#include <utility>
 #include "LSDStatsTools.hpp"
 #include "LSDShapeTools.hpp"
 #include "LSDCosmoData.hpp"
@@ -405,6 +406,36 @@ bool LSDSpatialCSVReader::check_if_all_data_columns_same_length()
 
 }
 //==============================================================================
+
+
+//==============================================================================
+// Some functions to check the data members
+//==============================================================================
+bool LSDSpatialCSVReader::add_data_column(string column_name, vector<string> column_data)
+{
+
+  bool added_column_works = false;
+  int n_lat,n_col;
+
+  n_lat = int(latitude.size());
+
+  n_col = int(column_data.size());
+
+  if(n_lat == n_col)
+  {
+    data_map[column_name] = column_data;
+  }
+  else
+  {
+    cout << "The data column is not the same size as the other columns. The addition of this column has failed" << endl;
+  }
+
+  return added_column_works;
+
+}
+//==============================================================================
+
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
@@ -1026,6 +1057,11 @@ void LSDSpatialCSVReader::check_if_points_are_in_raster()
   is_point_in_raster = temp_is_point_in_raster;
 }
 
+vector<bool> LSDSpatialCSVReader::get_if_points_are_in_raster_vector()
+{
+  return is_point_in_raster;
+}
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
 // Function to get vectors of x and y coordinates, and the node indices of these
@@ -1057,6 +1093,7 @@ void LSDSpatialCSVReader::get_nodeindices_from_x_and_y_coords(LSDFlowInfo& FlowI
 }
 
 // get the node indices from lat-long coords in the csv file
+// If the nodeindex is nodata it will return nodatavalue
 vector<int> LSDSpatialCSVReader::get_nodeindices_from_lat_long(LSDFlowInfo& FlowInfo)
 {
   vector<int> NIs;
@@ -1071,6 +1108,24 @@ vector<int> LSDSpatialCSVReader::get_nodeindices_from_lat_long(LSDFlowInfo& Flow
   return NIs;
 
 }
+
+void LSDSpatialCSVReader::add_nodeindex_vector_to_data_map_using_lat_long(LSDFlowInfo& FlowInfo)
+{
+  vector<int> NIs;
+  vector<string> NI_strings;
+  vector<float> X_coords, Y_coords;
+  get_x_and_y_from_latlong(X_coords,Y_coords);
+  for (int i = 0; i < int(X_coords.size()); i++)
+  {
+    int NodeIndex = FlowInfo.get_node_index_of_coordinate_point(X_coords[i], Y_coords[i]);
+    NIs.push_back(NodeIndex);
+    NI_strings.push_back(itoa(NodeIndex));
+  }
+
+  string nistr1 = "nodeindex";
+  add_data_column( nistr1, NI_strings);
+}
+
 
 
 vector<int> LSDSpatialCSVReader::get_nodeindex_vector()
@@ -1545,7 +1600,16 @@ void LSDSpatialCSVReader::print_data_to_geojson(string json_outname)
       }
       string fourth_bit = " }, \"geometry\": { \"type\": \"Point\", \"coordinates\": [ ";
       //string fifth_bit = dtoa(this_longitude) +","+ dtoa(latitude[i]) +" ] } },";
-      string fifth_bit = " ] } },";
+
+      string fifth_bit;
+      if (i == (n_nodes-1) )
+      {
+        fifth_bit = " ] } }";
+      }
+      else
+      {
+        fifth_bit = " ] } },";
+      }
 
       outfile << first_bit << latitude[i] << second_bit << this_longitude
               << third_bit+fourth_bit << this_longitude << "," << latitude[i] << fifth_bit
@@ -1565,6 +1629,20 @@ void LSDSpatialCSVReader::print_data_to_geojson(string json_outname)
 
 
 }
+
+//==============================================================================
+// This returns the data map
+//==============================================================================
+map<string,vector<string> >& LSDSpatialCSVReader::get_data_map() {return this->data_map;}
+
+//==============================================================================
+// This appends a value to a column
+//==============================================================================
+void LSDSpatialCSVReader::append_to_col(string colname, string val){this->data_map[colname].push_back(val);}
+
+
+
+
 
 
 #endif

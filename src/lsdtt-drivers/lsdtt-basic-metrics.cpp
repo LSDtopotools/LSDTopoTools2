@@ -46,6 +46,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <utility>
 #include <ctime>
 #include <sys/time.h>
 #include <fstream>
@@ -116,6 +117,16 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["remove_nodes_influenced_by_edge"] = false;
   bool_default_map["isolate_pixels_draining_to_fixed_channel"] = false;
   string_default_map["fixed_channel_csv_name"] = "single_channel_nodes";
+  
+  // Parameters for swath mapping
+  bool_default_map["calculate_swath_profile"] = false;
+  bool_default_map["calculate_swath_along_line"] = false;
+  bool_default_map["calculate_swath_along_channel"] = false;
+  bool_default_map["print_swath_rasters"] = true;
+  string_default_map["swath_points_csv"] = "swath.csv";
+  float_default_map["swath_point_spacing"] = 500;
+  float_default_map["swath_bin_spacing"] = 1000;
+  float_default_map["swath_width"] = 1000;
 
   // some tools for punching out polygons and then getting distance to nearest nodata
   // used for creating rivers in noisy DEMs
@@ -126,6 +137,13 @@ int main (int nNumberofArgs,char *argv[])
   float_default_map["punch_threshold"] = 1000;
   float_default_map["minimum_bank_elevation_window_radius"] = 20;
   float_default_map["river_depth"] = 1.0;
+
+  // More river processing tools
+  bool_default_map["channel_and_valley_width_extraction"] = false;
+  string_default_map["channel_or_valley_raster_prefix"] = "channel";
+  string_default_map["channel_or_valley_skeleton_prefix"] = "skeleton";
+  int_default_map["test_scale"] = 4;
+  float_default_map["test_bearing"] = 90;
 
   // raster trimming, to take care of rasters that have a bunch of nodata at the edges
   bool_default_map["print_trimmed_raster"] = false;
@@ -191,6 +209,7 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["impose_single_channel"] = false;
   string_default_map["fixed_channel_csv_name"] = "NULL";
   bool_default_map["buffer_single_channel"] = true;
+  bool_default_map["use_XY_for_buffer"] = false;
   bool_default_map["force_single_channel_slope"] = false;
   bool_default_map["fixed_channel_dig_and_slope"] = false;
   float_default_map["single_channel_drop"] = 0;
@@ -199,6 +218,8 @@ int main (int nNumberofArgs,char *argv[])
   string_default_map["single_channel_elev_string"] = "elevation(m)";
   string_default_map["test_single_channel_name"] = "test_single_channel";
 
+  // for reading in a channel csv file
+  bool_default_map["use_xy_for_node_index"] = false;
   
 
 
@@ -218,6 +239,7 @@ int main (int nNumberofArgs,char *argv[])
   string_default_map["BaselevelJunctions_file"] = "NULL";
   bool_default_map["get_basins_from_outlets"] = false;
   int_default_map["search_radius_nodes"] = 8;
+  int_default_map["threshold_stream_order_for_snapping"] = 2;
   string_default_map["basin_outlet_csv"] = "NULL";
   bool_default_map["extend_channel_to_node_before_receiver_junction"] = true;
   bool_default_map["print_basin_raster"] = false;
@@ -349,6 +371,267 @@ int main (int nNumberofArgs,char *argv[])
     trimmed_raster.write_raster(this_raster_name,raster_ext);
   }
 
+  //=========================================================================
+  // ..####...##...##...####...######..##..##.
+  // .##......##...##..##..##....##....##..##.
+  // ..####...##.#.##..######....##....######.
+  // .....##..#######..##..##....##....##..##.
+  // ..####....##.##...##..##....##....##..##.
+  // 
+  //=========================================================================
+  // We need some logic to keep people from messing up.
+  if (this_bool_map["calculate_swath_along_line"] && this_bool_map["calculate_swath_along_channel"])
+  {
+    cout << "You can only use one swath method." << endl;
+    cout << "Choose *EITHER* calculate_swath_along_line *OR* calculate_swath_along_channel" << endl;
+    cout << "Exiting so you can fix." << endl;
+    exit(0);
+  }
+  if (this_bool_map["calculate_swath_along_line"] || this_bool_map["calculate_swath_along_channel"])
+  {
+    this_bool_map["calculate_swath_profile"] = true;
+  }
+  if (not this_bool_map["calculate_swath_along_line"] && 
+      not this_bool_map["calculate_swath_along_channel"] &&
+      this_bool_map["calculate_swath_profile"])
+  {
+    cout << "You can't set calculate_swath_profile to true without choosing a method." << endl;
+    cout << "Please select EITHER calculate_swath_along_line OR calculate_swath_along_channel" << endl;
+    cout << "You cannot choose both." << endl;
+    cout << "Exiting for you to fix." << endl;
+    exit(0);
+  }
+
+
+  // okay, now the calculations. 
+  if(this_bool_map["calculate_swath_profile"])
+  {
+    cout << "This is exciting! I get to make a swath profile!!" << endl;
+    LSDRasterInfo RI(topography_raster);
+
+
+    LSDSpatialCSVReader CSVFile(RI,this_string_map["swath_points_csv"]);
+
+    // get the x and y locations of the points
+    vector<float> UTME;
+    vector<float> UTMN;
+    CSVFile.get_x_and_y_from_latlong(UTME,UTMN); 
+
+    int n_nodes = int(UTME.size()); 
+    CSVFile.check_if_points_are_in_raster();
+    vector<bool> is_in_raster = CSVFile.get_if_points_are_in_raster_vector();
+    for (int i= 0; i< n_nodes; i++)
+    {
+      //cout << "x: " << UTME[i] << ", y: " << UTMN[i] << endl;
+      if(not is_in_raster[i])
+      {
+        cout << "There is a point in the swath baseline that is not in the raster." << endl;
+        cout << "You need to either correct your raster or correct this point." << endl;
+        exit(0);
+      }
+    }   
+
+    vector<float> spaced_eastings;
+    vector<float> spaced_northings; 
+    vector<float> spaced_distances;
+
+    if(this_bool_map["calculate_swath_along_line"])
+    {
+      cout << "I am going to get the swath profile along a line that is" << endl;
+      cout << "made up of segments derived from your swath points file" << endl;
+
+      // Now segment the line
+      float spacing = this_float_map["swath_point_spacing"];
+      cout << "Segmenting the swath baseline with a spacing of " << this_float_map["swath_point_spacing"] << endl;
+
+      evenly_spaced_points_along_polyline(UTME, UTMN, spacing, spaced_eastings, spaced_northings, spaced_distances);
+      vector< pair<float,float> > points = evenly_spaced_points_along_polyline(UTME, UTMN, spacing);
+      cout << "Got the segmented baseline." << endl;  
+      
+      cout << "Number of points is: " << points.size() << endl;
+      int n_points = int(spaced_northings.size());
+      //for(int i = 0; i< n_points; i++)
+      //{
+      // cout << spaced_eastings[i] << "," << spaced_northings[i] <<endl;
+      //}
+
+      cout << "Converting pairs to UTM vectors." << endl;
+      vector<float> swath_UTME, swath_UTMN;
+      convert_pairs_to_x_and_y_vecs(points, swath_UTME, swath_UTMN);
+      cout << "Done." << endl;
+
+      ofstream points_out;
+      string swath_baseline_fname = OUT_DIR+OUT_ID+"_swath_baseline.csv";
+      points_out.open(swath_baseline_fname);
+      points_out << "easting,northing" << endl;
+      for (int i = 0; i < int(swath_UTME.size()); i++)
+      {
+        points_out << spaced_eastings[i]<< "," << spaced_northings[i] << endl;
+      }
+      points_out.close();
+
+      if ( this_bool_map["convert_csv_to_geojson"])
+      {
+        string gjson_name = OUT_DIR+OUT_ID+"_swath_baseline.geojson";
+        LSDSpatialCSVReader thiscsv(swath_baseline_fname);
+        thiscsv.print_data_to_geojson(gjson_name);
+      }
+
+    }
+
+    if (this_bool_map["calculate_swath_along_channel"])
+    {
+      cout << "I am going to calculate a swath along a channel!" << endl;
+      cout << "I need to check your channel file to see if it is a full channel record" << endl;
+      cout << "Or just the start and end points (i.e., if it has two nodes)" << endl;
+      if (n_nodes == 2)
+      {
+        cout << "Okay, the channel file has two nodes. " << endl;
+        cout << "This means I need to find the channel. " << endl;
+        cout << "To do this I need to get the flow info object, which will take a little while." << endl;
+        cout << "Also I am assuming your first point is the upstream point" << endl;
+        cout << "and the second point is the downstream point." << endl;
+
+        LSDRaster filled_topography,carved_topography;
+        // now get the flow info object
+        if ( this_bool_map["raster_is_filled"] )
+        {
+          cout << "You have chosen to use a filled raster." << endl;
+          filled_topography = topography_raster;
+        }
+        else
+        {
+          cout << "Let me fill that raster for you, the min slope is: "
+              << this_float_map["min_slope_for_fill"] << endl;
+          if(this_bool_map["carve_before_fill"])
+          {
+            carved_topography = topography_raster.Breaching_Lindsay2016();
+            filled_topography = carved_topography.fill(this_float_map["min_slope_for_fill"]);
+          }
+          else
+          {
+            filled_topography = topography_raster.fill(this_float_map["min_slope_for_fill"]);
+          }
+        }
+        LSDFlowInfo FlowInfo(boundary_conditions,filled_topography);
+        cout << "Finished flow routing for the swath." << endl;
+
+        LSDIndexRaster FlowAcc = FlowInfo.write_NContributingNodes_to_LSDIndexRaster();
+        vector<int> sources;
+        sources = FlowInfo.get_sources_index_threshold(FlowAcc, this_int_map["threshold_contributing_pixels"]);
+        LSDRaster FlowDistance = FlowInfo.distance_from_outlet();
+        LSDJunctionNetwork JunctionNetwork(sources, FlowInfo);
+
+        // Now get the upstream and downstream node
+        CSVFile.get_x_and_y_from_latlong(UTME,UTMN); 
+        vector<double> latitudes = CSVFile.get_latitude();
+        vector<double> longitudes = CSVFile.get_longitude();
+        vector<int> NI_of_points =  CSVFile.get_nodeindices_from_lat_long(FlowInfo);
+
+        // flow path in NI
+        vector<int> flow_path = FlowInfo.get_flow_path(UTME[0],UTMN[0]);
+
+        // snap the lower point to a channel
+        int downstream_NI;
+        cout << "The search radius is: " << this_int_map["search_radius_nodes"] << endl;
+        downstream_NI = JunctionNetwork.get_nodeindex_of_nearest_channel_for_specified_coordinates(UTME[1],UTMN[1],
+                            this_int_map["search_radius_nodes"],  
+                            this_int_map["threshold_stream_order_for_snapping"], 
+                            FlowInfo);
+
+        // travel down the flow path until you either reach the outlet node or 
+        // get to the end
+        vector<int> final_channel_list;
+        for(int node = 0; node < int(flow_path.size()); node ++)
+        {
+          final_channel_list.push_back(flow_path[node]);
+
+          // get the flow distance of the point, as well as the x and y locations
+          int curr_row,curr_col;
+          float curr_E,curr_N;
+          FlowInfo.retrieve_current_row_and_col(flow_path[node],curr_row,curr_col);
+          spaced_distances.push_back( FlowDistance.get_data_element(curr_row,curr_col));
+          FlowInfo.get_x_and_y_from_current_node(flow_path[node],curr_E, curr_N);
+          spaced_eastings.push_back( curr_E );
+          spaced_northings.push_back( curr_N );
+
+
+          // If this is the downstream node, jump to the end of the flowpath
+          if ( flow_path[node] == downstream_NI)
+          {
+            node = flow_path.size();
+          }
+        }
+        LSDRaster DA_d8 = FlowInfo.write_DrainageArea_to_LSDRaster();
+
+        string filename = OUT_ID+"_swath_channel";
+        FlowInfo.print_vector_of_nodeindices_to_csv_file_with_latlong(final_channel_list,
+                          OUT_DIR, filename,filled_topography, FlowDistance,
+                          DA_d8);
+
+        if ( this_bool_map["convert_csv_to_geojson"])
+        {
+          string in_name = OUT_DIR+OUT_ID+"_swath_channel_nodes.csv";
+          cout << "Printing the geojson of the swath channel." << endl;
+          string gjson_name = OUT_DIR+OUT_ID+"_swath_channel.geojson";
+          LSDSpatialCSVReader thiscsv(in_name);
+          thiscsv.print_data_to_geojson(gjson_name);
+        }
+
+      }
+      else
+      {
+        cout << "The channel file has more than two nodes. " << endl;
+        cout << "I am assuming this is a fully functional channel file. " << endl;
+        cout << "I need to look at this file for the correct header (flow_distance)" << endl;
+        cout << "If it doesn't have it, the file isn't correctly formatted." << endl;
+
+        CSVFile.get_x_and_y_from_latlong(spaced_eastings,spaced_northings); 
+        string fd_column_name = "flowdistance(m)";
+
+        if ( CSVFile.is_column_in_csv(fd_column_name) )
+        {
+          cout << "Super, I've go the distances in the file." << endl;
+          spaced_distances = CSVFile.data_column_to_float(fd_column_name);   
+        }
+        else
+        {
+          cout << "You are attempting to load a swath baseline file but it does not contain" << endl;
+          cout << "A flowdistance(m) column (note that whitespace in column names are removed)" << endl;
+          cout << "The column names in this file are: " << endl;
+          CSVFile.print_data_map_keys_to_screen();
+          cout << "I am afaid I will need to exit." << endl;
+          exit(0);
+        }
+      }
+    }
+
+
+    // Now for the swath!
+    string swath_data_prefix = OUT_DIR+OUT_ID;
+    topography_raster.make_swath(spaced_eastings, spaced_northings,spaced_distances, this_float_map["swath_width"],
+                                 this_float_map["swath_bin_spacing"], swath_data_prefix, this_bool_map["print_swath_rasters"]);
+
+
+
+  }
+
+
+  //=========================================================================
+  // .##..##...####...##......##......######..##..##..........##...##..######..#####...######..##..##.
+  // .##..##..##..##..##......##......##.......####...........##...##....##....##..##....##....##..##.
+  // .##..##..######..##......##......####......##............##.#.##....##....##..##....##....######.
+  // ..####...##..##..##......##......##........##............#######....##....##..##....##....##..##.
+  // ...##....##..##..######..######..######....##.............##.##...######..#####.....##....##..##.
+  //
+  //=========================================================================
+  if(this_bool_map["channel_and_valley_width_extraction"])
+  {
+    cout << "I am going to test some code for valley and channel widths" << endl;
+
+
+    Array2D<int> test = make_template_for_vector_bearing(this_float_map["test_bearing"], this_int_map["test_scale"]);
+  }
 
   // Some tools for punching out some nodata using a secondary raster that we can use to make river
   // pathways in noisy DEMs. 
@@ -762,12 +1045,19 @@ int main (int nNumberofArgs,char *argv[])
     }
 
     LSDRasterMaker RM(topography_raster);
-    if(this_bool_map["buffer_single_channel"])
+    if(this_bool_map["buffer_single_channel"] and this_bool_map["use_XY_for_buffer"])
     {
+      cout << "I am going to impose and buffer the single channel using XY coordinates." << endl;
+      RM.impose_channels_with_buffer_use_XY(single_channel_data, this_float_map["min_slope_for_fill"]*2);
+    }
+    else if(this_bool_map["buffer_single_channel"] and not this_bool_map["use_XY_for_buffer"])
+    {
+      cout << "I am going to impose and buffer the single channel using lat-long coordinates." << endl;
       RM.impose_channels_with_buffer(single_channel_data, this_float_map["min_slope_for_fill"]*2);
     }
     else
     {
+      cout << "I am going to impose the single channel using lat-long coordinates, without buffering." << endl;
       RM.impose_channels(single_channel_data);
     }
     LSDRaster imposed_topography = RM.return_as_raster();
@@ -777,6 +1067,14 @@ int main (int nNumberofArgs,char *argv[])
     imposed_topography.write_raster(filled_raster_name,raster_ext);       
   }
 
+  //============================================================================
+  //
+  //.######..##.......####...##...##..........#####....####...##..##..######..######..##..##...####..
+  //.##......##......##..##..##...##..........##..##..##..##..##..##....##......##....###.##..##.....
+  //.####....##......##..##..##.#.##..........#####...##..##..##..##....##......##....##.###..##.###.
+  //.##......##......##..##..#######..........##..##..##..##..##..##....##......##....##..##..##..##.
+  //.##......######...####....##.##...........##..##...####....####.....##....######..##..##...####..
+  //.................................................................................................
   //============================================================================
   //
   // EVERTHING BELOW THIS POINT NEEDS A FILL RASTER AND FLOW ROUTING
@@ -861,8 +1159,30 @@ int main (int nNumberofArgs,char *argv[])
       // Get the latitude and longitude
       cout << "I am reading points from the file: "+ this_string_map["fixed_channel_csv_name"] << endl;
       LSDSpatialCSVReader source_points_data( RI, (DATA_DIR+this_string_map["fixed_channel_csv_name"]) );
+      vector<float> X_coords; 
+      vector<float> Y_coords; 
+      vector<int> nodes_from_channel;
 
-      vector<int> nodes_from_channel = source_points_data.get_nodeindex_vector();
+      if(this_bool_map["use_xy_for_node_index"])
+      {
+        cout << "I am going to get node indices from X-Y coordinates." << endl;
+        
+        source_points_data.get_nodeindices_from_x_and_y_coords(FlowInfo, X_coords, Y_coords, nodes_from_channel);        
+      } else{
+        cout << "I am going to get node indices from lat-long coordinates." << endl;
+        nodes_from_channel = source_points_data.get_nodeindices_from_lat_long(FlowInfo); 
+      }
+      
+
+      //vector<int> new_nodes_from_channel = source_points_data.get_nodeindex_vector();
+      //cout << "Old nodes: " <<  new_nodes_from_channel.size() << " and new: " << nodes_from_channel.size() << endl;
+      //for (int i = 0; i< int(nodes_from_channel.size()); i++)
+      //{
+      //  if (nodes_from_channel[i] < 0)
+      //  {
+      //    cout << "Invalid node index: " << nodes_from_channel[i] << endl;
+      //  }
+      //}
 
       // Now run the flowinfo routine
       LSDRaster NodesRemovedRaster = FlowInfo.find_nodes_not_influenced_by_edge_draining_to_nodelist(nodes_from_channel,filled_topography);
@@ -1104,7 +1424,11 @@ int main (int nNumberofArgs,char *argv[])
       else
       {
         cout << "Loading channel heads from the file: " << DATA_DIR+CHeads_file << endl;
-        sources = FlowInfo.Ingest_Channel_Heads((DATA_DIR+CHeads_file), "csv",2);
+        cout << "The channel heads file *MUST* have a csv extension or this will crash!!" << endl;
+        LSDRasterInfo ThisRI(filled_topography);
+        string csv_filename = DATA_DIR+CHeads_file;
+        LSDSpatialCSVReader CHeadCSV(ThisRI,csv_filename);
+        sources = CHeadCSV.get_nodeindices_from_lat_long(FlowInfo);      
         cout << "\t Got sources!" << endl;
       }
 

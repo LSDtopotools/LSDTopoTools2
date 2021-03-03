@@ -181,6 +181,22 @@ void LSDRasterMaker::set_to_constant_value(float new_value)
 }
 
 
+// Add a float to all pixels in the raster
+void LSDRasterMaker::add_value(float value_to_add)
+{
+  // now loop through the matrix rescaling the values.
+  for (int row = 0; row< NRows; row++)
+  {
+    for(int col = 0; col < NCols; col++)
+    {
+      if(RasterData[row][col] != NoDataValue)
+      {
+        RasterData[row][col] = RasterData[row][col]+value_to_add;
+      }
+    }
+  }
+}
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This function add strips of a given value.
 // This happily overwrites NoData
@@ -316,6 +332,147 @@ void LSDRasterMaker::impose_channels(LSDSpatialCSVReader& source_points_data)
   RasterData = zeta.copy();
 }
 
+
+void LSDRasterMaker::buffer_basin_to_single_outlet(float slope)
+{
+  Array2D<float> zeta=RasterData.copy();  
+
+  vector<int> edge_rows;
+  vector<int> edge_cols;
+
+  float elev_diff = DataResolution*sqrt(2)*slope;
+
+  // we look for any edge nodes. We don't look along the edge of the DEM
+  // any node that is not itself nodata but has an edge pixel as nodata
+  // gets added as an edge node
+  int rp1,rm1,cp1,cm1;
+  bool is_edge_node;
+  int min_edge_row = 0;
+  int min_edge_col = 0;
+  float min_edge_elev = 99999999999999;
+  for(int row = 1; row < NRows-1; row++)
+  {
+    for(int col = 1; col < NCols-1; col++)
+    {
+      if (zeta[row][col] != NoDataValue)
+      {
+        is_edge_node = false;
+        rp1 = row+1;
+        rm1 = row-1;
+        cp1 = col+1;
+        cm1 = col-1;
+
+        // now search all adjacent nodes
+        if ( zeta[rp1][cp1] == NoDataValue)
+        {
+          is_edge_node = true;
+        }
+        if ( zeta[rp1][col] == NoDataValue)
+        {
+          is_edge_node = true;
+        }
+        if ( zeta[rp1][cm1] == NoDataValue)
+        {
+          is_edge_node = true;
+        }
+        if ( zeta[row][cp1] == NoDataValue)
+        {
+          is_edge_node = true;
+        }
+        if ( zeta[row][cm1] == NoDataValue)
+        {
+          is_edge_node = true;
+        }
+        if ( zeta[rm1][cp1] == NoDataValue)
+        {
+          is_edge_node = true;
+        }
+        if ( zeta[rm1][col] == NoDataValue)
+        {
+          is_edge_node = true;
+        }
+        if ( zeta[rm1][cm1] == NoDataValue)
+        {
+          is_edge_node = true;
+        }
+
+        if (is_edge_node)
+        {
+          edge_rows.push_back(row);
+          edge_cols.push_back(col);
+
+          if (min_edge_elev > zeta[row][col])
+          {
+            min_edge_elev = zeta[row][col];
+            min_edge_row = row;
+            min_edge_col = col;
+          }
+        }
+      }
+    }
+  }
+
+
+  // Okay, now look through the edge rows and columns, beffering up the nodes.
+  int n_edge_nodes = int(edge_rows.size()); 
+  int row,col;
+  for(int i = 0; i< n_edge_nodes; i++)
+  {
+    row = edge_rows[i];
+    col = edge_cols[i];
+   
+    rp1 = row+1;
+    rm1 = row-1;
+    cp1 = col+1;
+    cm1 = col-1;
+    
+    if (row ==  min_edge_row && col ==  min_edge_col)
+    {
+      cout << "Found the minimum elevation edge node." << endl;
+    }
+    else
+    { 
+      // now search all adjacent nodes
+      if ( zeta[rp1][cp1] == NoDataValue)
+      {
+        zeta[rp1][cp1] = zeta[row][col]+elev_diff;
+      }
+      if ( zeta[rp1][col] == NoDataValue)
+      {
+        zeta[rp1][col] = zeta[row][col]+elev_diff;
+      }
+      if ( zeta[rp1][cm1] == NoDataValue)
+      {
+        zeta[rp1][cm1] = zeta[row][col]+elev_diff;
+      }
+      if ( zeta[row][cp1] == NoDataValue)
+      {
+        zeta[row][cp1] = zeta[row][col]+elev_diff;
+      }
+      if ( zeta[row][cm1] == NoDataValue)
+      {
+        zeta[row][cm1] = zeta[row][col]+elev_diff;
+      }
+      if ( zeta[rm1][cp1] == NoDataValue)
+      {
+        zeta[rm1][cp1] = zeta[row][col]+elev_diff;
+      }
+      if ( zeta[rm1][col] == NoDataValue)
+      {
+        zeta[rm1][col] = zeta[row][col]+elev_diff;
+      }
+      if ( zeta[rm1][cm1] == NoDataValue)
+      {
+        zeta[rm1][cm1] = zeta[row][col]+elev_diff;
+      }
+    }
+  }
+
+  this->RasterData = zeta.copy();
+
+  RasterData = zeta.copy(); 
+}
+
 ////------------------------------------------------------------------------------
 //// impose_channels: this imposes channels onto the landscape
 //// You need to print a channel to csv and then load the data
@@ -338,6 +495,20 @@ void LSDRasterMaker::impose_channels_with_buffer(LSDSpatialCSVReader& source_poi
   source_points_data.get_x_and_y_from_latlong(UTME,UTMN);
   vector<float> elev = source_points_data.data_column_to_float(column_name);
 
+  // find the minimum elevation
+  float min_elev = 10000000000;
+  int node_of_min_elev = 0;
+  for(int i = 0; i< int(elev.size()); i++)
+  {
+    if(elev[i] < min_elev)
+    {
+      min_elev = elev[i];
+      node_of_min_elev = i;
+    }
+  }
+
+  cout << "The minimum elevation is: " << min_elev << endl;
+
 
   // make the map
   cout << "I am making an elevation map. This will not work if points in the raster lie outside of the csv channel points." << endl;
@@ -349,60 +520,63 @@ void LSDRasterMaker::impose_channels_with_buffer(LSDSpatialCSVReader& source_poi
     source_points_data.get_row_and_col_of_a_point(UTME[i],UTMN[i],row, col);
     zeta[row][col] = elev[i];
 
-    // now search neighbouring nodes for nodata
-    rp1 = row+1;
-    if(rp1 == NRows)
+    if (i != node_of_min_elev)
     {
-      rp1 = row;
-    }
-    rm1 = row-1;
-    if (rm1 == -1)
-    {
-      rm1 = 0;
-    }
-    cp1 = col+1;
-    if (cp1 == NCols)
-    {
-      cp1 = col;
-    }
-    cm1 = col-1;
-    if (cm1 == -1)
-    {
-      cm1 = 0;
-    }
+      // now search neighbouring nodes for nodata
+      rp1 = row+1;
+      if(rp1 == NRows)
+      {
+        rp1 = row;
+      }
+      rm1 = row-1;
+      if (rm1 == -1)
+      {
+        rm1 = 0;
+      }
+      cp1 = col+1;
+      if (cp1 == NCols)
+      {
+        cp1 = col;
+      }
+      cm1 = col-1;
+      if (cm1 == -1)
+      {
+        cm1 = 0;
+      }
 
-    // now search all adjacent nodes
-    if ( zeta[rp1][cp1] == NoDataValue)
-    {
-      zeta[rp1][cp1] = elev[i]+elev_diff;
-    }
-    if ( zeta[rp1][col] == NoDataValue)
-    {
-      zeta[rp1][col] = elev[i]+elev_diff;
-    }
-    if ( zeta[rp1][cm1] == NoDataValue)
-    {
-      zeta[rp1][cm1] = elev[i]+elev_diff;
-    }
-    if ( zeta[row][cp1] == NoDataValue)
-    {
-      zeta[row][cp1] = elev[i]+elev_diff;
-    }
-    if ( zeta[row][cm1] == NoDataValue)
-    {
-      zeta[row][cm1] = elev[i]+elev_diff;
-    }
-    if ( zeta[rm1][cp1] == NoDataValue)
-    {
-      zeta[rm1][cp1] = elev[i]+elev_diff;
-    }
-    if ( zeta[rm1][col] == NoDataValue)
-    {
-      zeta[rm1][col] = elev[i]+elev_diff;
-    }
-    if ( zeta[rm1][cm1] == NoDataValue)
-    {
-      zeta[rm1][cm1] = elev[i]+elev_diff;
+      // now search all adjacent nodes
+      if ( zeta[rp1][cp1] == NoDataValue)
+      {
+        zeta[rp1][cp1] = elev[i]+elev_diff;
+      }
+      if ( zeta[rp1][col] == NoDataValue)
+      {
+        zeta[rp1][col] = elev[i]+elev_diff;
+      }
+      if ( zeta[rp1][cm1] == NoDataValue)
+      {
+        zeta[rp1][cm1] = elev[i]+elev_diff;
+      }
+      if ( zeta[row][cp1] == NoDataValue)
+      {
+        zeta[row][cp1] = elev[i]+elev_diff;
+      }
+      if ( zeta[row][cm1] == NoDataValue)
+      {
+        zeta[row][cm1] = elev[i]+elev_diff;
+      }
+      if ( zeta[rm1][cp1] == NoDataValue)
+      {
+        zeta[rm1][cp1] = elev[i]+elev_diff;
+      }
+      if ( zeta[rm1][col] == NoDataValue)
+      {
+        zeta[rm1][col] = elev[i]+elev_diff;
+      }
+      if ( zeta[rm1][cm1] == NoDataValue)
+      {
+        zeta[rm1][cm1] = elev[i]+elev_diff;
+      }
     }
   }
 
@@ -411,6 +585,125 @@ void LSDRasterMaker::impose_channels_with_buffer(LSDSpatialCSVReader& source_poi
 
   RasterData = zeta.copy();
 }
+
+////------------------------------------------------------------------------------
+//// impose_channels: this imposes channels onto the landscape using XY data
+//// You need to print a channel to csv and then load the data
+//// ELSG 23/02/2021
+////------------------------------------------------------------------------------
+void LSDRasterMaker::impose_channels_with_buffer_use_XY(LSDSpatialCSVReader& source_points_data, float slope)
+{
+
+  string column_name = "elevation(m)";
+  string x_column_name = "X";
+  string y_column_name = "Y";
+
+  float elev_diff = DataResolution*sqrt(2)*slope;
+
+
+  Array2D<float> zeta=RasterData.copy();
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
+
+  // Get the local coordinate as well as the elevations
+  vector<float> X = source_points_data.data_column_to_float(x_column_name);
+  vector<float> Y = source_points_data.data_column_to_float(y_column_name);
+  //source_points_data.get_x_and_y_from_latlong(X,Y);
+  vector<float> elev = source_points_data.data_column_to_float(column_name);
+
+  // find the minimum elevation
+  float min_elev = 10000000000;
+  int node_of_min_elev = 0;
+  for(int i = 0; i< int(elev.size()); i++)
+  {
+    if(elev[i] < min_elev)
+    {
+      min_elev = elev[i];
+      node_of_min_elev = i;
+    }
+  }
+
+  cout << "The minimum elevation is: " << min_elev << endl;
+
+
+  // make the map
+  cout << "I am making an elevation map. This will not work if points in the raster lie outside of the csv channel points." << endl;
+  int row,col;
+  int rp1,rm1,cp1,cm1;
+  for(int i = 0; i< int(elev.size()); i++)
+  {
+    cout << "At i " << i << ", X is: " << X[i] << ", and Y is: " << Y[i] << "; elevation is: " << elev[i] << endl;
+    source_points_data.get_row_and_col_of_a_point(X[i],Y[i],row, col);
+    cout << "Row is: " << row << ", and col is: " << col << endl;
+    zeta[row][col] = elev[i];
+
+    if (i != node_of_min_elev)
+    {
+      // now search neighbouring nodes for nodata
+      rp1 = row+1;
+      if(rp1 == NRows)
+      {
+        rp1 = row;
+      }
+      rm1 = row-1;
+      if (rm1 == -1)
+      {
+        rm1 = 0;
+      }
+      cp1 = col+1;
+      if (cp1 == NCols)
+      {
+        cp1 = col;
+      }
+      cm1 = col-1;
+      if (cm1 == -1)
+      {
+        cm1 = 0;
+      }
+
+      // now search all adjacent nodes
+      if ( zeta[rp1][cp1] == NoDataValue)
+      {
+        zeta[rp1][cp1] = elev[i]+elev_diff;
+      }
+      if ( zeta[rp1][col] == NoDataValue)
+      {
+        zeta[rp1][col] = elev[i]+elev_diff;
+      }
+      if ( zeta[rp1][cm1] == NoDataValue)
+      {
+        zeta[rp1][cm1] = elev[i]+elev_diff;
+      }
+      if ( zeta[row][cp1] == NoDataValue)
+      {
+        zeta[row][cp1] = elev[i]+elev_diff;
+      }
+      if ( zeta[row][cm1] == NoDataValue)
+      {
+        zeta[row][cm1] = elev[i]+elev_diff;
+      }
+      if ( zeta[rm1][cp1] == NoDataValue)
+      {
+        zeta[rm1][cp1] = elev[i]+elev_diff;
+      }
+      if ( zeta[rm1][col] == NoDataValue)
+      {
+        zeta[rm1][col] = elev[i]+elev_diff;
+      }
+      if ( zeta[rm1][cm1] == NoDataValue)
+      {
+        zeta[rm1][cm1] = elev[i]+elev_diff;
+      }
+    }
+  }
+
+
+  this->RasterData = zeta.copy();
+
+  RasterData = zeta.copy();
+}
+
 
 
 

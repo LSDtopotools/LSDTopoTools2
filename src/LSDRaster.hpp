@@ -633,6 +633,41 @@ class LSDRaster
   /// @date 26/01/2021
   void find_nearest_data(int this_row,int this_col, float& distance, float& value);
 
+
+  /// @brief This takes a list of points. Then, for every pixel in the 
+  ///  raster it finds the point amongst that list that is closest to the given pixel. 
+  /// @param Eastings a vector of easting locations
+  /// @param Northings a vector of northing locations
+  /// @param values The value of the list of points to map onto the raster. 
+  ///  This functions is most commonly used for swath mapping so the value is usually a distance
+  /// @param swath_width the width of the swath in metres
+  /// @return A vector or rasters. The first is the closest distance to each pixel in the list
+  ///  the second is the value of the pixel in the list, and the third is the index in the list
+  ///  of the closest pixel
+  /// @author SMM
+  /// @date 15/02/2021
+  vector< LSDRaster > find_nearest_point_from_list_of_points(vector<float> Eastings, vector<float> Northings,
+                                              vector<float> values, float swath_width);
+
+  /// @brief This takes a list of points and makes a swath profile around them. 
+  /// @param Eastings a vector of easting locations
+  /// @param Northings a vector of northing locations
+  /// @param values The value of the list of points to map onto the raster. 
+  ///  This functions is most commonly used for swath mapping so the value is usually a distance
+  /// @param swath_width the width of the swath in metres
+  /// @param bin_width the distance between bins in the (i.e., the distance between points)
+  /// @param swath_data_prefix the prefix for the swath filenames
+  /// @param print_swath_rasters A boolean that controls if the swath rasters are printed
+  /// @return A vector or rasters. The first is the closest distance to each pixel in the list
+  ///  the second is the value of the pixel in the list, and the third is the index in the list
+  ///  of the closest pixel
+  /// @author SMM
+  /// @date 15/02/2021
+  void make_swath(vector<float> Eastings, vector<float> Northings,
+                                              vector<float> values, float swath_width, float bin_width,
+                                              string swath_data_prefix, bool print_swath_rasters);
+
+
   /// @brief Finds all nodata nodes and gets rasters of the nearest points value and
   ///  its distance
   /// @return a vector of two rasters, the first is the distance and the second is the value

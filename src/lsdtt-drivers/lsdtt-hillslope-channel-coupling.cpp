@@ -158,6 +158,7 @@ int main (int nNumberofArgs,char *argv[])
   string_default_map["CHeads_file"] = "NULL";
   bool_default_map["get_basins_from_outlets"] = false;
   int_default_map["search_radius_nodes"] = 8;
+  int_default_map["threshold_stream_order_for_snapping"] = 1;
   string_default_map["BaselevelJunctions_file"] = "NULL";
   string_default_map["basin_outlet_csv"] = "NULL";
 
@@ -503,7 +504,7 @@ int main (int nNumberofArgs,char *argv[])
     DrainageArea.write_raster(DA_raster_name,raster_ext);
   }
 
-  // calcualte the distance from outlet
+  // calculate the distance from outlet
   cout << "\t Calculating flow distance..." << endl;
   LSDRaster DistanceFromOutlet = FlowInfo.distance_from_outlet();
 
@@ -568,7 +569,11 @@ int main (int nNumberofArgs,char *argv[])
     cout << "\t\tI found a channel head filename. " << endl;
     cout << "\t\tLoading channel heads from the file: " << DATA_DIR+CHeads_file << endl;
     cout << "\t\tWarning: if you got the filename wrong this won't work." << endl;
-    sources = FlowInfo.Ingest_Channel_Heads((DATA_DIR+CHeads_file), "csv",2);
+    cout << "\t\tThe filename MUST INCLUDE THE csv extension." << endl;
+    LSDRasterInfo ThisRI(filled_topography);
+    string csv_filename = DATA_DIR+CHeads_file;
+    LSDSpatialCSVReader CHeadCSV(ThisRI,csv_filename);
+    sources = CHeadCSV.get_nodeindices_from_lat_long(FlowInfo);
     cout << "\t\tGot sources!" << endl;
   }
 
@@ -740,7 +745,7 @@ int main (int nNumberofArgs,char *argv[])
       string full_BL_LL_name = DATA_DIR+this_string_map["basin_outlet_csv"];
       cout << "The file is: " << full_BL_LL_name << endl;
       int search_radius_nodes = this_int_map["search_radius_nodes"];
-      int threshold_stream_order = 3;
+      int threshold_stream_order = this_int_map["threshold_stream_order_for_snapping"];
       BaseLevelJunctions = JunctionNetwork.snap_point_locations_to_upstream_junctions_from_latlong_csv(full_BL_LL_name,
                                                           search_radius_nodes, threshold_stream_order,FlowInfo, RI);
 
@@ -1274,7 +1279,7 @@ int main (int nNumberofArgs,char *argv[])
       auto t1 = std::chrono::high_resolution_clock::now();
       string ht_csv_full_fname = OUT_DIR+OUT_ID+"_RidgeData.csv";   // name of the ridgeline file
       FlowInfo.HilltopFlowRouting_TerrifyingRefactored(filled_topography, Surfaces[2], Surfaces[4], 
-                                                            StreamNetwork, ht_csv_full_fname, (DATA_DIR+DEM_ID), 
+                                                            StreamNetwork, ht_csv_full_fname, (OUT_DIR+OUT_ID), 
                                                             this_bool_map["print_hillslope_traces"], this_int_map["hillslope_trace_thinning"], 
                                                             HillslopeTracesFolder, this_bool_map["hillslope_traces_basin_filter"]);    
 

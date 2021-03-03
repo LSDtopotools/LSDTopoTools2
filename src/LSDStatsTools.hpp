@@ -506,6 +506,37 @@ vector<int> duplicates(vector<int> data);
 // Generate vector of evenly spaced numbers between two points
 vector<float> linspace(float min, float max, int n);
 
+
+///===========================================================================
+/// 
+/// .#####....####...######..##..##..######...####..
+/// .##..##..##..##....##....###.##....##....##.....
+/// .#####...##..##....##....##.###....##.....####..
+/// .##......##..##....##....##..##....##........##.
+/// .##.......####...######..##..##....##.....####..
+/// 
+///===========================================================================
+float distance_between_two_points(float x1, float y1, float x2, float y2);
+vector<float> distance_between_point_and_set_of_points(float x1, float y1, vector<float> x2, vector<float> y2);
+float points_along_lines_at_distance_from_start(float x1, float y1, float x2, float y2, float distance);
+vector< pair<float,float> > evenly_spaced_points_along_polyline(vector<float> x1, vector<float> y1, float spacing);
+void evenly_spaced_points_along_polyline(vector<float> x1, vector<float> y1, float spacing, 
+                                                                vector<float>& spaced_eastings, vector<float>& spaced_northings, 
+                                                                vector<float>& spaced_distances);
+vector< pair<float,float> > convert_x_and_y_vecs_to_pairs(vector<float> x_vec, vector<float> y_vec);
+void convert_pairs_to_x_and_y_vecs(vector< pair<float,float> > pairs, vector<float>& x_vec, vector<float>& y_vec);
+
+
+
+///===========================================================================
+/// 
+/// ...####...##..##...####...##......######...####..
+/// ..##..##..###.##..##......##......##......##.....
+/// ..######..##.###..##.###..##......####.....####..
+/// ..##..##..##..##..##..##..##......##..........##.
+/// ..##..##..##..##...####...######..######...####..
+///
+///=========================================================================== 
 // convert degree bearing from north to radians from east
 float BearingToRad(float Bearing);
 
@@ -541,6 +572,15 @@ float angle_between_two_vector_datasets(vector<float>& x1_data, vector<float>& y
 // vector vector vector, Victor.
 vector<float> get_directional_vector_coords_from_dataset(vector<float> x1_data, vector<float>& y_data,
                       bool vectors_point_downstream);
+
+
+// This creates a template array for a line of a given bearing
+Array2D<int> make_template_for_vector_bearing(float bearing, int scale);
+
+// This is a template with empty values on the inside and the bearing as values along the outside
+Array2D<float> make_template_for_line_angles(int scale);
+
+
 
 // Get the data for a boxplot from an unsorted vector of floats, which does not
 // contain any NDV values.

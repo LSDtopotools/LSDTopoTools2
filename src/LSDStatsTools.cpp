@@ -5819,6 +5819,239 @@ vector<float> linspace(float min, float max, int n){
 }
 
 
+
+///===========================================================================
+/// 
+/// .#####....####...######..##..##..######...####..
+/// .##..##..##..##....##....###.##....##....##.....
+/// .#####...##..##....##....##.###....##.....####..
+/// .##......##..##....##....##..##....##........##.
+/// .##.......####...######..##..##....##.....####..
+/// 
+///===========================================================================
+float distance_between_two_points(float x1, float y1, float x2, float y2)
+{
+  float x_dif = x2-x1;
+  float y_dif = y2-y1;
+
+  float dist = sqrt(x_dif*x_dif+y_dif*y_dif);
+  return dist;
+}
+
+vector<float> distance_between_point_and_set_of_points(float x1, float y1, vector<float> x2, vector<float> y2)
+{
+  int n_points = int(x2.size());
+  vector<float> dists;
+  for (int i = 0; i< n_points; i++)
+  {
+    dists.push_back(  distance_between_two_points(x1,y1,x2[i],y2[i]));
+  }
+
+  return dists;
+}
+
+vector<float> point_along_lines_at_distance_from_start(float xs, float ys, float xe, float ye, float distance)
+{
+  float dist_between_points = distance_between_two_points(xs,ys,xe,ye);
+  
+  float dist_frac = distance/dist_between_points;
+  //cout << "Dist: " << dist_between_points << " distance_along: " << distance << " dist_frac "<< dist_frac << endl;
+  //cout << "new x: " << (1-dist_frac)*xs+dist_frac*xe << " new y: " << (1-dist_frac)*ys+dist_frac*ye << endl;
+  vector<float> x_and_y;
+  x_and_y.push_back((1-dist_frac)*xs+dist_frac*xe);
+  x_and_y.push_back((1-dist_frac)*ys+dist_frac*ye);
+
+  return x_and_y;
+
+}
+
+
+// Does what it says on the tin
+vector< pair<float,float> > evenly_spaced_points_along_polyline(vector<float> x1, vector<float> y1, float spacing)
+{
+  cout << "Brace yourself, I am about to do some super segmentation!" << endl;
+  
+  vector< pair<float,float> > points_along_line;
+  vector<float> location_vec;
+  float current_x, current_y;
+  int n_points = int(x1.size());
+  float sxs, sys,sxe,sye;
+  float this_segment_distance,current_distance_along_segment,next_distance_along_segment;
+  float leftover_distance;
+  if(n_points > 1)
+  {
+    current_x = x1[0];
+    current_y = y1[0];
+    pair<float,float> start_pair(current_x,current_y);
+    points_along_line.push_back(start_pair);
+    leftover_distance = spacing;
+    for(int i = 0; i< n_points-1; i++)
+    {
+      cout << "I am on segment number " << i+1 << " of " << n_points-1 << endl;
+      // get the starting and ending points of this segment, and its distance
+      sxs = x1[i];
+      sys = y1[i];
+      sxe = x1[i+1];
+      sye = y1[i+1];
+      this_segment_distance = distance_between_two_points(sxs,sys,sxe,sye);
+
+      cout << "Segment distance is: " << this_segment_distance << " and leftover is " << leftover_distance << endl;
+
+      // if the leftover distance is greater than the length of te segment, we just move on
+      // to the next segment
+      if(leftover_distance > this_segment_distance)
+      {
+        leftover_distance = leftover_distance-this_segment_distance;
+      }
+      else
+      {
+        next_distance_along_segment = leftover_distance;
+
+        do
+        {
+          // first get the current point based on the next distance along segment
+          location_vec = point_along_lines_at_distance_from_start(sxs, sys, sxe, sye, next_distance_along_segment);
+          cout << "New point: " << location_vec[0] << "," << location_vec[1] << endl;
+          pair<float,float> current_location_pair(location_vec[0],location_vec[1]);
+          points_along_line.push_back(current_location_pair);
+
+          // now increment the next distance along the segment
+          next_distance_along_segment+=spacing;
+          cout << "The next distance will be: " << next_distance_along_segment << endl;
+
+        } while (next_distance_along_segment <= this_segment_distance);
+        leftover_distance = next_distance_along_segment-this_segment_distance;
+        
+      }
+    }
+  }
+  return points_along_line;
+}
+
+// Overloaded version that includes the distance along the polyline
+// Vectors are overwritten
+void evenly_spaced_points_along_polyline(vector<float> x1, vector<float> y1, float spacing, 
+                                                                vector<float>& spaced_eastings, vector<float>& spaced_northings, 
+                                                                vector<float>& spaced_distances)
+{
+  cout << "Brace yourself, I am about to do some super segmentation!" << endl;
+  
+
+  vector<float> SD, SE, SN;
+
+
+  vector< pair<float,float> > points_along_line;
+  vector<float> location_vec;
+  float current_x, current_y, current_distance;
+  int n_points = int(x1.size());
+  float sxs, sys,sxe,sye;
+  float this_segment_distance,current_distance_along_segment,next_distance_along_segment;
+  float leftover_distance;
+  if(n_points > 1)
+  {
+    
+    
+    current_x = x1[0];
+    current_y = y1[0];
+    current_distance = 0;
+
+    SE.push_back(current_x);
+    SN.push_back(current_y);
+    SD.push_back(0);
+
+    leftover_distance = spacing;
+    for(int i = 0; i< n_points-1; i++)
+    {
+      cout << "I am on segment number " << i+1 << " of " << n_points-1 << endl;
+      // get the starting and ending points of this segment, and its distance
+      sxs = x1[i];
+      sys = y1[i];
+      sxe = x1[i+1];
+      sye = y1[i+1];
+      this_segment_distance = distance_between_two_points(sxs,sys,sxe,sye);
+
+      cout << "Segment distance is: " << this_segment_distance << " and leftover is " << leftover_distance << endl;
+
+      // if the leftover distance is greater than the length of te segment, we just move on
+      // to the next segment
+      if(leftover_distance > this_segment_distance)
+      {
+        leftover_distance = leftover_distance-this_segment_distance;
+      }
+      else
+      {
+        next_distance_along_segment = leftover_distance;
+
+        do
+        {
+          // first get the current point based on the next distance along segment
+          location_vec = point_along_lines_at_distance_from_start(sxs, sys, sxe, sye, next_distance_along_segment);
+          cout << "New point: " << location_vec[0] << "," << location_vec[1] << endl;
+          current_distance = current_distance+spacing;          
+          
+          SE.push_back(location_vec[0]);
+          SN.push_back(location_vec[1]);
+          SD.push_back(current_distance);          
+
+          // now increment the next distance along the segment
+          next_distance_along_segment+=spacing;
+          cout << "The next distance will be: " << next_distance_along_segment << endl;
+
+        } while (next_distance_along_segment <= this_segment_distance);
+        leftover_distance = next_distance_along_segment-this_segment_distance;
+        
+      }
+    }
+  }
+  spaced_eastings = SE; 
+  spaced_northings = SN; 
+  spaced_distances = SD;
+
+}
+
+
+vector< pair<float,float> > convert_x_and_y_vecs_to_pairs(vector<float> x_vec, vector<float> y_vec)
+{
+  int n_pairs = int(x_vec.size());
+  vector< pair<float,float> > pairs;
+  
+  for (int i = 0; i<n_pairs; i++)
+  {
+    pair<float,float> this_pair(x_vec[i],y_vec[i]);
+    pairs.push_back(this_pair);
+  }
+
+  return pairs;
+}
+
+void convert_pairs_to_x_and_y_vecs(vector< pair<float,float> > pairs, vector<float>& x_vec, vector<float>& y_vec)
+{
+  int n_pairs = int(pairs.size());
+  vector<float> new_x;
+  vector<float> new_y;
+  
+  for (int i = 0; i<n_pairs; i++)
+  {
+    new_x.push_back(pairs[i].first);
+    new_y.push_back(pairs[i].second);
+
+    cout << "Pushing back " << pairs[i].first << ", " << pairs[i].second << endl;
+  }
+
+  x_vec = new_x;
+  y_vec = new_y;
+
+}
+
+
+///===========================================================================
+/// 
+/// ...####...##..##...####...##......######...####..
+/// ..##..##..###.##..##......##......##......##.....
+/// ..######..##.###..##.###..##......####.....####..
+/// ..##..##..##..##..##..##..##......##..........##.
+/// ..##..##..##..##...####...######..######...####..
+///
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Convert a bearing with 0/360 degrees at north to radians with 0/2pi radians at east -
@@ -6075,6 +6308,345 @@ vector<float> get_directional_vector_coords_from_dataset(vector<float> x_data, v
   vec_coords[1] = y1;
   return vec_coords;
 }
+
+
+
+
+// Some utility functions
+// This creates a template array for a line of a given bearing
+Array2D<int> make_template_for_vector_bearing(float bearing, int scale)
+{
+  int dim = 2*scale+1;
+  Array2D<int> bearing_template(dim,dim,0);
+
+  float max_extent = float(scale)*0.5+float(scale);
+
+  //Declare parameters
+  int r,c;
+  int dir;
+
+  // This is the index of the starting node
+  int a = 0;
+  int b = 0;
+  float degs, degs_new, theta;
+  float xo, yo, xi, yi, temp_yo1, temp_yo2, temp_xo1, temp_xo2;
+
+  degs = bearing;
+  float rads = BearingToRad(degs);
+  float tan_of_bearing = tan(rads);
+  float cos_of_bearing = cos(rads);
+
+  vector<float> east_vec;
+  vector<float> north_vec;
+
+  vector<int> a_vec;
+  vector<int> b_vec;
+
+  // Do each side of the bearing
+  // This code comes from the flow routing routines by stuart
+  
+  
+  // This is for the first bearing
+  xo = 0;
+  yo = 0;
+
+  east_vec.push_back(0);
+  north_vec.push_back(0);
+
+  a_vec.push_back(a);
+  b_vec.push_back(b);
+  
+  //test direction, calculate outlet coordinates and update indicies
+  // easterly
+  if (degs >= 45 && degs < 135)
+  {
+    cout << "\neasterly" << endl;
+    xo = 1, yo = (1+tan_of_bearing)*0.5;
+    xi = 0, yi = yo;
+    dir = 1;
+    east_vec.push_back(0.5);
+    north_vec.push_back(yo - 0.5);
+    ++b;
+    if (yi == 0) yi = 0.00001;
+    else if (yi == 1) yi = 1 - 0.00001;
+  }
+  //southerly
+  else if (degs >= 135 && degs < 225)
+  {
+    cout << "\nsoutherly" << endl;
+    xo = (1-(1/tan_of_bearing))*0.5, yo = 0;
+    xi = xo, yi = 1;
+    dir = 2;
+    east_vec.push_back(xo - 0.5);
+    north_vec.push_back(-0.5);
+    ++a;
+    if (xi == 0) xi = 0.00001;
+    else if (xi == 1) xi = 1 - 0.00001;
+  }
+  // westerly
+  else if (degs >= 225 && degs < 315)
+  {
+    cout << "\nwesterly" << endl;
+    xo = 0, yo = (1-tan_of_bearing)*0.5;
+    xi = 1,  yi = yo;
+    dir = 3;
+    east_vec.push_back(-0.5);
+    north_vec.push_back((yo - 0.5));
+    --b;
+    if (yi == 0) yi = 0.00001;
+    else if (yi == 1) yi = 1 - 0.00001;
+  }
+  //northerly
+  else if (degs >= 315 || degs < 45)
+  {
+    cout << "\nnortherly" << endl;
+    xo = (1+(1/tan_of_bearing))*0.5, yo = 1;
+    xi = xo, yi = 0;
+    dir = 4;
+    east_vec.push_back(xo - 0.5);
+    north_vec.push_back(0.5);
+    --a;
+    if (xi == 0) xi = 0.00001;
+    else if (xi == 1) xi = 1 - 0.00001;
+  }  
+  a_vec.push_back(a);
+  b_vec.push_back(b);
+
+
+  // now loop through the next
+  //continue trace until you get to the edge
+  while (a > -scale-1 && a < scale && b > -scale-1 && b < scale)
+  {   //added boudary checking to catch cells which flow off the  edge of the DEM tile.
+
+    degs_new = degs;
+
+    //DO NORMAL FLOW PATH
+    //set xo, yo to 0 and 1 in turn and test for true outlet (xi || yi == 0 || 1)
+    temp_yo1 = yi + (1-xi)*tan_of_bearing;     // xo = 1
+    temp_xo1 = xi + (1-yi)*(1/tan_of_bearing);   // yo = 1
+    temp_yo2 = yi - xi*tan_of_bearing;      // xo = 0
+    temp_xo2 = xi - yi*(1/tan_of_bearing);    // yo = 0
+
+    // can't outlet at same point as inlet
+    if (dir == 1) temp_yo2 = -1;
+    else if (dir == 2) temp_xo1 = -1;
+    else if (dir == 3) temp_yo1 = -1;
+    else if (dir == 4) temp_xo2 = -1;
+
+    if (temp_yo1 <= 1 && temp_yo1 > 0)
+    {
+      xo = 1, yo = temp_yo1;
+      xi = 0, yi = yo,
+      dir = 1;
+      east_vec.push_back(float(b) + 0.5);
+      north_vec.push_back(float(-a) + (yo - 0.5));
+      ++b;
+      if (xi== 0 && yi == 0) yi = 0.00001;
+      else if (xi== 0 && yi == 1) yi = 1 - 0.00001;
+    }
+    else if (temp_xo2 <= 1 && temp_xo2 > 0)
+    {
+      xo = temp_xo2, yo = 0;
+      xi = xo, yi = 1,
+      dir = 2;
+      east_vec.push_back(float(b) + (xo - 0.5));
+      north_vec.push_back(float(-a) - 0.5);
+      ++a;
+      if (xi== 0 && yi == 1) xi = 0.00001;
+      else if (xi== 1 && yi == 1) xi = 1 - 0.00001;
+    }
+    else if (temp_yo2 <= 1 && temp_yo2 > 0)
+    {
+      xo = 0, yo = temp_yo2;
+      xi = 1, yi = yo,
+      dir = 3;
+      east_vec.push_back(float(b) -0.5);
+      north_vec.push_back(float(-a) + (yo - 0.5));
+      --b;
+      if (xi== 1 && yi == 0) yi = 0.00001;
+      else if (xi== 1 && yi == 1) yi = 1 - 0.00001;
+    }
+    else if (temp_xo1 <= 1 && temp_xo1 > 0)
+    {
+      xo = temp_xo1, yo = 1;
+      xi = xo, yi = 0,
+      dir = 4;
+      east_vec.push_back(float(b) + (xo - 0.5));
+      north_vec.push_back(float(-a) + 0.5);
+      --a;
+      if (xi == 0 && yi == 0) xi = 0.00001;
+      else if (xi== 1 && yi == 0) xi = 1 - 0.00001;
+    }
+    a_vec.push_back(a);
+    b_vec.push_back(b);
+  }
+
+
+
+  xo = 0;
+  yo = 0;
+  a = 0;
+  b = 0;
+  degs = degs+180;
+  if(degs > 360)
+  {
+    degs = degs-360;
+  }
+  rads = BearingToRad(degs);
+  tan_of_bearing = tan(rads);
+  cos_of_bearing = cos(rads);  
+  // Now the reverse direction
+  //test direction, calculate outlet coordinates and update indicies
+  // easterly
+  if (degs >= 45 && degs < 135)
+  {
+    cout << "\neasterly" << endl;
+    xo = 1, yo = (1+tan_of_bearing)*0.5;
+    xi = 0, yi = yo;
+    dir = 1;
+    east_vec.push_back(0.5);
+    north_vec.push_back(yo - 0.5);
+    ++b;
+    if (yi == 0) yi = 0.00001;
+    else if (yi == 1) yi = 1 - 0.00001;
+  }
+  //southerly
+  else if (degs >= 135 && degs < 225)
+  {
+    cout << "\nsoutherly" << endl;
+    xo = (1-(1/tan_of_bearing))*0.5, yo = 0;
+    xi = xo, yi = 1;
+    dir = 2;
+    east_vec.push_back(xo - 0.5);
+    north_vec.push_back(-0.5);
+    ++a;
+    if (xi == 0) xi = 0.00001;
+    else if (xi == 1) xi = 1 - 0.00001;
+  }
+  // westerly
+  else if (degs >= 225 && degs < 315)
+  {
+    cout << "\nwesterly" << endl;
+    xo = 0, yo = (1-tan_of_bearing)*0.5;
+    xi = 1,  yi = yo;
+    dir = 3;
+    east_vec.push_back(-0.5);
+    north_vec.push_back((yo - 0.5));
+    --b;
+    if (yi == 0) yi = 0.00001;
+    else if (yi == 1) yi = 1 - 0.00001;
+  }
+  //northerly
+  else if (degs >= 315 || degs < 45)
+  {
+    cout << "\nnortherly" << endl;
+    xo = (1+(1/tan_of_bearing))*0.5, yo = 1;
+    xi = xo, yi = 0;
+    dir = 4;
+    east_vec.push_back(xo - 0.5);
+    north_vec.push_back(0.5);
+    --a;
+    if (xi == 0) xi = 0.00001;
+    else if (xi == 1) xi = 1 - 0.00001;
+  }  
+  a_vec.push_back(a);
+  b_vec.push_back(b);
+
+  // now loop through the next
+  //continue trace until you get to the edge
+  while (a > -scale-1 && a < scale && b > -scale-1 && b < scale)
+  {   //added boudary checking to catch cells which flow off the  edge of the DEM tile.
+
+    degs_new = degs;
+
+    //DO NORMAL FLOW PATH
+    //set xo, yo to 0 and 1 in turn and test for true outlet (xi || yi == 0 || 1)
+    temp_yo1 = yi + (1-xi)*tan_of_bearing;     // xo = 1
+    temp_xo1 = xi + (1-yi)*(1/tan_of_bearing);   // yo = 1
+    temp_yo2 = yi - xi*tan_of_bearing;      // xo = 0
+    temp_xo2 = xi - yi*(1/tan_of_bearing);    // yo = 0
+
+    // can't outlet at same point as inlet
+    if (dir == 1) temp_yo2 = -1;
+    else if (dir == 2) temp_xo1 = -1;
+    else if (dir == 3) temp_yo1 = -1;
+    else if (dir == 4) temp_xo2 = -1;
+
+    if (temp_yo1 <= 1 && temp_yo1 > 0)
+    {
+      xo = 1, yo = temp_yo1;
+      xi = 0, yi = yo,
+      dir = 1;
+      east_vec.push_back(float(b) + 0.5);
+      north_vec.push_back(float(-a) + (yo - 0.5));
+      ++b;
+      if (xi== 0 && yi == 0) yi = 0.00001;
+      else if (xi== 0 && yi == 1) yi = 1 - 0.00001;
+    }
+    else if (temp_xo2 <= 1 && temp_xo2 > 0)
+    {
+      xo = temp_xo2, yo = 0;
+      xi = xo, yi = 1,
+      dir = 2;
+      east_vec.push_back(float(b) + (xo - 0.5));
+      north_vec.push_back(float(-a) - 0.5);
+      ++a;
+      if (xi== 0 && yi == 1) xi = 0.00001;
+      else if (xi== 1 && yi == 1) xi = 1 - 0.00001;
+    }
+    else if (temp_yo2 <= 1 && temp_yo2 > 0)
+    {
+      xo = 0, yo = temp_yo2;
+      xi = 1, yi = yo,
+      dir = 3;
+      east_vec.push_back(float(b) -0.5);
+      north_vec.push_back(float(-a) + (yo - 0.5));
+      --b;
+      if (xi== 1 && yi == 0) yi = 0.00001;
+      else if (xi== 1 && yi == 1) yi = 1 - 0.00001;
+    }
+    else if (temp_xo1 <= 1 && temp_xo1 > 0)
+    {
+      xo = temp_xo1, yo = 1;
+      xi = xo, yi = 0,
+      dir = 4;
+      east_vec.push_back(float(b) + (xo - 0.5));
+      north_vec.push_back(float(-a) + 0.5);
+      --a;
+      if (xi == 0 && yi == 0) xi = 0.00001;
+      else if (xi== 1 && yi == 0) xi = 1 - 0.00001;
+    }
+    a_vec.push_back(a);
+    b_vec.push_back(b);
+  }
+
+  // now tag the raster
+  int n_cells = int( a_vec.size());
+  for(int i = 0; i<n_cells; i++)
+  {
+    r = a_vec[i]+scale;
+    c = b_vec[i]+scale;
+
+    if (r >= 0 && r < 2*scale+1 && c >= 0 && c < 2*scale+1)
+    {
+      bearing_template[r][c] = 1;
+    }
+  }
+
+  ofstream out_file;
+  out_file.open("data_out.csv");
+  for(int i = 0; i<n_cells; i++)
+  {
+    cout << "a: " << a_vec[i] << " b: " << b_vec[i] << " x: " << east_vec[i] << " y: " << north_vec[i] << endl;
+    out_file <<  a_vec[i] << "," << b_vec[i] << "," << east_vec[i] << "," << north_vec[i] << endl;
+  }
+  out_file.close();
+  return bearing_template;
+
+
+}
+
+
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-

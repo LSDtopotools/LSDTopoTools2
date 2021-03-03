@@ -88,7 +88,7 @@ using namespace std;
 using namespace TNT;
 
 
-/// @brief This object packages a number of tools for chi analysis
+/// @brief This object has some routines for dealing with points and lines
 class LSDGeometry
 {
   public:
@@ -398,7 +398,7 @@ class LSDPolyline: public LSDGeometry
     vector<int> get_flowinfo_nodes_of_line(LSDRasterInfo& RI, LSDFlowInfo& FlowInfo);
 
 /*
-    /// @detail THis traces to the next pixel ensureing no nodes are missed
+    /// @detail THis traces to the next pixel ensuring no nodes are missed
     void trace_to_next_pixel(LSDRasterInfo& RI, double StartEasting,double StartNorthing, int start_row, int start_col,
                          int end_row, int end_col, int current_row, int current_col,
                          double slope,

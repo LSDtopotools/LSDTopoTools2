@@ -318,6 +318,68 @@ void LSDRasterModel::add_path_to_names( string pathname)
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Some tools for transient model runs
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+float LSDRasterModel::calculate_bl_drop_rate( vector<float> phase_start, vector<float> phase_rates)
+{
+
+  int n_phases = int(phase_start.size());
+  // get the current time
+
+  float this_rate;
+  if (n_phases == 1)
+  {
+    this_rate = phase_rates[0];
+  }
+  else
+  {
+    if (current_time >= phase_start[n_phases-1])
+    {
+      this_rate = phase_rates[n_phases-1];
+    }
+    else
+    {
+      bool not_got_rate = true;
+      int phase = 0;
+      do
+      {
+        if (current_time >= phase_start[phase] && current_time < phase_start[phase+1])
+        {
+          not_got_rate = false;
+          this_rate = phase_rates[phase];
+        }
+        else
+        {
+          phase++;
+        }
+        
+      } while (not_got_rate);    
+    }
+  }
+  return this_rate;
+  
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // INITIALISATION MODULE
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -1106,6 +1168,27 @@ void LSDRasterModel::raise_and_fill_raster(float min_slope_for_fill)
   delete temp;
 
 }
+
+
+
+void LSDRasterModel::add_fixed_elevation(float adjustment)
+{
+  Array2D<float> zeta=RasterData.copy();
+
+  for(int row = 0; row<NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      if (zeta[row][col] != NoDataValue)
+      {
+        zeta[row][col] = zeta[row][col]+adjustment;
+      }
+    }
+  }
+
+  RasterData = zeta.copy();
+}
+
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -3563,6 +3646,138 @@ void LSDRasterModel::run_components_combined( LSDRaster& URaster, LSDRaster& KRa
 
 
 
+
+
+
+
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This is a wrapper function used to drive a model run
+// it checks parameters and flags from the data members
+//
+// Similar to run_componets but instead of running fluvial
+// and uplift in seperate steps it inserts the fluvial
+// and uplift matrices into the nonlinear hillslope
+// solver.
+//
+// This version allows variable K and U rasters to be used.
+// You can also switch on an adaptive timestep
+//
+// It also allows an imposed base level
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterModel::run_components_combined_imposed_baselevel( LSDRaster& URaster, LSDRaster& KRaster, 
+                                          bool use_adaptive_timestep, LSDSpatialCSVReader& source_points_data,
+                                          vector<float> phase_time, vector<float> phase_rates)
+{
+  //recording = false;
+  cycle_number = 1;
+  total_erosion = 0;
+  max_erosion = 0;
+  min_erosion = -99;
+  switch_delay = 0;
+  time_delay = 0;
+
+  stringstream ss, ss_root;
+
+  // some fields for uplift and fluvial incision
+  Array2D<float> uplift_field;
+  Array2D<float> fluvial_incision_rate_field;
+
+  // set the frame to the current frame plus 1
+  int timestep_counter = 0;   // for debugging
+  int frame = current_frame;
+  do
+  {
+    // Get the current baselevel fall rate
+    float fall_rate = calculate_bl_drop_rate( phase_time, phase_rates);
+
+    if (timestep_counter % 100  == 0)
+    {
+      cout << "Time: " << current_time << " and fall rate: " << fall_rate << endl;
+    }
+    
+    
+    // Record current topography
+    zeta_old = RasterData.copy();
+
+    // run active model components
+    // first diffuse the hillslopes. Currently two options. Perhaps a flag could be
+    // added so that we don't have to keep adding if statements as more
+    // hillslope rules are added?
+    if (hillslope)
+    {
+      if (nonlinear)
+      {
+        //soil_diffusion_fv_nonlinear();
+        MuddPILE_nl_soil_diffusion_nouplift();
+      }
+      else
+      {
+        soil_diffusion_fd_linear();
+      }
+    }
+
+    // sediment will have moved into channels. This is assumed to
+    // be immediately removed by fluvial processes, so we use the
+    // 'wash out' member function
+    wash_out();
+
+    // now for fluvial erosion
+    if (fluvial)
+    {
+      // currently the only option is stream power using the FASTSCAPE
+      // algorithm so there are no choices here
+
+      //cout << "I am using an adaptive timestep" << endl;
+      //fluvial_incision_with_variable_uplift_and_variable_K_adaptive_timestep( URaster, KRaster );
+      fluvial_incision_with_variable_uplift_and_variable_K_adaptive_timestep_impose_baselevel(  URaster, KRaster, 
+                                                        source_points_data,fall_rate);
+    }
+
+    //update the time
+    current_time += timeStep;
+
+    // now see if the time has exceeded the next print time
+    if (current_time > next_printing_time)
+    {
+      do
+      {
+        next_printing_time+=float_print_interval;
+      } while(next_printing_time < current_time);
+      print_rasters_and_csv( frame );
+      ++frame;
+    }
+    if (quiet == false) cout << "\rTime: " << current_time << " years" << flush;
+
+  } while (check_end_condition() == false);
+
+  // reset the current frame
+  current_frame = frame;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This is a wrapper function used to drive a model run
 // it checks parameters and flags from the data members
@@ -5871,7 +6086,7 @@ void LSDRasterModel::fluvial_incision_with_uplift( void )
   for (int i=0; i<numNodes; ++i)
   {
 
-    // get the information about node relashionships from the flow info object
+    // get the information about node relationships from the flow info object
     node = nodeList[i];
     flow.retrieve_current_row_and_col(node, row, col);
     flow.retrieve_receiver_information(node, receiver, receiver_row, receiver_col);
@@ -6055,7 +6270,7 @@ void LSDRasterModel::fluvial_incision_with_uplift_and_variable_K( LSDRaster& K_r
   for (int i=0; i<numNodes; ++i)
   {
 
-    // get the information about node relashionships from the flow info object
+    // get the information about node relationships from the flow info object
     node = nodeList[i];
     flow.retrieve_current_row_and_col(node, row, col);
     flow.retrieve_receiver_information(node, receiver, receiver_row, receiver_col);
@@ -6228,7 +6443,7 @@ void LSDRasterModel::fluvial_incision_with_variable_uplift_and_variable_K( LSDRa
   for (int i=0; i<numNodes; ++i)
   {
 
-    // get the information about node relashionships from the flow info object
+    // get the information about node relationships from the flow info object
     node = nodeList[i];
     flow.retrieve_current_row_and_col(node, row, col);
     flow.retrieve_receiver_information(node, receiver, receiver_row, receiver_col);
@@ -6409,7 +6624,7 @@ void LSDRasterModel::fluvial_incision_with_variable_uplift_and_variable_K_adapti
     // Calculate new heights
     for (int i=0; i<numNodes; ++i)
     {
-      // get the information about node relashionships from the flow info object
+      // get the information about node relationships from the flow info object
       node = nodeList[i];
       flow.retrieve_current_row_and_col(node, row, col);
       flow.retrieve_receiver_information(node, receiver, receiver_row, receiver_col);
@@ -6572,6 +6787,302 @@ void LSDRasterModel::fluvial_incision_with_variable_uplift_and_variable_K_adapti
 
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This is the component of the model that is solved using the
+// FASTSCAPE algorithm of Willett and Braun (2013)
+// Uses Newton's method to solve incision if the slope exponent != 1
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterModel::fluvial_incision_with_variable_uplift_and_variable_K_adaptive_timestep_impose_baselevel( LSDRaster& Urate_raster, 
+                                 LSDRaster& K_raster, LSDSpatialCSVReader& source_points_data,
+                                 float bl_fall_rate )
+{
+  
+
+  // We need to impose the baselevel channels first
+  impose_channels(source_points_data);
+
+  // now we get the raster
+  Array2D<float> zeta=RasterData.copy();
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta);
+  //cout << "The nodatavalue is: " << NoDataValue << endl;
+  LSDFlowInfo flow(boundary_conditions, temp);
+
+  // We need to get the node indices from the channel
+  string column_name = "elevation(m)";
+  float bl_drop;
+  vector<int> ni = source_points_data.get_nodeindices_from_lat_long(flow);
+  vector<float> start_elev = source_points_data.data_column_to_float(column_name);  
+
+  vector <int> nodeList = flow.get_SVector();
+  int numNodes = nodeList.size();
+  int node, row, col, receiver, receiver_row, receiver_col;
+  float drainageArea, dx, streamPowerFactor;
+  float U;
+
+  // these save a bit of computational expense.
+  float root_2 = pow(2, 0.5);
+  float dx_root2 = root_2*DataResolution;
+  float DR2 = DataResolution*DataResolution;
+
+  // this is only for bug checking
+  if (quiet == false && name == "debug" && NRows <= 10 && NCols <= 10)
+  {
+    cout << "Drainage area: " << endl;
+    for (int i=0; i<NRows*NCols; ++i)
+    {
+      drainageArea = flow.retrieve_contributing_pixels_of_node(i) *  DR2;
+      cout << drainageArea << " ";
+      if (((i+1)%NCols) == 0)
+      cout << endl;
+    }
+  }
+
+  // We nest the main calculation routines in a logic statement that will
+  // recalculate everything at a smaller timestep if the model overexcavates
+  int timestep_iterator = 0;      // this checks how many times you have reduced the
+                                  // timestep
+  bool it_has_overexcavated;
+  do
+  {
+    // reset the overexcavation switch
+    it_has_overexcavated = false;
+
+    // reset zeta to the old elevation. This wastes a bit of time but we need it
+    // for the adaptive timestepping
+    zeta=RasterData.copy();
+
+    bl_drop = timeStep*bl_fall_rate;
+
+    // Make a map! Map map map. This speeds the searching
+    map<int,float> bl_map;
+    map<int,float>::iterator it;
+    for (int n = 0; n < int(ni.size()); n++)
+    {
+      bl_map[ ni[n] ] = start_elev[n] - bl_drop;
+    }
+  
+    // Calculate new heights
+    for (int i=0; i<numNodes; ++i)
+    {
+      // get the information about node relationships from the flow info object
+      node = nodeList[i];
+      
+      // Skip this node if it is in the imposed baselevel
+      if (bl_map.find( node ) != bl_map.end()) 
+      {
+        flow.retrieve_current_row_and_col(node, row, col);
+        zeta[row][col] = bl_map[node];
+      }
+      else      /// this node needs to be computed
+      {   
+        flow.retrieve_current_row_and_col(node, row, col);
+        flow.retrieve_receiver_information(node, receiver, receiver_row, receiver_col);
+        drainageArea = flow.retrieve_contributing_pixels_of_node(node)*DR2;
+
+        // get the distance between nodes. Depends on flow direction
+        switch (flow.retrieve_flow_length_code_of_node(node))
+        {
+          case 0:
+            dx = -99;
+            break;
+          case 1:
+            dx = DataResolution;
+            break;
+          case 2:
+            dx = dx_root2;
+            break;
+          default:
+            dx = -99;
+            break;
+        }
+
+        // some logic if n is close to 1. Saves a bit of computational expense.
+        if (abs(n - 1) < 0.0001)
+        {
+          if (dx == -99)
+            continue;
+
+          // compute new elevation if node is not a base level node
+          if (node != receiver)
+          {
+            // get the uplift rate
+            U = Urate_raster.get_data_element(row,col);
+
+            // get the stream power factor
+            streamPowerFactor = K_raster.get_data_element(row,col) * pow(drainageArea, m) * (timeStep / dx);
+
+            // calculate elevation
+            float zeta_old = zeta[row][col];
+            zeta[row][col] = (zeta[row][col]
+                            + zeta[receiver_row][receiver_col]*streamPowerFactor
+                            + timeStep*U) /
+                          (1 + streamPowerFactor);
+
+            // check for overexcavation
+            if(zeta[row][col] <= zeta[receiver_row][receiver_col])
+            {
+              //cout << "HEY HEY JABBA I found overexcavation!" << endl;
+              it_has_overexcavated = true;
+
+              if (timestep_iterator> 100)
+              {
+                cout << "There is an overexcavation that has not  been fixed by a very small timestep." << endl;
+                cout << "I think there is a numerical instability and I am killing the computation." << endl;
+                cout << "This does not mean that you are a bad person." << endl;
+                cout << "zeta old is: " << zeta_old << endl;
+                cout << "zeta reciever is: " << zeta[receiver_row][receiver_col] << endl;
+                cout << "Streampower factor: " << streamPowerFactor << endl;
+                cout << "denominator is: " << (1 + streamPowerFactor) << endl;
+                cout << "uplift term is: " << timeStep*U << endl;
+                cout << "reciever term is: " << zeta[receiver_row][receiver_col]*streamPowerFactor << endl;
+
+                if (bl_map.find( receiver ) != bl_map.end()) 
+                {
+                  cout << "The reciever of this problem node is in the imposed channel." << endl;
+                }
+
+                exit(EXIT_FAILURE);
+              }
+            }
+          }
+        }
+        else    // this else loop is for when n is not close to one and you need an iterative solution
+        {
+          if (dx == -99)
+          {
+            continue;
+          }
+          float new_zeta = zeta[row][col];
+          //float old_iter_zeta = zeta[row][col];
+          float old_zeta = zeta[row][col];
+
+          // get the uplift rate
+          U = Urate_raster.get_data_element(row,col);
+
+          float epsilon;     // in newton's method, z_n+1 = z_n - f(z_n)/f'(z_n)
+                            // and here epsilon =   f(z_n)/f'(z_n)
+                              // f(z_n) = -z_n + z_old - dt*K*A^m*( (z_n-z_r)/dx )^n
+                            // We differentiate the above equation to get f'(z_n)
+                          // the resulting equation f(z_n)/f'(z_n) is seen below
+          float streamPowerFactor = K_raster.get_data_element(row,col) * pow(drainageArea, m) * timeStep;
+          float slope;
+
+          // iterate until you converge on a solution. Uses Newton's method.
+          int iter_count = 0;
+          do
+          {
+            slope = (new_zeta - zeta[receiver_row][receiver_col]) / dx;
+
+            if(slope < 0)
+            {
+              epsilon = 0;
+            }
+            else
+            {
+              // Get epsilon based on f(z_n)/f'(z_n)
+              epsilon = (new_zeta - old_zeta
+                      + streamPowerFactor * pow(slope, n) - timeStep*U) /
+                (1 + streamPowerFactor * (n/dx) * pow(slope, n-1));
+            }
+
+            new_zeta -= epsilon;
+
+            iter_count++;
+            if(iter_count > 100)
+            {
+              epsilon = 0.5e-6;
+            }
+
+          } while (abs(epsilon) > 1e-6);
+          zeta[row][col] = new_zeta;
+
+          // check for overexcavation
+          if(zeta[row][col] <= zeta[receiver_row][receiver_col])
+          {
+            it_has_overexcavated = true;
+
+            // kill the program if the number of overexcavation steps get too small
+            if (timestep_iterator> 100)
+            {
+              cout << "There is an overexcavation that has not  been fixed by a very small timestep." << endl;
+              cout << "I think there is a numerical instability and I am killing the computation." << endl;
+              cout << "I am so sorry for your simulation." << endl;
+              cout << "This does not mean that you are a bad person." << endl;
+              exit(EXIT_FAILURE);
+            }
+          }
+        }        // end logic for n not equal to one
+
+        if (it_has_overexcavated)
+        {
+          //cout << "Whoops I had an overexcavation! " << endl;
+          //cout << " The number of times this has happend this timestep is: " << timestep_iterator << endl;
+          timeStep = timeStep*0.25;
+          timestep_iterator++;
+          i = numNodes;
+        }
+      }         // end logic for the if it is in the baselevel node list    
+    }           // end logic for node loop
+
+  } while ( it_has_overexcavated);
+
+  // if the model didn't overexcavate at all, then increase the timestep.
+  //cout << "The timestep iterator is: " << timestep_iterator << endl;
+  if(timestep_iterator ==0)
+  {
+    timeStep = 2*timeStep;
+    if (timeStep > maxtimeStep)
+    {
+      timeStep = maxtimeStep;
+    }
+  }
+
+  // we need to update the baselevel nodes
+  source_points_data.data_column_add_float(column_name, -bl_drop);
+
+  this->RasterData = zeta.copy();
+
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
