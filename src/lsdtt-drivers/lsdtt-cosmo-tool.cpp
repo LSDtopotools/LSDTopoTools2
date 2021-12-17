@@ -19,7 +19,7 @@
 //
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
-// Copyright (C) 2020 Simon M. Mudd 2020
+// Copyright (C) 2021 Simon M. Mudd 2021
 //
 // Developer can be contacted by simon.m.mudd _at_ ed.ac.uk
 //
@@ -84,26 +84,71 @@
 int main (int nNumberofArgs,char *argv[])
 {
 
+  string version_number = "0.5";
+  string citation = "http://doi.org/10.5281/zenodo.4577879";
+
   cout << "=========================================================" << endl;
   cout << "|| Welcome to the LSDTopoTools cosmogenic tool!        ||" << endl;
   cout << "|| This program has a number of options for calculating||" << endl;
   cout << "|| cosmogenic nuclide concentrations.                  ||" << endl;
   cout << "|| This program was developed by Simon M. Mudd         ||" << endl;
   cout << "||  at the University of Edinburgh                     ||" << endl;
-  cout << "=========================================================" << endl;   
+  cout << "=========================================================" << endl;  
+  cout << "|| Citation for this code is:                          ||" << endl;
+  cout << "|| " << citation << endl; 
   cout << "|| If you use these routines please cite:              ||" << endl;   
   cout << "|| https://doi.org/10.5194/esurf-4-655-2016            ||" << endl;
   cout << "=========================================================" << endl;
   cout << "|| Documentation can be found at:                      ||" << endl;
   cout << "|| https://lsdtopotools.github.io/LSDTT_documentation/ ||" << endl;
   cout << "=========================================================" << endl;
+  cout << "|| This is LSDTopoTools2 version                       ||" << endl;
+  cout << "|| " << version_number << endl;
+  cout << "|| If the version number has a d at the end it is a    ||" << endl;
+  cout << "||  development version.                               ||" << endl;
+  cout << "=========================================================" << endl;
+
+  // this will contain the help file
+  map< string, vector<string> > help_map;
 
   // Get the arguments
   vector<string> path_and_file = DriverIngestor(nNumberofArgs,argv);
-
-
   string path_name = path_and_file[0];
   string f_name = path_and_file[1];
+
+
+  // Check if we are doing the version or the citation
+  if(f_name == "lsdtt_citation.txt")
+  {
+
+    cout << endl << endl << endl << "==============================================" << endl;
+    cout << "To cite this code, please use this citation: " << endl;
+    cout << citation << endl;
+    cout << "Copy this url to find the full citation." << endl;
+    cout << "also see above for more detailed citation information." << endl;
+    cout << "=========================================================" << endl;
+
+    ofstream ofs;
+    ofs.open("./lsdtt-cosmo-tool-citation.txt");
+    ofs << citation << endl;
+    ofs.close();
+
+    exit(0);
+  }
+
+  if(f_name == "lsdtt_version.txt")
+  {
+    cout << endl << endl << endl << "==============================================" << endl;    
+    cout << "This is lsdtt-cosmo-tool version number " << version_number << endl;
+    cout << "If the version contains a 'd' then you are using a development version." << endl;
+    cout << "=========================================================" << endl;
+    ofstream ofs;
+    ofs.open("./lsdtt-cosmo-tool-version.txt");
+    ofs << version_number << endl;
+    ofs.close();
+
+    exit(0);
+  }
 
   // load parameter parser object
   LSDParameterParser LSDPP(path_name,f_name);
@@ -117,62 +162,137 @@ int main (int nNumberofArgs,char *argv[])
   map<string,bool> bool_default_map;
   map<string,string> string_default_map;
 
+
+  //==================================================================================
+  //
+  // .#####....####...#####....####...##...##..######..######..######..#####....####..
+  // .##..##..##..##..##..##..##..##..###.###..##........##....##......##..##..##.....
+  // .#####...######..#####...######..##.#.##..####......##....####....#####....####..
+  // .##......##..##..##..##..##..##..##...##..##........##....##......##..##......##.
+  // .##......##..##..##..##..##..##..##...##..######....##....######..##..##...####..
+  //
+  //=================================================================================
   // Basic DEM preprocessing
   float_default_map["minimum_elevation"] = 0.0;
+  help_map["minimum_elevation"] = { "float","0.0","All elevation values below this become nodata if remove_seas is true.","Ususally 0."};
+
   float_default_map["maximum_elevation"] = 30000;
+  help_map["maximum_elevation"] = {  "float","0.0","All elevation values above this become nodata if remove_seas is true.","Pick a big number."};
+
   float_default_map["min_slope_for_fill"] = 0.0001;
+  help_map["min_slope_for_fill"] = {  "float","0.0001","Minimum slope between pixels for the filling algorithm.","Best not to change the default."};
+
   bool_default_map["raster_is_filled"] = false; // assume base raster is already filled
+  help_map["raster_is_filled"] = {  "bool","false","This reads a pre-existing fill raster to save time.","You need to have printed the fill raster if you set this to true."};
+
   bool_default_map["remove_seas"] = true; // elevations above minimum and maximum will be changed to nodata
+  help_map["remove_seas"] = {  "bool","true","Slightly misleading name; it replaces both high and low DEM values with nodata.","This gets rid of low lying areas but also is handy when the nodata is not translated from the raw DEM and it is full of funny large numbers."};
+ 
   string_default_map["CHeads_file"] = "NULL";
+  help_map["CHeads_file"] = {  "string","NULL","The name of a channel heads file.","You can output this csv file with the channel extraction algorithms. It contains latitude and longitude values of the channel heads."};
+ 
   bool_default_map["only_check_parameters"] = false;
-  
+  help_map["only_check_parameters"] = {  "bool","false","This just checks parameters without running an analysis.","For bug checking."};
+
+
   // the most basic raster printing
   bool_default_map["write_hillshade"] = false;
+  help_map["write_hillshade"] = {  "bool","false","Write the hillshade raster.","You need this for a lot of our plotting routines. Filename includes _HS"};
+
   bool_default_map["print_raster_without_seas"] = false;
+  help_map["print_raster_without_seas"] = {  "bool","false","Overwrites the raster without seas.","DANGER this will replace your existing raster with the high and low points replaced by nodata. See the remove_seas flag"};
+
   bool_default_map["print_fill_raster"] = false;
-  bool_default_map["print_channels_to_csv"] = false;
-  
+  help_map["print_fill_raster"] = {  "bool","false","Prints the fill raster.","Filename includes _FILL"};
+
   // This converts all csv files to geojson (for easier loading in a GIS)
-  bool_default_map["convert_csv_to_geojson"] = false;  
+  bool_default_map["convert_csv_to_geojson"] = false;
+  help_map["convert_csv_to_geojson"] = {  "bool","false","Converts csv files to geojson files","Makes csv output easier to read with a GIS. Warning: these files are much bigger than csv files."};
+
+  bool_default_map["print_channels_to_csv"] = false;
+  help_map["print_channels_to_csv"] = {  "bool","false","Prints the channel network to a csv file.","This version produces smaller files than the raster version."};
+
 
   // These are parameters for the cosmogenic data
   string_default_map["cosmo_parameter_prefix"] = "NULL";  
+  help_map["cosmo_parameter_prefix"] = {  "string","MULL","The prefix of the cosmogenic parameter files.","You will need three files with this prefix and extensions .CRNParam ._CRNData.csv and ._CRNRasters.csv."};
+
   bool_default_map["check_cosmo_basins"] = false;
+  help_map["check_cosmo_basins"] = {  "bool","false","This checks if the cosmo data are in the dem and prints a basin raster.","Used to check input data locations."};
+
   bool_default_map["spawn_cosmo_basins"] = false;
+  help_map["spawn_cosmo_basins"] = {  "bool","false","If true will create a little raster for each basin.","Used to speed up computation."};
+
   int_default_map["spawn_padding_pixels"] = 20;
+  help_map["spawn_padding_pixels"] = {  "int","20","How many padded ext5ra pixels around each basin after spawning.","Use with spawn_cosmo_basins"};
+
 
   // Here are some options for shielding
   bool_default_map["make_shielding_rasters"] = false;
+  help_map["make_shielding_rasters"] = {  "bool","false","If true calculate all the shielding rasters.","Makes shielding in a separate step from erosion rate analysis"};
+
   bool_default_map["calculate_shielding"] = false;
+  help_map["calculate_shielding"] = {  "bool","false","You need to make all the shielding rasters with make_shielding_rasters but if this is true it will calculate full topographic shielding.","DiBiase 2018 ESURF suggests topographic shielding calculations are not needed so keep this false to save computational time"};
+
 
   // This is all for snow shielding
   bool_default_map["calculate_snow_shielding"] = false;
+  help_map["calculate_snow_shielding"] = {  "bool","false","If true this calculates the snow shielding using some snowpack information.","You need to fit all the snowpack parameters using some python code and then adjust the parameters for the snowpack in the parameter file"};
+
   string_default_map["snowpack_method"] = "Bilinear";
+  help_map["snowpack_method"] = {  "string","Bilinear","Method for calculating snowpack. Options are Bilinear and Richards. Case sensitive","You need to fit all the snowpack parameters using some python code and then adjust the parameters for the snowpack in the parameter file"};
+
 
   // parameters for bilinear snowpack
   float_default_map["snow_SlopeAscend"] = 0.035;
+  help_map["snow_SlopeAscend"] = {  "float","0.035","A parameter for the bilinear snowpack method","You need to fit all the snowpack parameters using some python code and then adjust the parameters for the snowpack in the parameter file"};
+
   float_default_map["snow_SlopeDescend"] = -0.03;
+  help_map["snow_SlopeDescend"] = {  "float","-0.03","A parameter for the bilinear snowpack method","You need to fit all the snowpack parameters using some python code and then adjust the parameters for the snowpack in the parameter file"};
+
   float_default_map["snow_PeakElevation"] = 1500;
+  help_map["snow_PeakElevation"] = {  "float","1500","A parameter for the bilinear snowpack method. The elevation of the peak snowpack","You need to fit all the snowpack parameters using some python code and then adjust the parameters for the snowpack in the parameter file"};
+
   float_default_map["snow_PeakSnowpack"] = 30;
+  help_map["snow_PeakSnowpack"] = {  "float","30","A parameter for the bilinear snowpack method. The peak snowpack in g/cm^2","You need to fit all the snowpack parameters using some python code and then adjust the parameters for the snowpack in the parameter file"};
 
   // parameters for richards snowpack
   float_default_map["snow_v"] = 0.5;
+  help_map["snow_v"] = {  "float","0.5", "A parameter for the Richards snowpack method","You need to fit all the snowpack parameters using some python code and then adjust the parameters for the snowpack in the parameter file"};
+
   float_default_map["snow_lambda"] = 0.5;
+  help_map["snow_lambda"] = {  "float","0.5", "A parameter for the Richards snowpack method","You need to fit all the snowpack parameters using some python code and then adjust the parameters for the snowpack in the parameter file"};
+
   float_default_map["snow_MaximumSlope"] = 0.05;
+  help_map["snow_MaximumSlope"] = {  "float","0.05", "A parameter for the Richards snowpack method","You need to fit all the snowpack parameters using some python code and then adjust the parameters for the snowpack in the parameter file"};
+
+
 
   // These are for the erosion rate calculations
   bool_default_map["calculate_erosion_rates"] = false;
+  help_map["calculate_erosion_rates"] = {  "bool","false", "The basic CAIRN routine that just gets the erosion rate for each CRN point","See Mudd et al 2016 ESURF for details"};
+
   bool_default_map["calculate_soil_erosion_rates"] = false;
+  help_map["calculate_soil_erosion_rates"] = {  "bool","false", "This calculates soil erosion rates so does not accumulate erosion from upslope","See Mudd et al 2016 ESURF for details"};
+
   bool_default_map["calculate_nested_erosion_rates"] = false;
-  
+  help_map["calculate_nested_erosion_rates"] = {  "bool","false", "This looks for nested basins. It calculates the smallest basin first and then sets this as the erosion rate for pixels in that basin before it goes on to calculate the next largest basin.","See Mudd et al 2016 ESURF for details"};
+
   bool_default_map["use_spawned_basins"] = false;
+  help_map["use_spawned_basins"] = {  "bool","false", "You need to have previously set spawn_cosmo_basins to true and this will use those for erosion rate calculations. Spawning saves computational expense but is not necessary if you have turned of the topographic shielding calculation as advised by DiBiase ESURF 2018.","See Mudd et al 2016 ESURF for details"};
+
   bool_default_map["calculate_using_muons_and_errors"] = true;   
+  help_map["calculate_using_muons_and_errors"] = {  "bool","true", "If you want a very simple calculation just using spallation set this to false.","See Mudd et al 2016 ESURF for details"};
 
   bool_default_map["print_production_raster"] = false; 
+  help_map["print_production_raster"] = {  "bool","false", "Prints the production raster duh.","You can recyle the production raster in other analyses such as forward modelling of 10Be concentrations under different erosion scenarios"};
+
   bool_default_map["print_pressure_raster"] = false; 
+  help_map["print_pressure_raster"] = {  "bool","false", "Prints the pressure raster for bug checking.","Data comes from NCEP see balco's cronus calculator and this can be used to check if the numbers make sense."};
 
   bool_default_map["print_scaling_and_shielding_rasters"] = false;
-  
+  help_map["print_scaling_and_shielding_rasters"] = {  "bool","false", "Prints scaling and shielding rasters.","You can recyle the production raster in other analyses such as forward modelling of 10Be concentrations under different erosion scenarios"};
+
   
   // The stuff below here is all for creating rasters for forward prediction of 
   // erosion rates.
@@ -181,45 +301,97 @@ int main (int nNumberofArgs,char *argv[])
   // 0.01 g/cm^2/yr is ~ 37 mm/kyr
   // 0.1 g/cm^2/yr is ~ 370 mm/kyr or 0.37 mm/yr
   //bool_default_map["make_all_shielding_and_scaling_rasters"] = false;
-  bool_default_map["single_erosion_rate"] = false;
-  float_default_map["effective_erosion_rate"] = 0.01;
-  float_default_map["self_shield_eff_thickness"] = 0;
-  float_default_map["snow_shield_eff_thickness"] = 0;
   bool_default_map["calculate_CRN_concentration_raster"] = false;
+  help_map["calculate_CRN_concentration_raster"] = {  "bool","false", "Switch to true to forward model CRN concentrations.","This can be used to test the 10Be outcome of different erosion scenarios"};
+
+  float_default_map["effective_erosion_rate"] = 0.01;
+  help_map["effective_erosion_rate"] = {  "float","0.01", "Used for forward modelling of cosmogenic concentrations. Units are g/cm^2/yr.","To convert to mm/kyr you multiply by 10^7/(density in kg/m^3)  0.01 g/cm^2/yr is ~ 37 mm/kyr  0.1 g/cm^2/yr is ~ 370 mm/kyr or 0.37 mm/yr"};
+ 
+  float_default_map["self_shield_eff_thickness"] = 0;
+  help_map["self_shield_eff_thickness"] = {  "float","0", "Used for forward modelling of cosmogenic concentrations. Units are g/cm^2/yr.","This is for removing chunks of surface material"};
+ 
+  float_default_map["snow_shield_eff_thickness"] = 0;
+  help_map["snow_shield_eff_thickness"] = {  "float","0", "Single snow shielding used for forward modelling of cosmogenic concentrations. Units are g/cm^2/yr.","This is for removing chunks of surface material"};
+
   bool_default_map["load_production_raster"] = false;
+  help_map["load_production_raster"] = {  "bool","false", "For forward modelling of CRN concentrations.","You can precalculate a production ratster that then gets used for multiple 10Be concentration scenarios"};
+
   string_default_map["production_raster_suffix"] = "_PROD";
-  string_default_map["concentration_column_name"] = "Be10_CONC";
+  help_map["production_raster_suffix"] = {  "string","_PROD", "If you are loading a production raster using load_production_raster this is the extension of the production raster.","The suffix goes after the DEM_ID"};
+
   bool_default_map["calculate_erosion_rates_new"] = true;
+  help_map["calculate_erosion_rates_new"] = {  "bool","true", "For cosmogenic calculations this turns on the new more computationally effience method of calculating denudation rates.","You still need to set calculate_erosion_rates to true"};
+
+  string_default_map["concentration_column_name"] = "Be10_CONC";
+  help_map["concentration_column_name"] = {  "string","Be10_CONC", "If you use the calculate_erosion_rates_new this is the coluum in the points_filename file that has the 10Be concentration.","Only used with calculate_erosion_rates_new"};
 
   bool_default_map["calculate_accumulated_CRN_concentration"] = false;
+  help_map["calculate_accumulated_CRN_concentration"] = {  "bool","false", "Calculates accomulated CRN concentrations across a DEM.","For forward modelling of 10Be concentrations"};
+
+
   bool_default_map["calculate_accumulated_CRN_concentration_from_points"] = false;
+  help_map["calculate_accumulated_CRN_concentration_from_points"] = {  "bool","false", "Calculates accomulated CRN concentrations from a list of points.","For forward modelling of 10Be concentrations"};
 
   // some parameters for getting points in the landscape
   // You need a river network for this. 
   // You probably should keep the contributing pixels at the default unless you have either
   // very small or very large basins. Increase the number 
   bool_default_map["read_points_csv"] = false;
+  help_map["read_points_csv"] = {  "bool","false", "For calculating concentrations of 10Be for scenarios this reads locations from a csv.","Assign the file with points_filename"};
+
   string_default_map["points_filename"] ="CRN_points.csv";
+  help_map["points_filename"] = {  "string","CRN_points.csv", "Name of the file where you pick points to calculate accumulated 10Be","You need to set read_points_csv to true for this to work"};
+
+
+
   int_default_map["threshold_contributing_pixels"] = 1000;
+  help_map["threshold_contributing_pixels"] = {  "int","1000","The number of contributing pixels needed to start a channel using the threshold method.","This is in pixels not drainage area. More options are in the lsdtt-channel-extraction tool."};
 
 
   // These parameters are for raster aggregation that is used for sediment routine and 
   // CRN concentration prediction
   bool_default_map["route_cosmo_concentrations"] = false;
+  help_map["route_cosmo_concentrations"] = {  "bool","false","Experimental. Doesn't do anything yet.","Experimental. Produces no outputs."};
+
   string_default_map["raster_fnames_prefix"] = "NULL";
+  help_map["raster_fnames_prefix"] = {  "string","NULL","Experimental. Doesn't do anything yet.","Experimental. Produces no outputs."};
+
   bool_default_map["accumulate_cosmo"] = false;
+  help_map["accumulate_cosmo"] = {  "bool","false","Experimental. Doesn't do anything yet.","Experimental. Produces no outputs."};
 
   bool_default_map["check_sediment_routing_rasters"] = false;
-
+  help_map["check_sediment_routing_rasters"] = {  "bool","false","Experimental. Doesn't do anything yet.","Experimental. Produces no outputs."};
 
 
   // This burns a raster value to any csv output of chi data
   // Useful for appending geology data to chi profiles
   bool_default_map["burn_raster_to_csv"] = false;
-  string_default_map["burn_raster_prefix"] = "NULL";
-  string_default_map["burn_data_csv_column_header"] = "burned_data";
-  string_default_map["csv_to_burn_name"] = "NULL";
+  help_map["burn_raster_to_csv"] = {  "bool","false","Takes a raster with burn_raster_prefix and then samples that raster with the points in the csv file. The new column will be burn_data_csv_column_header.","Useful for adding raster data to csv file. Often used to add lithological information to csv data (you must rasterize the lithology data first."};
 
+  string_default_map["burn_raster_prefix"] = "NULL";
+  help_map["burn_raster_prefix"] = {  "string","NULL","The prefix of the raster to burn to a csv.","No extension required."};
+
+  string_default_map["burn_data_csv_column_header"] = "burned_data";
+  help_map["burn_data_csv_column_header"] = {  "string","burned_data","Column header in csv of data burned from raster.","For example lithocode."};
+
+  string_default_map["csv_to_burn_name"] = "NULL";
+  help_map["csv_to_burn_name"] = {  "string","NULL","Name of csv file to which data will be burned.","You need to include the csv extension."};
+
+
+  //=========================================================================
+  //
+  //.#####....####...#####....####...##...##..######..######..######..#####..
+  //.##..##..##..##..##..##..##..##..###.###..##........##....##......##..##.
+  //.#####...######..#####...######..##.#.##..####......##....####....#####..
+  //.##......##..##..##..##..##..##..##...##..##........##....##......##..##.
+  //.##......##..##..##..##..##..##..##...##..######....##....######..##..##.
+  //
+  //..####...##..##..######...####...##..##...####..                         
+  //.##..##..##..##..##......##..##..##.##...##.....                         
+  //.##......######..####....##......####.....####..                         
+  //.##..##..##..##..##......##..##..##.##.......##.                         
+  //..####...##..##..######...####...##..##...####..    
+  //                     
   // Use the parameter parser to get the maps of the parameters required for the
   // analysis
   LSDPP.parse_all_parameters(float_default_map, int_default_map, bool_default_map,string_default_map);
@@ -240,6 +412,17 @@ int main (int nNumberofArgs,char *argv[])
   string raster_ext =  LSDPP.get_dem_read_extension();
   vector<string> boundary_conditions = LSDPP.get_boundary_conditions();
   string CHeads_file = LSDPP.get_CHeads_file();
+
+  if(f_name == "cry_for_help.txt")
+  {
+    cout << "I am going to print the help and exit." << endl;
+    cout << "You can find the help in the file:" << endl;
+    cout << "./lsdtt-cosmo-tool-README.csv" << endl;
+    string help_prefix = "lsdtt-cosmo-tool-README";
+    LSDPP.print_help(help_map, help_prefix, version_number, citation);
+    exit(0);
+  }
+
 
   cout << "Read filename is: " <<  DATA_DIR+DEM_ID << endl;
   cout << "Write filename is: " << OUT_DIR+OUT_ID << endl;

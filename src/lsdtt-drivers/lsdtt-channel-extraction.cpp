@@ -75,6 +75,9 @@ int main (int nNumberofArgs,char *argv[])
   //start the clock
   clock_t begin = clock();
 
+  string version_number = "0.5";
+  string citation = "http://doi.org/10.5281/zenodo.4577879";
+
   cout << "=========================================================" << endl;
   cout << "|| Welcome to the LSDTopoTools channel extraction tool!||" << endl;
   cout << "|| This program has a number of options to extract     ||" << endl;
@@ -82,7 +85,9 @@ int main (int nNumberofArgs,char *argv[])
   cout << "|| This program was developed by Fiona J. Clubb        ||" << endl;
   cout << "||  and Simon M. Mudd                                  ||" << endl;
   cout << "||  at the University of Edinburgh                     ||" << endl;
-  cout << "=========================================================" << endl;   
+  cout << "=========================================================" << endl;  
+  cout << "|| Citation for this code is:                          ||" << endl;
+  cout << "|| " << citation << endl;
   cout << "|| If you use these routines please cite:              ||" << endl;   
   cout << "|| https://www.doi.org/10.1002/2013WR015167            ||" << endl;
   cout << "|| If you use the wiener routine please cite:          ||" << endl;   
@@ -91,12 +96,51 @@ int main (int nNumberofArgs,char *argv[])
   cout << "|| Documentation can be found at:                      ||" << endl;
   cout << "|| https://lsdtopotools.github.io/LSDTT_documentation/ ||" << endl;
   cout << "=========================================================" << endl;
+  cout << "|| This is LSDTopoTools2 version                       ||" << endl;
+  cout << "|| " << version_number << endl;
+  cout << "|| If the version number has a d at the end it is a    ||" << endl;
+  cout << "||  development version.                               ||" << endl;
+  cout << "=========================================================" << endl;
 
   // Get the arguments
   vector<string> path_and_file = DriverIngestor(nNumberofArgs,argv);
 
   string path_name = path_and_file[0];
   string f_name = path_and_file[1];
+
+  // Check if we are doing the version or the citation
+  if(f_name == "lsdtt_citation.txt")
+  {
+
+    cout << endl << endl << endl << "==============================================" << endl;
+    cout << "To cite this code, please use this citation: " << endl;
+    cout << citation << endl;
+    cout << "Copy this url to find the full citation." << endl;
+    cout << "also see above for more detailed citation information." << endl;
+    cout << "=========================================================" << endl;
+
+    ofstream ofs;
+    ofs.open("./lsdtt-channel-extraction-citation.txt");
+    ofs << citation << endl;
+    ofs.close();
+
+    exit(0);
+  }
+
+  if(f_name == "lsdtt_version.txt")
+  {
+    cout << endl << endl << endl << "==============================================" << endl;    
+    cout << "This is lsdtt-channel-extraction version number " << version_number << endl;
+    cout << "If the version contains a 'd' then you are using a development version." << endl;
+    cout << "=========================================================" << endl;
+    ofstream ofs;
+    ofs.open("./lsdtt-channel-extraction-version.txt");
+    ofs << version_number << endl;
+    ofs.close();
+
+    exit(0);
+  }
+
 
   // load parameter parser object
   LSDParameterParser LSDPP(path_name,f_name);
@@ -109,60 +153,156 @@ int main (int nNumberofArgs,char *argv[])
   map<string,float> float_default_map;
   map<string,bool> bool_default_map;
   map<string,string> string_default_map;
+
+  // this will contain the help file
+  map< string, vector<string> > help_map;
   
+
+  //==================================================================================
+  //
+  // .#####....####...#####....####...##...##..######..######..######..#####....####..
+  // .##..##..##..##..##..##..##..##..###.###..##........##....##......##..##..##.....
+  // .#####...######..#####...######..##.#.##..####......##....####....#####....####..
+  // .##......##..##..##..##..##..##..##...##..##........##....##......##..##......##.
+  // .##......##..##..##..##..##..##..##...##..######....##....######..##..##...####..
+  //
+  //=================================================================================  
   // Basic DEM preprocessing
   float_default_map["minimum_elevation"] = 0.0;
+  help_map["minimum_elevation"] = { "float","0.0","All elevation values below this become nodata if remove_seas is true.","Ususally 0."};
+
   float_default_map["maximum_elevation"] = 30000;
+  help_map["maximum_elevation"] = {  "float","0.0","All elevation values above this become nodata if remove_seas is true.","Pick a big number."};
+
+  float_default_map["min_slope_for_fill"] = 0.0001;
+  help_map["min_slope_for_fill"] = {  "float","0.0001","Minimum slope between pixels for the filling algorithm.","Best not to change the default."};
+
   bool_default_map["raster_is_filled"] = false; // assume base raster is already filled
+  help_map["raster_is_filled"] = {  "bool","false","This reads a pre-existing fill raster to save time.","You need to have printed the fill raster if you set this to true."};
+
   bool_default_map["remove_seas"] = true; // elevations above minimum and maximum will be changed to nodata
-  
+  help_map["remove_seas"] = {  "bool","true","Slightly misleading name; it replaces both high and low DEM values with nodata.","This gets rid of low lying areas but also is handy when the nodata is not translated from the raw DEM and it is full of funny large numbers."};
+ 
+  string_default_map["CHeads_file"] = "NULL";
+  help_map["CHeads_file"] = {  "string","NULL","The name of a channel heads file.","You can output this csv file with the channel extraction algorithms. It contains latitude and longitude values of the channel heads."};
+ 
+
   // set default float parameters
   int_default_map["threshold_contributing_pixels"] = 1000;
+  help_map["threshold_contributing_pixels"] = {  "int","1000","The number of contributing pixels needed to start a channel using the threshold method.","This is in pixels not drainage area. More options are in the lsdtt-channel-extraction tool."};
+
   int_default_map["connected_components_threshold"] = 100;
-  int_default_map["number_of_junctions_dreich"] = 1;
+  help_map["connected_components_threshold"] = {  "int","100","Number of connected pixels to classify as a channel.","Used in pelletier and wiener methods."};
 
-  // set default in parameter
-  float_default_map["min_slope_for_fill"] = 0.0001;
   float_default_map["surface_fitting_radius"] = 6;
+  help_map["surface_fitting_radius"] = {  "float","6","Our surface fitting routines fit a polynomial over the points with in a radius defined by surface_fitting_radius and then differentiate this surface to get the surface metrics like gradient and curvature","If not bigger than the pixel_size*sqrt(2) then will increase to that number. Unlike lsdtt-basic-metrics this default is tuned for lidar data"};
+
   float_default_map["pruning_drainage_area"] = 1000;
+  help_map["pruning_drainage_area"] = {  "float","1000","In both driech and wiener channels with less than this drainage area are removed during the pruning process.","In m^2."};
+
   float_default_map["curvature_threshold"] = 0.1;
+  help_map["curvature_threshold"] = {  "float","0.1","For the pelletier method this is the threshold of planform curvature for a channel head.","In 1/m"};
+
   float_default_map["minimum_drainage_area"] = 400;
-  float_default_map["A_0"] = 1;
+  help_map["minimum_drainage_area"] = {  "float","400","For the pelletier method this is the minimum drainage area for a channel head.","In m^2"};
+
+  int_default_map["number_of_junctions_dreich"] = 1;
+  help_map["number_of_junctions_dreich"] = {  "int","1","For driech the number of junctions to pass to construct the chi profile at the upstream end of the channel.","Applies only to dreich"};
+
+    
+
+  float_default_map["A_0"] = 1.0;
+  help_map["A_0"] = {  "float","1.0","The A_0 parameter for chi computation. See https://doi.org/10.1002/esp.3302","Usually set to 1 so that the slope in chi-elevation space is the same as k_sn"};
+   
   float_default_map["m_over_n"] = 0.5;
+  help_map["m_over_n"] = {  "float","0.5","The concavity index for chi calculations. Ususally denoted as the greek symbol theta.","Default is 0.5 but possibly 0.45 is better as Kwang and Parker suggest 0.5 leads to unrealistic behaviour in landscape evolution models."};
 
-  // set default methods
+
+  // The actual channel extraction routines
   bool_default_map["print_area_threshold_channels"] = true;
-  bool_default_map["print_dreich_channels"] = false;
-  bool_default_map["print_pelletier_channels"] = false;
-  bool_default_map["print_wiener_channels"] = false;
+  help_map["print_area_threshold_channels"] = {  "bool","true","Prints the channel network determined by an area threshold.","Output is a csv file."};
 
-  bool_default_map["convert_csv_to_geojson"] = false;
+  bool_default_map["print_dreich_channels"] = false;
+  help_map["print_dreich_channels"] = {  "bool","false","Prints the channel network determined by the driech method.","Output is a csv file."};
+
+  bool_default_map["print_pelletier_channels"] = false;
+  help_map["print_pelletier_channels"] = {  "bool","false","Prints the channel network determined by the pelletier method.","Output is a csv file."};
+
+  bool_default_map["print_wiener_channels"] = false;
+  help_map["print_wiener_channels"] = {  "bool","false","Prints the channel network determined by the the wiener method which is a mashup of passalacqua and pelletier methods first reported by grieve et al 2016.","Output is a csv file."};
 
   bool_default_map["print_stream_order_raster"] = false;
+  help_map["print_stream_order_raster"] = {  "bool","false","Prints a raster with _SO in filename with stream orders of channel in the appropriate pixel.","Generates a big file so we suggest printing the network to csv."};
+
   bool_default_map["print_sources_to_raster"] = false;
-  bool_default_map["print_fill_raster"] = false;
-  bool_default_map["write_hillshade"] = false;
+  help_map["print_sources_to_raster"] = {  "bool","false","If true the sources to a raster.","Inefficient so print_sources_to_csv is preferred."};
+  
   bool_default_map["print_wiener_filtered_raster"] = false;
-  bool_default_map["print_curvature_raster"] = false;
+  help_map["print_wiener_filtered_raster"] = {  "bool","false","Runs the raster through a wiener filter and prints the result.","Output file has _Wfilt in filename."};
 
-  bool_default_map["print_sources_to_csv"] = true;
+
+  // some simple raster printing
+  bool_default_map["write_hillshade"] = false;
+  help_map["write_hillshade"] = {  "bool","false","Write the hillshade raster.","You need this for a lot of our plotting routines. Filename includes _HS"};
+
+  bool_default_map["print_fill_raster"] = false;
+  help_map["print_fill_raster"] = {  "bool","false","Prints the fill raster.","Filename includes _FILL"};
+
+  // This converts all csv files to geojson (for easier loading in a GIS)
+  bool_default_map["convert_csv_to_geojson"] = false;
+  help_map["convert_csv_to_geojson"] = {  "bool","false","Converts csv files to geojson files","Makes csv output easier to read with a GIS. Warning: these files are much bigger than csv files."};
+
+  bool_default_map["print_curvature"]= false;
+  help_map["print_curvature"] = {  "bool","false","Prints curvature raster after polynomial fitting.","Part of surface fitting metrics."};
+
+  bool_default_map["print_sources_to_csv"] = false;
+  help_map["print_sources_to_csv"] = {  "bool","false","Prints the sources to a csv file.","Each source on its own row with latitude and longitude columns."};
+
   bool_default_map["print_channels_to_csv"] = true;
-  bool_default_map["print_junctions_to_csv"] = false;
+  help_map["print_channels_to_csv"] = {  "bool","false","Prints the channel network to a csv file.","This version produces smaller files than the raster version."};
+
   bool_default_map["use_extended_channel_data"] = false;
+  help_map["use_extended_channel_data"] = {  "bool","false","If this is true you get more data columns in your channel network csv.","I will tell you what these columns are one day."};
 
+  bool_default_map["print_junctions_to_csv"] = false;
+  help_map["print_junctions_to_csv"] = {  "bool","false","Prints a csv with the locations and numbers of the junctions.","This is better to use than the raster version."};
+ 
+  // drainage area printing
   bool_default_map["print_dinf_drainage_area_raster"] = false;
+  help_map["print_dinf_drainage_area_raster"] = {  "bool","false","Prints d-infinity drainage area raster.","Raster extension is Dinf."};
+ 
   bool_default_map["print_d8_drainage_area_raster"] = false;
+  help_map["print_d8_drainage_area_raster"] = {  "bool","false","Prints d8 drainage area raster.","Raster extension is D8."};
+
   bool_default_map["print_QuinnMD_drainage_area_raster"] = false;
+  help_map["print_QuinnMD_drainage_area_raster"] = {  "bool","false","Prints Quinn multidirection drainage area raster.","Raster extension is QMD."};
+
   bool_default_map["print_FreemanMD_drainage_area_raster"] = false;
+  help_map["print_FreemanMD_drainage_area_raster"] = {  "bool","false","Prints Freeman multidirection drainage area raster.","Raster extension is FMD."};
+
   bool_default_map["print_MD_drainage_area_raster"] = false;
+  help_map["print_MD_drainage_area_raster"] = {  "bool","false","Prints multidirection (fully divergent flow) drainage area raster.","Raster extension is MD."};
 
 
-  // set default string method
-  string_default_map["CHeads_file"] = "NULL";
 
+
+
+  //=========================================================================
+  //
+  //.#####....####...#####....####...##...##..######..######..######..#####..
+  //.##..##..##..##..##..##..##..##..###.###..##........##....##......##..##.
+  //.#####...######..#####...######..##.#.##..####......##....####....#####..
+  //.##......##..##..##..##..##..##..##...##..##........##....##......##..##.
+  //.##......##..##..##..##..##..##..##...##..######....##....######..##..##.
+  //
+  //..####...##..##..######...####...##..##...####..                         
+  //.##..##..##..##..##......##..##..##.##...##.....                         
+  //.##......######..####....##......####.....####..                         
+  //.##..##..##..##..##......##..##..##.##.......##.                         
+  //..####...##..##..######...####...##..##...####..    
+  //                     
   // Use the parameter parser to get the maps of the parameters required for the
   // analysis
-
   LSDPP.parse_all_parameters(float_default_map, int_default_map, bool_default_map,string_default_map);
   map<string,float> this_float_map = LSDPP.get_float_parameters();
   map<string,int> this_int_map = LSDPP.get_int_parameters();
@@ -184,10 +324,30 @@ int main (int nNumberofArgs,char *argv[])
   cout << "Read filename is: " <<  DATA_DIR+DEM_ID << endl;
   cout << "Write filename is: " << OUT_DIR+OUT_ID << endl;
 
+  if(f_name == "cry_for_help.txt")
+  {
+    cout << "I am going to print the help and exit." << endl;
+    cout << "You can find the help in the file:" << endl;
+    cout << "./lsdtt-basic-metrics-README.csv" << endl;
+    string help_prefix = "lsdtt-channel_extraction-README";
+    LSDPP.print_help(help_map, help_prefix, version_number, citation);
+    exit(0);
+  }
+
+
+
   // check to see if the raster exists
   LSDRasterInfo RI((DATA_DIR+DEM_ID), raster_ext);
 
-  // load the  DEM
+  //========================================================================
+  //
+  //.##.......####....####...#####...........#####....####...######...####..
+  //.##......##..##..##..##..##..##..........##..##..##..##....##....##..##.
+  //.##......##..##..######..##..##..........##..##..######....##....######.
+  //.##......##..##..##..##..##..##..........##..##..##..##....##....##..##.
+  //.######...####...##..##..#####...........#####...##..##....##....##..##.
+  //
+  //========================================================================
   LSDRaster topography_raster;
   if (this_bool_map["remove_seas"])
   {
@@ -258,9 +418,16 @@ int main (int nNumberofArgs,char *argv[])
   // get the flow info object
   LSDFlowInfo FlowInfo(boundary_conditions,filled_topography);
 
-  //=================================================================
-  // Now, if you want, calculate drainage areas
-  //=================================================================
+
+  //=======================================================================================================
+  //
+  //.#####...#####....####...######..##..##...####....####...######...........####...#####...######...####..
+  //.##..##..##..##..##..##....##....###.##..##..##..##......##..............##..##..##..##..##......##..##.
+  //.##..##..#####...######....##....##.###..######..##.###..####............######..#####...####....######.
+  //.##..##..##..##..##..##....##....##..##..##..##..##..##..##..............##..##..##..##..##......##..##.
+  //.#####...##..##..##..##..######..##..##..##..##...####...######..........##..##..##..##..######..##..##.
+  //
+  //========================================================================================================
   if (this_bool_map["print_dinf_drainage_area_raster"])
   {
     cout << "I am writing dinf drainage area to raster." << endl;
@@ -302,7 +469,15 @@ int main (int nNumberofArgs,char *argv[])
   }
 
   //=================================================================
-  // This is used to check on previously read sources
+  //==============================================================
+  //
+  //..####....####...##..##..#####....####...######...####..
+  //.##......##..##..##..##..##..##..##..##..##......##.....
+  //..####...##..##..##..##..#####...##......####.....####..
+  //.....##..##..##..##..##..##..##..##..##..##..........##.
+  //..####....####....####...##..##...####...######...####..
+  //
+  //==============================================================
   //=================================================================
   cout << endl << endl << "The channel heads file is " << CHeads_file << endl;
   if (CHeads_file != "NULL" && CHeads_file != "Null" && CHeads_file != "null")

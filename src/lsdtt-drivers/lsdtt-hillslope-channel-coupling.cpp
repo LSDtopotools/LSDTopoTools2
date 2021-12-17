@@ -14,7 +14,7 @@
 //
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //
-// Copyright (C) 2019 Martin D. Hurst and Simon M. Mudd 2019
+// Copyright (C) 2021 Martin D. Hurst and Simon M. Mudd 2021
 //
 // Developers can be contacted:
 //
@@ -79,16 +79,25 @@
 int main (int nNumberofArgs,char *argv[])
 {
 
+  string version_number = "0.5";
+  string citation = "http://doi.org/10.5281/zenodo.4577879";
+
   cout << "=========================================================" << endl;
   cout << "|| Welcome to the coupled channel and hillslope tool!  ||" << endl;
   cout << "|| This program has a number of options to make chi    ||" << endl;
   cout << "|| plots and to map out slopes in chi space.           ||" << endl;
   cout << "|| This program was developed by Martin D. Hurst       ||" << endl;
   cout << "||  at the University of Glasgow                       ||" << endl;
-  cout << "|| and Simon M. Mudd                                   ||" << endl;
+  cout << "|| and Simon M. Mudd and Stuart W.D. Grieve            ||" << endl;
   cout << "||  at the University of Edinburgh                     ||" << endl;
   cout << "=========================================================" << endl;
+  cout << "|| Citation for this code is:                          ||" << endl;
+  cout << "|| " << citation << endl;
   cout << "|| If you use these routines please cite:              ||" << endl;
+  cout << "|| Grieve et al. 2016. How long is a hillslope?        ||" << endl;
+  cout << "|| ESPL 41, 1039–1054.                                 ||" << endl;
+  cout << "|| https://doi.org/10.1002/esp.3884                    ||" << endl;
+  cout << "|| and                                                 ||" << endl;
   cout << "|| Hurst et al., 2019, Detection of channel-hillslope  ||" << endl;
   cout << "|| coupling along a tectonic gradient, EPSL, 522, 30-39||" << endl;
   cout << "|| , https://doi.org/10.1016/j.epsl.2019.06.018        ||" << endl;
@@ -96,13 +105,50 @@ int main (int nNumberofArgs,char *argv[])
   cout << "|| Documentation can be found at:                      ||" << endl;
   cout << "|| https://lsdtopotools.github.io/LSDTT_documentation/ ||" << endl;
   cout << "=========================================================" << endl;
-
+  cout << "|| This is LSDTopoTools2 version                       ||" << endl;
+  cout << "|| " << version_number << endl;
+  cout << "|| If the version number has a d at the end it is a    ||" << endl;
+  cout << "||  development version.                               ||" << endl;
+  cout << "=========================================================" << endl;
+  
   // Get the arguments
   vector<string> path_and_file = DriverIngestor(nNumberofArgs,argv);
-
-
   string path_name = path_and_file[0];
   string f_name = path_and_file[1];
+
+  // Check if we are doing the version or the citation
+  if(f_name == "lsdtt_citation.txt")
+  {
+
+    cout << endl << endl << endl << "==============================================" << endl;
+    cout << "To cite this code, please use this citation: " << endl;
+    cout << citation << endl;
+    cout << "Copy this url to find the full citation." << endl;
+    cout << "also see above for more detailed citation information." << endl;
+    cout << "=========================================================" << endl;
+
+    ofstream ofs;
+    ofs.open("./lsdtt-hillslope-channel-coupling-citation.txt");
+    ofs << citation << endl;
+    ofs.close();
+
+    exit(0);
+  }
+
+  if(f_name == "lsdtt_version.txt")
+  {
+    cout << endl << endl << endl << "==============================================" << endl;    
+    cout << "This is lsdtt-hillslope-channel-coupling version number " << version_number << endl;
+    cout << "If the version contains a 'd' then you are using a development version." << endl;
+    cout << "=========================================================" << endl;
+    ofstream ofs;
+    ofs.open("./lsdtt-hillslope-channel-coupling-version.txt");
+    ofs << version_number << endl;
+    ofs.close();
+
+    exit(0);
+  }
+
 
   // load parameter parser object
   LSDParameterParser LSDPP(path_name,f_name);
@@ -110,142 +156,313 @@ int main (int nNumberofArgs,char *argv[])
   // for the chi tools we need georeferencing so make sure we are using bil format
   LSDPP.force_bil_extension();
 
+  // this will contain the help file
+  map< string, vector<string> > help_map;
+
   // maps for setting default parameters
   map<string,int> int_default_map;
   map<string,float> float_default_map;
   map<string,bool> bool_default_map;
   map<string,string> string_default_map;
 
+  //==================================================================================
+  //
+  // .#####....####...#####....####...##...##..######..######..######..#####....####..
+  // .##..##..##..##..##..##..##..##..###.###..##........##....##......##..##..##.....
+  // .#####...######..#####...######..##.#.##..####......##....####....#####....####..
+  // .##......##..##..##..##..##..##..##...##..##........##....##......##..##......##.
+  // .##......##..##..##..##..##..##..##...##..######....##....######..##..##...####..
+  //
+  //=================================================================================
   // Basic DEM preprocessing
   float_default_map["minimum_elevation"] = 0.0;
+  help_map["minimum_elevation"] = { "float","0.0","All elevation values below this become nodata if remove_seas is true.","Ususally 0."};
+
   float_default_map["maximum_elevation"] = 30000;
+  help_map["maximum_elevation"] = {  "float","0.0","All elevation values above this become nodata if remove_seas is true.","Pick a big number."};
+
   float_default_map["min_slope_for_fill"] = 0.0001;
-  float_default_map["surface_fitting_radius"] = 12.0;  // This is for the surface mapping (in metres)
+  help_map["min_slope_for_fill"] = {  "float","0.0001","Minimum slope between pixels for the filling algorithm.","Best not to change the default."};
+
   bool_default_map["raster_is_filled"] = false; // assume base raster is already filled
-  bool_default_map["remove_seas"] = false; // elevations above minimum and maximum will be changed to nodata
+  help_map["raster_is_filled"] = {  "bool","false","This reads a pre-existing fill raster to save time.","You need to have printed the fill raster if you set this to true."};
+
+  bool_default_map["remove_seas"] = true; // elevations above minimum and maximum will be changed to nodata
+  help_map["remove_seas"] = {  "bool","true","Slightly misleading name; it replaces both high and low DEM values with nodata.","This gets rid of low lying areas but also is handy when the nodata is not translated from the raw DEM and it is full of funny large numbers."};
+
   bool_default_map["only_check_parameters"] = false;
+  help_map["only_check_parameters"] = {  "bool","false","This just checks parameters without running an analysis.","For bug checking."};
+
+  float_default_map["surface_fitting_radius"] = 12;
+  help_map["surface_fitting_radius"] = {  "float","12","Our surface fitting routines fit a polynomial over the points with in a radius defined by surface_fitting_radius and then differentiate this surface to get the surface metrics like gradient and curvature","If not bigger than the pixel_size*sqrt(2) then will increase to that number."};
+
 
   // Channel extraction
-  bool_default_map["print_wiener_channels"] = false;  // Note: even if this is true it gets overwritten by source file
+  bool_default_map["print_wiener_channels"] = false;
+  help_map["print_wiener_channels"] = {  "bool","false","Prints the channel network determined by the the wiener method which is a mashup of passalacqua and pelletier methods first reported by grieve et al 2016.","Output is a csv file."};
+
   float_default_map["pruning_drainage_area"] = 1000;
+  help_map["pruning_drainage_area"] = {  "float","1000","In both driech and wiener channels with less than this drainage area are removed during the pruning process.","In m^2."};
+
   int_default_map["threshold_contributing_pixels"] = 1000;
+  help_map["threshold_contributing_pixels"] = {  "int","1000","The number of contributing pixels needed to start a channel using the threshold method.","This is in pixels not drainage area. More options are in the lsdtt-channel-extraction tool."};
+
   int_default_map["connected_components_threshold"] = 100;
+  help_map["connected_components_threshold"] = {  "int","100","Number of connected pixels to classify as a channel.","Used in pelletier and wiener methods."};
+
 
    //Defining hilltops
 	int_default_map["StreamNetworkPadding"] = 0;
+  help_map["StreamNetworkPadding"] = {  "int","0","Distance in pixels from channel network that can't be classed as a hilltop","Use if you want to remove hilltops near channels."};
 
   bool_default_map["extract_ridges"] = false;
-	float_default_map["Threshold_Hilltop_Gradient"] = 0.4;
-  float_default_map["Threshold_Hilltop_Curvature"] = 0.0;
-  int_default_map["Threshold_Hilltop_Contributing_Pixels"] = 1;
-	
+  help_map["extract_ridges"] = {  "bool","false","Does what it says on the tin.","Output is a csv file. If you set run_HFR_analysis to true this will also be set to true by default"};
 
-  
-  
+	float_default_map["Threshold_Hilltop_Gradient"] = 0.4;
+  help_map["Threshold_Hilltop_Gradient"] = {  "float","0.4","Hilltops with greater than this gradient are removed from the analysis.","Used to remove plunging ridgelines."};
+
+  float_default_map["Threshold_Hilltop_Curvature"] = 0.0;
+  help_map["Threshold_Hilltop_Curvature"] = {  "float","0.4","Hilltops with greater than this curvature are removed from the analysis.","Used to remove concave ridgetops."};
+
+  int_default_map["Threshold_Hilltop_Contributing_Pixels"] = 1;
+  help_map["Threshold_Hilltop_Contributing_Pixels"] = {  "int","1","Hilltops with greater than this number of contributing pixels are removed from the analysis.","Used to remove ridgetops that are getting sediment from adjacent hilltop pixels."};
+
+	 
   // This is all for legacy HFR
   bool_default_map["complete_hilltop_masking"] = true;
-  bool_default_map["use_legacy_HFR"] = false;
-  bool_default_map["RemovePositiveHilltops"] = true;
-	bool_default_map["RemoveSteepHilltops"] = true;
-  bool_default_map["MaskHilltopstoBasins"] = true;
-  int_default_map["min_stream_order_to_extract_basins"] = 0;
-	int_default_map["max_stream_order_to_extract_basins"] = 100;
+  help_map["complete_hilltop_masking"] = {  "bool","false","Legacy hilltop flow routing. Runs all the masking routines.","Legacy code only. Use run_HFR_analysis now."};
 
+  bool_default_map["use_legacy_HFR"] = false;
+  help_map["use_legacy_HFR"] = {  "bool","false","Use the legacy hilltop flow routing.","Legacy code only. Use run_HFR_analysis now with this set to false."};
+
+  bool_default_map["RemovePositiveHilltops"] = true;
+  help_map["RemovePositiveHilltops"] = {  "bool","false","Removes positive (concave) hilltops in legacy hilltop flow routing.","Legacy code only. This defaults to true for new version."};
+ 
+	bool_default_map["RemoveSteepHilltops"] = true;
+  help_map["RemoveSteepHilltops"] = {  "bool","false","Removes steep (>0.4 gradient) hilltops in legacy hilltop flow routing.","Legacy code only. This defaults to true for new version."};
+ 
+  bool_default_map["MaskHilltopstoBasins"] = true;
+  help_map["MaskHilltopstoBasins"] = {  "bool","false","Removes hilltops not around study basins in legacy hilltop flow routing.","Legacy code only. This defaults to true for new version."};
+ 
+  int_default_map["min_stream_order_to_extract_basins"] = 0;
+  help_map["min_stream_order_to_extract_basins"] = {  "int","0","Minium basin order in legacy hilltop flow routing.","Legacy code only."};
+ 
+	int_default_map["max_stream_order_to_extract_basins"] = 100;
+  help_map["max_stream_order_to_extract_basins"] = {  "int","100","Maximum basin order in legacy hilltop flow routing.","Legacy code only."};
 
   // Input filenames
   string_default_map["ChannelSegments_file"] = "NULL";
+  help_map["ChannelSegments_file"] = {  "string","NULL","If you already calculated a channel segments file you can use this to load the file.","This will be a csv file that you can get by using the print_segments option."};
+
 	string_default_map["Floodplain_file"] = "NULL";
+  help_map["Floodplain_file"] = {  "string","NULL","The prefix (no extension) of the floodplain mask. Is a binary with true (1) for the floodplain. Hilltop traces will stop here","Floodplain mask can be generated using lsdtt-valley-metrics."};
+
   string_default_map["CHeads_file"] = "NULL";
+  help_map["CHeads_file"] = {  "string","NULL","The name of a channel heads file.","You can output this csv file with the channel extraction algorithms. It contains latitude and longitude values of the channel heads."};
+ 
   bool_default_map["get_basins_from_outlets"] = false;
+  help_map["get_basins_from_outlets"] = {  "bool","false","Switches on the outlet based basin finding.","See BaselevelJunctions_file for format of outlets csv."};
+
   int_default_map["search_radius_nodes"] = 8;
+  help_map["search_radius_nodes"] = {  "int","8","A parameter for snapping to the nearest channel. It will search for the largest channel (by stream order) within the pixel window.","You will want smaller pixel numbers if you have a dense channel network."};
+ 
   int_default_map["threshold_stream_order_for_snapping"] = 1;
+  help_map["threshold_stream_order_for_snapping"] = {  "int","2","If you are snapping to a channel, it will ignore channel with lower stream order than this number.","Set this to a higher number to avoid snapping to small channels."};
+  
   string_default_map["BaselevelJunctions_file"] = "NULL";
+  help_map["BaselevelJunctions_file"] = {  "string","NULL","The name of a csv file with basin outlets for selecting basins using junction numbers.","An old method. You should use get_basins_from_outlets: true and basin_outlet_csv instead."};
+  
   string_default_map["basin_outlet_csv"] = "NULL";
+  help_map["basin_outlet_csv"] = {  "string","NULL","A csv file with the lat long of basin outlets.","csv should have latitude and longitude columns and rows with basin outlets."};
+  
 
   // Selecting basins
   int_default_map["minimum_basin_size_pixels"] = 1000;
+  help_map["minimum_basin_size_pixels"] = {  "int","1000","For basin finding algorithm, the minimum size of a selected basin.","Will reject basins along edge."};
+  
   int_default_map["maximum_basin_size_pixels"] = 1000000000;
+  help_map["maximum_basin_size_pixels"] = {  "int","1000000000","For basin finding algorithm, the maximum size of a selected basin.","Will reject basins along edge."};
+  
   bool_default_map["extend_channel_to_node_before_receiver_junction"] = true;
-  bool_default_map["test_drainage_boundaries"] = false;
+  help_map["extend_channel_to_node_before_receiver_junction"] = {  "bool","true","For various basin extractions the basin snaps to the nearest junction. If this is true then the outlet of the basin is one pixel upstream of the reciever junction of the snapped channel.","If false it will pick the donor junction of the channel rather than one pixel above the reciever."};
+
+  bool_default_map["test_drainage_boundaries"] = true;
+  help_map["test_drainage_boundaries"] = {  "bool","true","Looks for basins influenced by edge and removes them if they are.","chi coordinate must be calculated using complete basins so this tests for that."};
+  
   bool_default_map["only_take_largest_basin"] = false;
+  help_map["only_take_largest_basin"] = {  "bool","false","This only retains the largest complete basin in the raster.","Will reject basins along edge."};
+  
   bool_default_map["print_basin_raster"] = false;
+  help_map["print_basin_raster"] = {  "bool","false","This prints a raster where the values are the basin number.","You can combine this with python tools to get basin shapefiles."};
+    
 
   // printing of rasters and data before chi analysis
-	bool_default_map["print_fill_raster"] = false;
-	bool_default_map["write_hillshade"] = false;
-  bool_default_map["print_slope"] = false;
-  bool_default_map["print_aspect"] = false;
-  bool_default_map["print_curvature"] = false;
-  bool_default_map["print_planform_curvature"] = false;
-  bool_default_map["print_stream_order_raster"] = false;
-  bool_default_map["print_channels_to_csv"] = false;
-  bool_default_map["print_junction_index_raster"] = false;
-  bool_default_map["print_junctions_to_csv"] = false;
-  bool_default_map["print_sources_to_csv"] = false;
+  bool_default_map["print_fill_raster"] = false;
+  help_map["print_fill_raster"] = {  "bool","false","Prints the fill raster.","Filename includes _FILL"};
 
-  bool_default_map["convert_csv_to_geojson"] = false;  // This converts all cv files to geojson (for easier loading in a GIS)
+  bool_default_map["write_hillshade"] = false;
+  help_map["write_hillshade"] = {  "bool","false","Write the hillshade raster.","You need this for a lot of our plotting routines. Filename includes _HS"};
+
+  bool_default_map["print_slope"] = false;
+  help_map["print_slope"] = {  "bool","false","Prints slope raster after polynomial fitting.","Part of surface fitting metrics."};
+
+  bool_default_map["print_aspect"]= false;
+  help_map["print_aspect"] = {  "bool","false","Prints aspect raster after polynomial fitting.","Part of surface fitting metrics."};
+
+  bool_default_map["print_curvature"]= false;
+  help_map["print_curvature"] = {  "bool","false","Prints curvature raster after polynomial fitting.","Part of surface fitting metrics."};
+
+  bool_default_map["print_planform_curvature"]= false;
+  help_map["print_planform_curvature"] = {  "bool","false","Prints planform curvature raster after polynomial fitting.","Part of surface fitting metrics."};
+
+  bool_default_map["print_stream_order_raster"] = false;
+  help_map["print_stream_order_raster"] = {  "bool","false","Prints a raster with _SO in filename with stream orders of channel in the appropriate pixel.","Generates a big file so we suggest printing the network to csv."};
+
+  bool_default_map["print_channels_to_csv"] = false;
+  help_map["print_channels_to_csv"] = {  "bool","false","Prints the channel network to a csv file.","This version produces smaller files than the raster version."};
+
+  bool_default_map["print_junction_index_raster"] = false;
+  help_map["print_junction_index_raster"] = {  "bool","false","Prints a raster with junctions and their number.","Makes big files. It is better to use the csv version."};
+
+  bool_default_map["print_junctions_to_csv"] = false;
+  help_map["print_junctions_to_csv"] = {  "bool","false","Prints a csv with the locations and numbers of the junctions.","This is better to use than the raster version."};
+ 
+  bool_default_map["print_sources_to_csv"] = false;
+  help_map["print_sources_to_csv"] = {  "bool","false","Prints the sources to a csv file.","Each source on its own row with latitude and longitude columns."};
+
+  bool_default_map["convert_csv_to_geojson"] = false;
+  help_map["convert_csv_to_geojson"] = {  "bool","false","Converts csv files to geojson files","Makes csv output easier to read with a GIS. Warning: these files are much bigger than csv files."};
 
   // These are the HFR printing flags
   bool_default_map["run_HFR_analysis"] = false;
+  help_map["run_HFR_analysis"] = {  "bool","false","Run the main hilltop flow routing code","Makes csv output of hilltop curvature and hillslope metrics."};
+
   bool_default_map["map_hilltops_to_channels"] = false;
+  help_map["map_hilltops_to_channels"] = {  "bool","false","This connects channel pixels to the hilltop pixels so you can compare channel steepness to hilltops","Makes csv output of hillslope metrics with channel metrics connected to each hilltop pixel."};
 
   // The below are for the legacy code
   bool_default_map["write_hilltops"] = false;
+  help_map["write_hilltops"] = {  "bool","false","Writes hilltops to a raster. Legacy code.","Legacy code. New code writes to csv."};
+
   bool_default_map["write_hilltop_curvature"] = false;
+  help_map["write_hilltop_curvature"] = {  "bool","false","Writes hilltop curvature to a raster. Legacy code.","Legacy code. New code writes to csv."};
+
   bool_default_map["write_hillslope_length"] = false;
+  help_map["write_hillslope_length"] = {  "bool","false","Writes hilltop length to a raster. Legacy code.","Legacy code. New code writes to csv."};
+
   bool_default_map["write_hillslope_gradient"] = false;
+  help_map["write_hillslope_gradient"] = {  "bool","false","Writes hilltop gradient to a raster. Legacy code.","Legacy code. New code writes to csv."};
+
   bool_default_map["write_hillslope_relief"] = false;
+  help_map["write_hillslope_relief"] = {  "bool","false","Writes hilltop relief to a raster. Legacy code.","Legacy code. New code writes to csv."};
 
   // set these if you want to read in a premade curvature raster
   bool_default_map["read_curvature_raster"] = false;
+  help_map["read_curvature_raster"] = {  "bool","false","Reads a precalculated curvature raster.","Use this if you already calculated curvature."};
+
   string_default_map["curvature_fname"] = "NULL";
+  help_map["curvature_fname"] = {  "string","NULL","The raster prefix (without extension) of a precalculated curvature raster.","You need to set read_curvature_raster to true to read the raster."};
 
 
  	// these params do not need changed during normal use of the HFR algorithm
 	bool_default_map["print_hillslope_traces"] = false;
+  help_map["print_hillslope_traces"] = {  "bool","false","Prints the (very large) hillslope traces files for plotting traces.","Warning: results in a huge file."};
+
 	int_default_map["hillslope_trace_thinning"] = 1;
-	string_default_map["hillslope_traces_file"] = "";
+  help_map["hillslope_trace_thinning"] = {  "int","1","The number of traces to print. If 1 it prints every trace. If 2 prints every other trace. And so on.","Use this if you already calculated curvature."};
+ 
 	bool_default_map["hillslope_traces_basin_filter"] = false;
+  help_map["hillslope_traces_basin_filter"] = {  "bool","false","If true only traces from selected basins will be printed.","Used to thin hillslope traces."};
+
 
   // basic parameters for calculating chi
-  float_default_map["A_0"] = 1;
+  float_default_map["A_0"] = 1.0;
+  help_map["A_0"] = {  "float","1.0","The A_0 parameter for chi computation. See https://doi.org/10.1002/esp.3302","Usually set to 1 so that the slope in chi-elevation space is the same as k_sn"};
+   
   float_default_map["m_over_n"] = 0.5;
-  int_default_map["threshold_pixels_for_chi"] = 0;
-  bool_default_map["print_chi_data_maps"] = false;
+  help_map["m_over_n"] = {  "float","0.5","The concavity index for chi calculations. Ususally denoted as the greek symbol theta.","Default is 0.5 but possibly 0.45 is better as Kwang and Parker suggest 0.5 leads to unrealistic behaviour in landscape evolution models."};
 
-    // These give unique IDs to each segment and then add this information to the
+  bool_default_map["print_chi_data_maps"] = false;
+  help_map["print_chi_data_maps"] = {  "bool","false","If true prints the chi network to csv.","csv file has chidatamaps in the filename. Has the locations of the channel pixels with their chi coordinates and other information."};
+  
+  int_default_map["threshold_pixels_for_chi"] = 0;
+  help_map["threshold_pixels_for_chi"] = {  "int","0","Minimum number of controbuting pixels for calculating chi.","You can reduce the size of the chi csv files by setting a high number."};
+
+
+  // These give unique IDs to each segment and then add this information to the
   // MChi and also semgent raster. We use this to map segments to other landscape
   // properties such as various hillslope metrics
   bool_default_map["print_segments"] = false;
+  help_map["print_segments"] = {  "bool","false","This will print a channel csv that includes segment numbers.","csv file will have lat-long chi and other information but also segment numbers."};
+
   bool_default_map["print_segments_raster"] = false;
+  help_map["print_segments_raster"] = {  "bool","false","Prints a raster of segment numbers.","For visualisation. The print_segments is more data efficient."};
+
 
   // This burns a raster value to any csv output of chi data
   // Useful for appending geology data to chi profiles
   bool_default_map["burn_raster_to_csv"] = false;
+  help_map["burn_raster_to_csv"] = {  "bool","false","Takes a raster with burn_raster_prefix and then samples that raster with the points in the csv file. The new column will be burn_data_csv_column_header.","Useful for adding raster data to csv file. Often used to add lithological information to csv data (you must rasterize the lithology data first."};
+
   string_default_map["burn_raster_prefix"] = "NULL";
+  help_map["burn_raster_prefix"] = {  "string","NULL","The prefix of the raster to burn to a csv.","No extension required."};
+
   string_default_map["burn_data_csv_column_header"] = "burned_data";
+  help_map["burn_data_csv_column_header"] = {  "string","burned_data","Column header in csv of data burned from raster.","For example lithocode."};
 
   // This burns a secondary raster value to any csv output of chi data
   // Useful when there are two datasets, e.g., precipitation data and geology data
   bool_default_map["secondary_burn_raster_to_csv"] = false;
+  help_map["secondary_burn_raster_to_csv"] = {  "bool","false","Takes a second raster with burn_raster_prefix and then samples that raster with the points in the csv file. The new column will be burn_data_csv_column_header.","Useful for adding raster data to csv file. Often used to add lithological information to csv data (you must rasterize the lithology data first."};
+
   string_default_map["secondary_burn_raster_prefix"] = "NULL";
+  help_map["secondary_burn_raster_prefix"] = {  "string","NULL","The prefix of the second raster to burn to a csv.","No extension required."};
+
   string_default_map["secondary_burn_data_csv_column_header"] = "secondary_burned_data";
+  help_map["secondary_burn_data_csv_column_header"] = {  "string","secondary_burned_data","Column header in csv of data burned from second raster.","For example lithocode."};
 
 
   // parameters for various chi calculations as well as slope-area
   int_default_map["n_iterations"] = 20;
+  help_map["n_iterations"] = {  "int","20","Number of interations of random sampling of chi-elevation space to make segments. Used to constrain segmentation uncertainty.","See Mudd et al 2014 JGR-ES for details.."};
+
   int_default_map["minimum_segment_length"] = 10;
+  help_map["minimum_segment_length"] = {  "int","10","The minimum number of pixels in a segment. If too short computation is very expensive.","See Mudd et al 2014 JGR-ES for details. Sensitivity testing suggest values between 8 and 14 are appropriate."};
+
   int_default_map["maximum_segment_length"] = 100000; //make super large so as not to be a factor unless user defined
+  help_map["maximum_segment_length"] = {  "int","100000","The maximum number of pixels in a segment. Usually not used so set to a very high number.","See Mudd et al 2014 JGR-ES for details."};
+
   int_default_map["n_nodes_to_visit"] = 10;
+  help_map["n_nodes_to_visit"] = {  "int","10","The number of nodes downslope of a junction to visit for segmentation across junctions.","See Mudd et al 2014 JGR-ES for details."};
+
   int_default_map["target_nodes"] = 80;
+  help_map["target_nodes"] = {  "int","80","Segmentation breaks channels into chunks of this length. It tests all combinations within that window so computation time increases a lot when this is bigger than 120.","See Mudd et al 2014 JGR-ES for details. 80 is okay. 120 will take forever. 60 too short"};
+
   int_default_map["skip"] = 2;
+  help_map["skip"] = {  "int","2","A parameter used in segmentation. This is the mean number of pixels skipped for each pixel selected. The actual number skipped in each iteration is uniformly distributed between 0 and 2*skip. This approach is taken to constrain uncertainty in segments.","See Mudd et al 2014 JGR-ES for details. A number between 2 and 4 is normal. Larger numbers can be used for lidar. "};
+
   float_default_map["sigma"] = 20;
+  help_map["sigma"] = {  "float","20","A parameter used in segmentation. This should be the geomorphic noise in metres so the topographic error plus the noise in the channels from boulders local erodibility variability etc.","See Mudd et al 2014 JGR-ES for details. Will vary between 5-20 unless you are using terrible ASTER data in which case use a bigger number. Never more than 50."};
 
   // these are routines that run segmentation
   bool_default_map["print_segmented_M_chi_map_to_csv"] = false;
+  help_map["print_segmented_M_chi_map_to_csv"] = {  "bool","false","This runs the Mudd et al 2014 JGR segmentation routine so you get all the chi slope segments.","See Mudd et al 2014 JGR-ES for details. If you want maps of k_sn this is the way to do it."};
 
  
-
+  //=========================================================================
+  //
+  //.#####....####...#####....####...##...##..######..######..######..#####..
+  //.##..##..##..##..##..##..##..##..###.###..##........##....##......##..##.
+  //.#####...######..#####...######..##.#.##..####......##....####....#####..
+  //.##......##..##..##..##..##..##..##...##..##........##....##......##..##.
+  //.##......##..##..##..##..##..##..##...##..######....##....######..##..##.
+  //
+  //..####...##..##..######...####...##..##...####..                         
+  //.##..##..##..##..##......##..##..##.##...##.....                         
+  //.##......######..####....##......####.....####..                         
+  //.##..##..##..##..##......##..##..##.##.......##.                         
+  //..####...##..##..######...####...##..##...####..    
+  //                     
   // Use the parameter parser to get the maps of the parameters required for the
   // analysis
   LSDPP.parse_all_parameters(float_default_map, int_default_map, bool_default_map,string_default_map);
@@ -269,6 +486,17 @@ int main (int nNumberofArgs,char *argv[])
   string BaselevelJunctions_file = LSDPP.get_BaselevelJunctions_file();
   string ChannelSegments_file = LSDPP.get_ChannelSegments_file();
   string Floodplain_file = LSDPP.get_Floodplain_file();
+
+  if(f_name == "cry_for_help.txt")
+  {
+    cout << "I am going to print the help and exit." << endl;
+    cout << "You can find the help in the file:" << endl;
+    cout << "./lsdtt-hillslope-channel-coupling-README.csv" << endl;
+    string help_prefix = "lsdtt-hillslope-channel-coupling-README";
+    LSDPP.print_help(help_map, help_prefix, version_number, citation);
+    exit(0);
+  }
+
 
   cout << "Read filename is: " <<  DATA_DIR+DEM_ID << endl;
   cout << "Write filename is: " << OUT_DIR+OUT_ID << endl;
@@ -342,7 +570,15 @@ int main (int nNumberofArgs,char *argv[])
   secondary_burn_raster_header = DATA_DIR+this_string_map["secondary_burn_raster_prefix"]+".hdr";
   secondary_burn_prefix = DATA_DIR+this_string_map["secondary_burn_raster_prefix"];
 
-
+  //============================================================================
+  //
+  //.#####....####....####...######..######..#####...........#####...##..##..#####...##..##.
+  //.##..##..##..##..##........##....##......##..##..........##..##..##..##..##..##..###.##.
+  //.#####...######...####.....##....####....#####...........#####...##..##..#####...##.###.
+  //.##..##..##..##......##....##....##......##..##..........##..##..##..##..##..##..##..##.
+  //.##..##..##..##...####.....##....######..##..##..........#####....####...##..##..##..##.
+  //
+  //============================================================================
   if (this_bool_map["burn_raster_to_csv"])
   {
     cout << "I am going to burn a raster to all your csv files. The header name for this raster is: " << endl;
@@ -400,12 +636,15 @@ int main (int nNumberofArgs,char *argv[])
   //============================================================================
 
 
-  //============================================================================
+  //========================================================================
   //
-  // LOAD THE DEM
+  //.##.......####....####...#####...........#####....####...######...####..
+  //.##......##..##..##..##..##..##..........##..##..##..##....##....##..##.
+  //.##......##..##..######..##..##..........##..##..######....##....######.
+  //.##......##..##..##..##..##..##..........##..##..##..##....##....##..##.
+  //.######...####...##..##..#####...........#####...##..##....##....##..##.
   //
-  //============================================================================
-  //============================================================================
+  //========================================================================
   LSDRaster topography_raster;
   if (this_bool_map["remove_seas"])
   {
@@ -441,11 +680,15 @@ int main (int nNumberofArgs,char *argv[])
   //============================================================================
 
 
+
   //============================================================================
   //
-  // Start gathering necessary rasters
+  //..####...##..##..#####...######...####....####...######..........######..######..######..######..######..##..##...####..
+  //.##......##..##..##..##..##......##..##..##..##..##..............##........##......##......##......##....###.##..##.....
+  //..####...##..##..#####...####....######..##......####............####......##......##......##......##....##.###..##.###.
+  //.....##..##..##..##..##..##......##..##..##..##..##..............##........##......##......##......##....##..##..##..##.
+  //..####....####...##..##..##......##..##...####...######..........##......######....##......##....######..##..##...####..
   //
-  //============================================================================
   //============================================================================
   LSDRaster filled_topography;
   // now get the flow info object
@@ -487,6 +730,17 @@ int main (int nNumberofArgs,char *argv[])
     Surfaces[3] = curvature_raster;
   }
 
+
+
+  //============================================================================
+  //
+  //.######..##.......####...##...##..........#####....####...##..##..######..######..##..##...####..
+  //.##......##......##..##..##...##..........##..##..##..##..##..##....##......##....###.##..##.....
+  //.####....##......##..##..##.#.##..........#####...##..##..##..##....##......##....##.###..##.###.
+  //.##......##......##..##..#######..........##..##..##..##..##..##....##......##....##..##..##..##.
+  //.##......######...####....##.##...........##..##...####....####.....##....######..##..##...####..
+  //
+  //============================================================================
   cout << "\t Flow routing..." << endl;
   // get a flow info object
   LSDFlowInfo FlowInfo(boundary_conditions,filled_topography);
@@ -511,6 +765,16 @@ int main (int nNumberofArgs,char *argv[])
   cout << "\t Loading Sources..." << endl;
   cout << "\t Source file is... " << CHeads_file << endl;
 
+
+  //==============================================================
+  //
+  //..####....####...##..##..#####....####...######...####..
+  //.##......##..##..##..##..##..##..##..##..##......##.....
+  //..####...##..##..##..##..#####...##......####.....####..
+  //.....##..##..##..##..##..##..##..##..##..##..........##.
+  //..####....####....####...##..##...####...######...####..
+  //
+  //==============================================================
   // load the sources
   vector<int> sources;
   if (CHeads_file == "NULL" || CHeads_file == "Null" || CHeads_file == "null")
@@ -855,7 +1119,13 @@ int main (int nNumberofArgs,char *argv[])
 
 
   //=====================================================================================================
-  // Some raster printing
+  //
+  //.#####...#####...######..##..##..######..........#####....####....####...######..######..#####....####..
+  //.##..##..##..##....##....###.##....##............##..##..##..##..##........##....##......##..##..##.....
+  //.#####...#####.....##....##.###....##............#####...######...####.....##....####....#####....####..
+  //.##......##..##....##....##..##....##............##..##..##..##......##....##....##......##..##......##.
+  //.##......##..##..######..##..##....##............##..##..##..##...####.....##....######..##..##...####..
+  //
   //=====================================================================================================
   //fill
   if (this_bool_map["print_fill_raster"])
@@ -937,8 +1207,13 @@ int main (int nNumberofArgs,char *argv[])
 
 
   //=====================================================================================================
-  // Get the chi coordinate if needed
-  // This does channel analysis
+  //
+  //.######..##..##..######..#####....####....####...######...........####...##..##..######.
+  //.##.......####.....##....##..##..##..##..##..##....##............##..##..##..##....##...
+  //.####......##......##....#####...######..##........##............##......######....##...
+  //.##.......####.....##....##..##..##..##..##..##....##............##..##..##..##....##...
+  //.######..##..##....##....##..##..##..##...####.....##.............####...##..##..######.
+  //
   //=====================================================================================================
   LSDRaster chi_coordinate;
   if ( this_bool_map["print_basin_raster"] ||
@@ -1087,7 +1362,13 @@ int main (int nNumberofArgs,char *argv[])
 
   
   //=====================================================================================================
-  // Now for various HFR and ridge routines
+  //
+  //.######..##..##..######..#####....####....####...######..........#####...######..#####....####...######...####..
+  //.##.......####.....##....##..##..##..##..##..##....##............##..##....##....##..##..##......##......##.....
+  //.####......##......##....#####...######..##........##............#####.....##....##..##..##.###..####.....####..
+  //.##.......####.....##....##..##..##..##..##..##....##............##..##....##....##..##..##..##..##..........##.
+  //.######..##..##....##....##..##..##..##...####.....##............##..##..######..#####....####...######...####..
+  //
   //=====================================================================================================
   if ( this_bool_map["run_HFR_analysis"] ||
        this_bool_map["extract_ridges"])
@@ -1170,6 +1451,15 @@ int main (int nNumberofArgs,char *argv[])
 
   }
 
+  //=========================================
+  //
+  //.##..##..######..#####..
+  //.##..##..##......##..##.
+  //.######..####....#####..
+  //.##..##..##......##..##.
+  //.##..##..##......##..##.
+  //
+  //==========================================
   if (this_bool_map["run_HFR_analysis"])
   {
     // Run hilltop flow routing
@@ -1299,7 +1589,13 @@ int main (int nNumberofArgs,char *argv[])
   }   // End HFR logic
 
   //=====================================================================================================
-  // This maps the hilltops to the rasters
+  // 
+  //.##..##..######..##......##......######...####...#####............####............####...##..##...####...##..##.
+  //.##..##....##....##......##........##....##..##..##..##..............##..........##..##..##..##..##..##..###.##.
+  //.######....##....##......##........##....##..##..#####............####...........##......######..######..##.###.
+  //.##..##....##....##......##........##....##..##..##..............##..............##..##..##..##..##..##..##..##.
+  //.##..##..######..######..######....##.....####...##..............######...........####...##..##..##..##..##..##.
+  //  
   //=====================================================================================================
   if (this_bool_map["map_hilltops_to_channels"])
   {

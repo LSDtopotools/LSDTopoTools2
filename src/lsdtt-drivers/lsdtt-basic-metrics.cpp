@@ -8,10 +8,10 @@
 // This program takes two arguments, the path name and the driver name
 //
 // The documentation is here:
-// https://lsdtopotools.github.io/LSDTopoTools_ChiMudd2014/
+// https://lsdtopotools.github.io/LSDTT_documentation/
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
-// Copyright (C) 2019 Simon M. Mudd 2019
+// Copyright (C) 2021 Simon M. Mudd 2021
 //
 // Developer can be contacted by simon.m.mudd _at_ ed.ac.uk
 //
@@ -68,6 +68,9 @@
 int main (int nNumberofArgs,char *argv[])
 {
 
+  string version_number = "0.5";
+  string citation = "http://doi.org/10.5281/zenodo.4577879";
+
   cout << "=========================================================" << endl;
   cout << "|| Welcome to the LSDTopoTools basic metrics tool!     ||" << endl;
   cout << "|| This program has a number of options for calculating||" << endl;
@@ -76,20 +79,58 @@ int main (int nNumberofArgs,char *argv[])
   cout << "||  at the University of Edinburgh                     ||" << endl;
   cout << "=========================================================" << endl;
   cout << "|| If you use these routines please cite:              ||" << endl;
-  cout << "|| https://www.doi.org/10.5281/zenodo.2560223          ||" << endl;
+  cout << "|| http://doi.org/10.5281/zenodo.4577879               ||" << endl;
   cout << "|| If you use the roughness routine please cite:       ||" << endl;
   cout << "|| https://www.doi.org/10.5194/esurf-3-483-2015        ||" << endl;
   cout << "=========================================================" << endl;
   cout << "|| Documentation can be found at:                      ||" << endl;
   cout << "|| https://lsdtopotools.github.io/LSDTT_documentation/ ||" << endl;
   cout << "=========================================================" << endl;
+  cout << "|| This is LSDTopoTools2 version                       ||" << endl;
+  cout << "|| " << version_number  << endl;
+  cout << "|| If the version number has a d at the end it is a    ||" << endl;
+  cout << "||  development version.                               ||" << endl;
+  cout << "=========================================================" << endl;
+
 
   // Get the arguments
   vector<string> path_and_file = DriverIngestor(nNumberofArgs,argv);
-
-
   string path_name = path_and_file[0];
   string f_name = path_and_file[1];
+
+  // Check if we are doing the version or the citation
+  if(f_name == "lsdtt_citation.txt")
+  {
+
+    cout << endl << endl << endl << "==============================================" << endl;
+    cout << "To cite this code, please use this citation: " << endl;
+    cout << citation << endl;
+    cout << "Copy this url to find the full citation." << endl;
+    cout << "also see above for more detailed citation information." << endl;
+    cout << "=========================================================" << endl;
+
+    ofstream ofs;
+    ofs.open("./lsdtt-basic-metrics-citation.txt");
+    ofs << citation << endl;
+    ofs.close();
+
+    exit(0);
+  }
+
+  if(f_name == "lsdtt_version.txt")
+  {
+    cout << endl << endl << endl << "==============================================" << endl;    
+    cout << "This is lsdtt-basic-metrics version number " << version_number << endl;
+    cout << "If the version contains a 'd' then you are using a development version." << endl;
+    cout << "=========================================================" << endl;
+    ofstream ofs;
+    ofs.open("./lsdtt-basic-metrics-version.txt");
+    ofs << version_number << endl;
+    ofs.close();
+
+    exit(0);
+  }
+
 
   // load parameter parser object
   LSDParameterParser LSDPP(path_name,f_name);
@@ -103,168 +144,448 @@ int main (int nNumberofArgs,char *argv[])
   map<string,bool> bool_default_map;
   map<string,string> string_default_map;
 
-  // Basic DEM preprocessing
-  float_default_map["minimum_elevation"] = 0.0;
-  float_default_map["maximum_elevation"] = 30000;
-  float_default_map["min_slope_for_fill"] = 0.0001;
-  bool_default_map["raster_is_filled"] = false; // assume base raster is already filled
-  bool_default_map["carve_before_fill"] = false; // Implements a carving algorithm
-  bool_default_map["remove_seas"] = true; // elevations above minimum and maximum will be changed to nodata
-  string_default_map["CHeads_file"] = "NULL";
-  bool_default_map["only_check_parameters"] = false;
+  // this will contain the help file
+  map< string, vector<string> > help_map;
 
-  // Various ways of trimming your raster
-  bool_default_map["remove_nodes_influenced_by_edge"] = false;
-  bool_default_map["isolate_pixels_draining_to_fixed_channel"] = false;
-  string_default_map["fixed_channel_csv_name"] = "single_channel_nodes";
+  //==================================================================================
+  //
+  // .#####....####...#####....####...##...##..######..######..######..#####....####..
+  // .##..##..##..##..##..##..##..##..###.###..##........##....##......##..##..##.....
+  // .#####...######..#####...######..##.#.##..####......##....####....#####....####..
+  // .##......##..##..##..##..##..##..##...##..##........##....##......##..##......##.
+  // .##......##..##..##..##..##..##..##...##..######....##....######..##..##...####..
+  //
+  //=================================================================================
   
-  // Parameters for swath mapping
-  bool_default_map["calculate_swath_profile"] = false;
-  bool_default_map["calculate_swath_along_line"] = false;
-  bool_default_map["calculate_swath_along_channel"] = false;
-  bool_default_map["print_swath_rasters"] = true;
-  string_default_map["swath_points_csv"] = "swath.csv";
-  float_default_map["swath_point_spacing"] = 500;
-  float_default_map["swath_bin_spacing"] = 1000;
-  float_default_map["swath_width"] = 1000;
+  //========================================================
+  // Basic DEM preprocessing
+  //========================================================
+  float_default_map["minimum_elevation"] = 0.0;
+  help_map["minimum_elevation"] = { "float","0.0","All elevation values below this become nodata if remove_seas is true.","Ususally 0."};
 
+  float_default_map["maximum_elevation"] = 30000;
+  help_map["maximum_elevation"] = {  "float","0.0","All elevation values above this become nodata if remove_seas is true.","Pick a big number."};
+
+  float_default_map["min_slope_for_fill"] = 0.0001;
+  help_map["min_slope_for_fill"] = {  "float","0.0001","Minimum slope between pixels for the filling algorithm.","Best not to change the default."};
+
+  bool_default_map["raster_is_filled"] = false; // assume base raster is already filled
+  help_map["raster_is_filled"] = {  "bool","false","This reads a pre-existing fill raster to save time.","You need to have printed the fill raster if you set this to true."};
+
+  bool_default_map["carve_before_fill"] = false; // Implements a carving algorithm
+  help_map["carve_before_fill"] = {  "bool","false","This implements a breaching algorithm before filling.","Good for landscapes with DEM obstructions (like roads) across the channels."};
+ 
+  bool_default_map["remove_seas"] = true; // elevations above minimum and maximum will be changed to nodata
+  help_map["remove_seas"] = {  "bool","true","Slightly misleading name; it replaces both high and low DEM values with nodata.","This gets rid of low lying areas but also is handy when the nodata is not translated from the raw DEM and it is full of funny large numbers."};
+ 
+  string_default_map["CHeads_file"] = "NULL";
+  help_map["CHeads_file"] = {  "string","NULL","The name of a channel heads file.","You can output this csv file with the channel extraction algorithms. It contains latitude and longitude values of the channel heads."};
+ 
+  bool_default_map["only_check_parameters"] = false;
+  help_map["only_check_parameters"] = {  "bool","false","This just checks parameters without running an analysis.","For bug checking."};
+ 
+  bool_default_map["replace_pixels"] = false;
+  help_map["replace_pixels"] = {  "bool","false","When true the raster will replace specific pixels designated by a csv file.","Pixels to be replaced are designated in the pixels_to_replace_file"};
+   
+  string_default_map["pixels_to_replace_file"] = "pixels_to_replace.csv";
+  help_map["pixels_to_replace_file"] = {  "string","pixels_to_replace.csv","The pixels to be replaced. Needs an X,Y,value column. Header is ignored so it needs to be in this order","Incorrect formatting of file will crash the code."};
+
+  float_default_map["elevation_change"] = 0;
+  help_map["elevation_change"] = {  "float","0","Adjusts the elevation of the raster by this amount. Does nothing if the elevation change is 0. This prints to a new raster and exits.","For when you need to lift or drop the raster."};
+  
+
+
+  //========================================================
+  // Various ways of trimming your raster
+  //========================================================
+  bool_default_map["remove_nodes_influenced_by_edge"] = false;
+  help_map["remove_nodes_influenced_by_edge"] = {  "bool","false","Runs flow routing and then any node downstream of a node adjacent to a nodata pixel is turned to nodata.","Use this is you want to be sure all you data is in complete basins."};
+
+  bool_default_map["isolate_pixels_draining_to_fixed_channel"] = false;
+  help_map["isolate_pixels_draining_to_fixed_channel"] = {  "bool","false","Runs flow routing and only take nodes that drain into a list of nodes defined in the fixed_channel_csv_name csv file.","Use this if you want to isolate a main drainage pathway."};
+
+  string_default_map["fixed_channel_csv_name"] = "single_channel_nodes";
+  help_map["fixed_channel_csv_name"] = {  "string","single_channel_nodes","A list of nodes in csv where each row has lititude and longitude that is used to define a fixed channel in the DEM. Filename does not include the csv extension.","The csv file must have latitude and longitude in the column headers."};
+
+  //========================================================
+  // raster trimming, to take care of rasters that have a bunch of nodata at the edges
+  //========================================================
+  bool_default_map["print_trimmed_raster"] = false;
+  help_map["print_trimmed_raster"] = {  "bool","false","This is for rasters that have nodata around the edges. Trims away nodata edges and updates the raster georeferencing.","Use if your raster has lots of nodata and you want to shrink it to the area with data."};
+
+  int_default_map["trimming_buffer_pixels"] = 0;
+  help_map["trimming_buffer_pixels"] = {  "int","0","Used with the print_trimed_raster Creates a buffer of this many nodata pixels around the edge.","You might want a buffer for use in numerical modelling or other applications."};
+
+  //========================================================
+  // Parameters for swath mapping
+  //========================================================
+  bool_default_map["calculate_swath_profile"] = false;
+  help_map["calculate_swath_profile"] = {  "bool","false","Program sets this itself if you choose one of two options: calculate_swath_along_line or calculate_swath_along_channel. This makes a swath that prints a csv with distance along swath and the statistics.","Don't select this, use the swath_along_channel or swath_along_points flags instead."};
+
+  bool_default_map["calculate_swath_along_line"] = false;
+  help_map["calculate_swath_along_line"] = {  "bool","false","Swath mapping where you give it a series of points in the csv file and it creates line segments between these points. This serves as the swath baseline.","Only one of this and calculate_swath_along_channel can be true."};
+
+  bool_default_map["calculate_swath_along_channel"] = false;
+  help_map["calculate_swath_along_channel"] = {  "bool","false","Swath mapping where you give it a starting point and a finish point (the latter is optional) and it will follow a flow path from the starting point and use that as the swath baseline.","Only one of this and calculate_swath_along_points can be true."};
+
+  bool_default_map["print_swath_rasters"] = true;
+  help_map["print_swath_rasters"] = {  "bool","true","If this is true and swath mapping is true then rasters showing the distance to the baseling and the cloed node along the baseline file are printed.","These rasters can be used to visualise the pixels that go into the swath."};
+
+  string_default_map["swath_points_csv"] = "swath.csv";
+  help_map["swath_points_csv"] = {  "string","swath.csv","The name of the csv file for swath mapping. It can be the start and (optional) end point of the swath channel, or a series of points that form a polyline that serves as the baseline for the swath.","Filename needs to include the csv extension and have latitude and longitude in the column headers."};
+
+  float_default_map["swath_point_spacing"] = 500;
+  help_map["swath_point_spacing"] = {  "float","500","Only used by calcualte_swath_along_points. How closely spaced the points are (in metres) along the baseline.","If this number is large (many times the DEM resolution) the swath will have an irregular edge so this should be close to the DEM resolution."};
+
+  float_default_map["swath_bin_spacing"] = 1000;
+  help_map["swath_bin_spacing"] = {  "float","1000","The spacing of the bins in metres that are used to calculate statistics along the swath.","Should be at least a few times bigger than swath_point_spacing or the pixel size of the DEM."};
+
+  float_default_map["swath_width"] = 1000;
+  help_map["swath_width"] = {  "float","1000","The width of the swath in metres.","Up to you. Don't let me tell you how wide your swath should be."};
+
+  //========================================================
   // some tools for punching out polygons and then getting distance to nearest nodata
   // used for creating rivers in noisy DEMs
+  //========================================================
   bool_default_map["punch_nodata"] = false;
+  help_map["punch_nodata"] = {  "bool","false","This takes a raster mask and punches out nodata pixels where the mask is true based on a threshold.","The threshold is set by punch_threshold and the name of the raster to use as a mask is punch_raster_prefix."};
+
   bool_default_map["print_nearest_to_nodata_rasters"] = false; 
+  help_map["print_nearest_to_nodata_rasters"] = {  "bool","false","This looks at interior nodata pixels and then makes rasters with values on the nodata pixels with distance to nearest nodata and the value of the nearest pixel with data.","The raster extensions are _DistToND and _ValueToND."};
+
   string_default_map["punch_raster_prefix"] = "DEM_punch";
+  help_map["punch_raster_prefix"] = {  "string","DEM_punch","For raster punching this is the prefix of the mask.","This mask will turn values in the punched raster to nodata."};
+
   bool_default_map["belowthresholdisnodata"] = true;
+  help_map["belowthresholdisnodata"] = {  "bool","true","For raster punching you set a threshold with punch_threshold and this controls whether values above or below will turn to nodata.","For example if the threshold is 1 and this is true then all mask values less than 1 will be turned to nodata in the punched raster."};
+
   float_default_map["punch_threshold"] = 1000;
+  help_map["punch_threshold"] = {  "float","1000","For raster punching this is the threshold above or below which you set to nodata.","Use belowthresholdisnodata to determine if values above or below are set to nodata."};
+
   float_default_map["minimum_bank_elevation_window_radius"] = 20;
+  help_map["minimum_bank_elevation_window_radius"] = {  "float","20","The valley routine will dig a trough where the starting elevation at the side is determined by the lowest bank elevation within this radius.","For best results this needs to be about the width of the valley."};
+   
   float_default_map["river_depth"] = 1.0;
+  help_map["river_depth"] = {  "float","1","If you are using create_valley_trough this sets the depth of the edges of the river below the minimum bank elevation.","Set to zero if you don't want the river inset into the banks."};
 
+  float_default_map["trough_scaling_factor"] = 0.1;
+  help_map["trough_scaling_factor"] = {  "float","0.1","The centreline routine digs a trough (to route flow through the centre of the valley) with a depth that is this factor times the distance from the edge. Increase this number for a deeper trough.","A deeper trough has more sucess at routing flow but you get backwater effects at the bottom of the valley. Play with this number to get the best result."};
+  
+  bool_default_map["create_valley_trough"] = false;
+  help_map["create_valley_trough"] = {  "bool","false","If you have a valley mask this will punch a trough in that valley mask. The new river will have a depth of river_depth and will be sloping toward the middle of the valley based on trough_scaling_factor. Used to condition noisy rasters to have rivers through them.","We use this routine for flood modelling when the data over the river is very noisy."};
+
+  bool_default_map["get_valley_centreline"] = false;
+  help_map["get_valley_centreline"] = {  "bool","false","This extracts as single csv centreline for a valley mask.","Can be used to make cross sections."};
+
+  int_default_map["centreline_loops"] = 5;
+  help_map["centreline_loops"] = {  "int","5","The centreline routine iteratively digs and fills the trough and this sets the number of iterations.","We find 5 is about right but if the results are looking bad then try increasing this number. Warning: that might make things worse."};
+ 
+
+  //========================================================
   // More river processing tools
+  //========================================================
   bool_default_map["channel_and_valley_width_extraction"] = false;
+  help_map["channel_and_valley_width_extraction"] = {  "bool","false","Some testing tools for channel and valley width. Operational routines in lsdtt-valley-metrics","For testing only. If you want valley width use lsdtt-valley-metrics."};
+ 
   string_default_map["channel_or_valley_raster_prefix"] = "channel";
+  help_map["channel_or_valley_raster_prefix"] = {  "string","channel","Some testing tools for channel and valley width. Operational routines in lsdtt-valley-metrics","For testing only. If you want valley width use lsdtt-valley-metrics."};
+ 
   string_default_map["channel_or_valley_skeleton_prefix"] = "skeleton";
+  help_map["channel_or_valley_skeleton_prefix"] = {  "string","skeleton","Some testing tools for channel and valley width. The prefix of the channel skeleton file.","For testing only. If you want valley width use lsdtt-valley-metrics."};
+ 
   int_default_map["test_scale"] = 4;
+  help_map["test_scale"] = {  "int","4","Some testing tools for channel bearings. Sets the size of the bearing template.","For testing only. If you want valley width use lsdtt-valley-metrics."};
+ 
   float_default_map["test_bearing"] = 90;
+  help_map["test_bearing"] = {  "float","90","Some testing tools for bearing","For testing only."};
+ 
+  bool_default_map["test_bearing_template"] = false;
+  help_map["test_bearing_template"] = {  "bool","false","A small debugging routine to test the size of the channel bearing template","Helps to bug check and visualise the direction of the channel where width is measured orthogonal to the bearing."};
+   
+  int_default_map["channel_bearing_node_spacing"]= 4;
+  help_map["channel_bearing_node_spacing"] = {  "int","4","This sets how frequently the cahnnel is sampled for its bearing.","Helps to bug check and visualise the direction of the channel where width is measured orthogonal to the bearing."};
+  
+  bool_default_map["print_channel_bearings"] = true; 
+  help_map["print_channel_bearings"] = {  "bool","true","This prints to csv the directional bearings (looking downslope) of channel pixels.","Helps to bug check and visualise the direction of the channel where width is measured orthogonal to the bearing."};
+ 
+  string_default_map["valley_points_csv"]  = "NULL";
+  help_map["valley_points_csv"] = {  "string","NULL","If this isn't NULL it will load a valley point csv that need latitude and longitude and flow distance columns.","If this is NULL the valley centreline will be calculated algorithmically."};
+   
 
-  // raster trimming, to take care of rasters that have a bunch of nodata at the edges
-  bool_default_map["print_trimmed_raster"] = false;
-  int_default_map["trimming_buffer_pixels"] = 0;
 
-
-
+  //========================================================
   // Calculate the basic relief within a window in a raster
+  //========================================================
   bool_default_map["print_relief_raster"] = false;
+  help_map["print_relief_raster"] = {  "bool","false","Prints relief in a moving window of size defined by relief_window.","A rudimentary measure of relief. If you want something more robust use the tools in lsdtt-hillslope-channel-coupling."};
+
   float_default_map["relief_window"] = 200;
+  help_map["relief_window"] = {  "float","200","The radius of the relief window in metres.","Choose what you like."};
+
   int_default_map["relief_window_kernel_type"] = 1;
+  help_map["relief_window_kernel_type"] = {  "int","1","A flag that defines the relief window.","1 = circular."};
 
-
+  //========================================================
   // the most basic raster printing
+  //========================================================
   bool_default_map["write_hillshade"] = false;
+  help_map["write_hillshade"] = {  "bool","false","Write the hillshade raster.","You need this for a lot of our plotting routines. Filename includes _HS"};
+
   bool_default_map["print_raster_without_seas"] = false;
+  help_map["print_raster_without_seas"] = {  "bool","false","Overwrites the raster without seas.","DANGER this will replace your existing raster with the high and low points replaced by nodata. See the remove_seas flag"};
+
   bool_default_map["print_distance_from_outlet"] = false;
+  help_map["print_distance_from_outlet"] = {  "bool","false","Prints a raster of the distance from the outlet.","Filename includes _FD"};
+
   bool_default_map["print_fill_raster"] = false;
+  help_map["print_fill_raster"] = {  "bool","false","Prints the fill raster.","Filename includes _FILL"};
 
   // This converts all csv files to geojson (for easier loading in a GIS)
   bool_default_map["convert_csv_to_geojson"] = false;
+  help_map["convert_csv_to_geojson"] = {  "bool","false","Converts csv files to geojson files","Makes csv output easier to read with a GIS. Warning: these files are much bigger than csv files."};
 
+  //========================================================
   // Slope calculations
+  //========================================================
   float_default_map["surface_fitting_radius"] = 30;
+  help_map["surface_fitting_radius"] = {  "float","30","Our surface fitting routines fit a polynomial over the points with in a radius defined by surface_fitting_radius and then differentiate this surface to get the surface metrics like gradient and curvature","If not bigger than the pixel_size*sqrt(2) then will increase to that number."};
+
   bool_default_map["print_smoothed_elevation"]= false;
+  help_map["print_smoothed_elevation"] = {  "bool","false","Prints smoothed surface after polynomial fitting.","Part of surface fitting metrics."};
+ 
   bool_default_map["print_slope"] = false;
+  help_map["print_slope"] = {  "bool","false","Prints slope raster after polynomial fitting.","Part of surface fitting metrics."};
+
   bool_default_map["print_aspect"]= false;
+  help_map["print_aspect"] = {  "bool","false","Prints aspect raster after polynomial fitting.","Part of surface fitting metrics."};
+
   bool_default_map["print_curvature"]= false;
+  help_map["print_curvature"] = {  "bool","false","Prints curvature raster after polynomial fitting.","Part of surface fitting metrics."};
+
   bool_default_map["print_planform_curvature"]= false;
+  help_map["print_planform_curvature"] = {  "bool","false","Prints planform curvature raster after polynomial fitting.","Part of surface fitting metrics."};
+
   bool_default_map["print_profile_curvature"]= false;
+  help_map["print_profile_curvature"] = {  "bool","false","Prints profile curvature raster after polynomial fitting.","Part of surface fitting metrics."};
+
   bool_default_map["print_tangential_curvature"]= false;
+  help_map["print_tangential_curvature"] = {  "bool","false","Prints tangential curvature raster after polynomial fitting.","Part of surface fitting metrics."};
+
   bool_default_map["print_point_classification"]= false;
+  help_map["print_point_classification"] = {  "bool","false","Prints point classification raster after polynomial fitting.","Part of surface fitting metrics."};
+
   bool_default_map["print_directional_gradients"] = false;
+  help_map["print_directional_gradients"] = {  "bool","false","Prints two rasters: the x and y direction gradients after polynomial fitting.","Part of surface fitting metrics."};
+
   bool_default_map["calculate_basin_statistics"] = false;
+  help_map["calculate_basin_statistics"] = {  "bool","false","Prints some statistics for each basin. SMM needs to check what this does.","Part of surface fitting metrics."};
 
+  //========================================================
   // Window size estimation
+  //========================================================  
   bool_default_map["calculate_window_size"] = false;
+  help_map["calculate_window_size"] = {  "bool","false","This is a routine that computes the optimal surface_fitting_radius for the surafce fitting metrics.","Warning: time consuming."};
 
+
+  //========================================================
   // Roughness calculations
-  float_default_map["REI_critical_slope"] = 1.0;
-  float_default_map["REI_window_radius"] = 10;
+  //========================================================
   bool_default_map["print_REI_raster"] = false;
+  help_map["print_REI_raster"] = {  "bool","false","This computes the value of REI (rock exposure index) which is a roughness metric.","See DiBiase et al 2012 ESPL for details."};
+ 
+  float_default_map["REI_critical_slope"] = 1.0;
+  help_map["REI_critical_slope"] = {  "float","1.0","Critical slope value for the REI metric. Above this slope the ground is considered to be rock.","See DiBiase et al 2012 ESPL for details."};
+
+  float_default_map["REI_window_radius"] = 10;
+  help_map["REI_window_radius"] = {  "float","10","Radius of window withing which you test for pixels above the REI_critical_slope.","See DiBiase et al 2012 ESPL for details."};
 
   bool_default_map["print_roughness_rasters"] = false;
+  help_map["print_roughness_rasters"] = {  "bool","false","Computes roughness rasters from divergence of surface normals.","See Milidowski et al 2015 ESURF for details."};
+   
   float_default_map["roughness_radius"] = 3;
-
-
-
+  help_map["roughness_radius"] = {  "float","3","Radius about centre point about which you calculate the surface normals.","See Milidowski et al 2015 ESURF for details. Should be around 3 times the pixel size."};
+ 
+  //========================================================
   // drainage area
+  //========================================================
   bool_default_map["print_dinf_drainage_area_raster"] = false;
+  help_map["print_dinf_drainage_area_raster"] = {  "bool","false","Prints d-infinity drainage area raster.","Raster extension is Dinf."};
+ 
   bool_default_map["print_d8_drainage_area_raster"] = false;
+  help_map["print_d8_drainage_area_raster"] = {  "bool","false","Prints d8 drainage area raster.","Raster extension is D8."};
+
   bool_default_map["print_QuinnMD_drainage_area_raster"] = false;
+  help_map["print_QuinnMD_drainage_area_raster"] = {  "bool","false","Prints Quinn multidirection drainage area raster.","Raster extension is QMD."};
+
   bool_default_map["print_FreemanMD_drainage_area_raster"] = false;
+  help_map["print_FreemanMD_drainage_area_raster"] = {  "bool","false","Prints Freeman multidirection drainage area raster.","Raster extension is FMD."};
+
   bool_default_map["print_MD_drainage_area_raster"] = false;
+  help_map["print_MD_drainage_area_raster"] = {  "bool","false","Prints multidirection (fully divergent flow) drainage area raster.","Raster extension is MD."};
 
 
+  //========================================================
   // Extracting a single channel
+  //========================================================
   bool_default_map["extract_single_channel"] = false;
+  help_map["extract_single_channel"] = {  "bool","false","This extracts a flow path from a line that starts at a point denoted in the file single_channel_source.","Used for imposing baselevel in various simulations."};
+
   bool_default_map["use_dinf_for_single_channel"] = false;
+  help_map["use_dinf_for_single_channel"] = {  "bool","false","Uses dinf accumulation to print to the single channel file.","Might be useful in headwaters."};
+
   string_default_map["channel_source_fname"] = "single_channel_source";
+  help_map["channel_source_fname"] = {  "string","single_channel_source","Name of the csv file without extension of the single channel source. Needs column headers latitude and longitude.","If latitude and longitude are not column headers in the csv this will not work."};
 
   // imposing a single channel
   bool_default_map["impose_single_channel"] = false;
+  help_map["impose_single_channel"] = {  "bool","false","This forces the elevations of pixels read from the fixed_channel_csv_name.","Useful for enfocing a main stem flow path."};
+
   string_default_map["fixed_channel_csv_name"] = "NULL";
+  help_map["fixed_channel_csv_name"] = {  "string","NULL","The prefix of the csv that holds the fixed channel information. csv much have latitude longitude flowdistance and elevation columns.","Obtain channel using extract_single_channel."};
+
   bool_default_map["buffer_single_channel"] = true;
+  help_map["buffer_single_channel"] = {  "bool","true","Adds data to nodata pixels next to the single channel so that after flow routing the channel does not drain off the edge of the DEM.","Useful for when the single channel runs along the edge of the DEM."};
+
   bool_default_map["use_XY_for_buffer"] = false;
+  help_map["use_XY_for_buffer"] = {  "bool","true","For buffering routine from buffer_single_channel this uses easting and northing instead of lat long","Preferred method is lat-long coordinates this is a legacy option"};
+
   bool_default_map["force_single_channel_slope"] = false;
+  help_map["force_single_channel_slope"] = {  "bool","false","For the single channel this enforces a minimum slope between nodes. Need the flow distance in the single channel csv","Set the flow distance column with single_channel_fd_string"};
+
   bool_default_map["fixed_channel_dig_and_slope"] = false;
+  help_map["fixed_channel_dig_and_slope"] = {  "bool","false","For the single channel this enforces the slope and digs the channel in a bit to ensure flow is routed through it","The digging is used to enforce flow routing"};
+
   float_default_map["single_channel_drop"] = 0;
+  help_map["single_channel_drop"] = {  "float","0","For the single channel this drops the elevation","Use if you want a big drop in base level"};
+
   float_default_map["single_channel_dig"] = 0.01;
+  help_map["single_channel_dig"] = {  "float","0.01","For the single channel this does the same as the drop but is used in the initial imposition of channel slope to try to enforce flow routing","Redundant with the fixed_channel_drop. Will probably remove at some point. "};
+
   string_default_map["single_channel_fd_string"] = "flow distance(m)";
+  help_map["single_channel_fd_string"] = {  "string","flow distance(m)","The name of the flow distance column in the single channel csv.","Case sensitive"};
+
   string_default_map["single_channel_elev_string"] = "elevation(m)";
+  help_map["single_channel_elev_string"] = {  "string","elevation(m)","The name of the elevation column in the single channel csv.","Case sensitive"};
+
   string_default_map["test_single_channel_name"] = "test_single_channel";
+  help_map["test_single_channel_name"] = {  "string","test_single_channel","This is the filename of the single channel that prints after the slope and dig are imposed","File is used for bug checking."};
+
+
+  // centre channel nodes and interpolate across gaps
+  bool_default_map["centre_and_interpolate_channel_coordinates"] = false;
+  help_map["centre_and_interpolate_channel_coordinates"] = {  "bool","true","This takes channel nodes that might not be exactly in the centre of pixels (possibly because they came from a different projection) and snaps them to pixel centres","Used for mapping channels from different projections onto a raster"};
+
+  string_default_map["X_column_name"] = "X";
+  help_map["X_column_name"] = {  "string","X","For channels that use projected data this is the X column name (sometimes called Easting)","Some csv files will have this of easting or some variant thereof"};
+
+  string_default_map["Y_column_name"] = "Y";
+  help_map["Y_column_name"] = {  "string","Y","For channels that use projected data this is the Y column name (sometimes called Northing)","Some csv files will have this of northing or some variant thereof"};
 
   // for reading in a channel csv file
   bool_default_map["use_xy_for_node_index"] = false;
-  
+  help_map["use_xy_for_node_index"] = {  "bool","true","For routine from centre_and_interpolate_channel_coordinates this uses easting and northing instead of lat long","Preferred method is lat-long coordinates this is a legacy option"};
 
 
   // Basic channel network
   int_default_map["threshold_contributing_pixels"] = 1000;
+  help_map["threshold_contributing_pixels"] = {  "int","1000","The number of contributing pixels needed to start a channel using the threshold method.","This is in pixels not drainage area. More options are in the lsdtt-channel-extraction tool."};
+
   bool_default_map["print_stream_order_raster"] = false;
+  help_map["print_stream_order_raster"] = {  "bool","false","Prints a raster with _SO in filename with stream orders of channel in the appropriate pixel.","Generates a big file so we suggest printing the network to csv."};
+
   bool_default_map["print_channels_to_csv"] = false;
+  help_map["print_channels_to_csv"] = {  "bool","false","Prints the channel network to a csv file.","This version produces smaller files than the raster version."};
+
+  bool_default_map["print_sources_to_csv"] = false;
+  help_map["print_sources_to_csv"] = {  "bool","false","Prints the sources to a csv file.","Each source on its own row with latitude and longitude columns."};
+
   bool_default_map["use_extended_channel_data"] = false;
+  help_map["use_extended_channel_data"] = {  "bool","false","If this is true you get more data columns in your channel network csv.","I will tell you what these columns are one day."};
+
   bool_default_map["print_junction_index_raster"] = false;
+  help_map["print_junction_index_raster"] = {  "bool","false","Prints a raster with junctions and their number.","Makes big files. It is better to use the csv version."};
+
   bool_default_map["print_junctions_to_csv"] = false;
+  help_map["print_junctions_to_csv"] = {  "bool","false","Prints a csv with the locations and numbers of the junctions.","This is better to use than the raster version."};
+ 
 
   // Basin-based channel extraction
   bool_default_map["find_basins"] = false;
+  help_map["find_basins"] = {  "bool","false","If true enters basin finding algorithms.","Used to try to extract basins of similar size. If you use outlets this flag is not required."};
+ 
   int_default_map["minimum_basin_size_pixels"] = 50000;
+  help_map["minimum_basin_size_pixels"] = {  "int","50000","For basin finding algorithm, the minimum size of a selected basin.","Will reject basins along edge."};
+  
   int_default_map["maximum_basin_size_pixels"] = 1000000;
+  help_map["maximum_basin_size_pixels"] = {  "int","1000000","For basin finding algorithm, the maximum size of a selected basin.","Will reject basins along edge."};
+  
   bool_default_map["only_take_largest_basin"] = false;
+  help_map["only_take_largest_basin"] = {  "bool","false","This only retains the largest complete basin in the raster.","Will reject basins along edge."};
+  
   string_default_map["BaselevelJunctions_file"] = "NULL";
+  help_map["BaselevelJunctions_file"] = {  "string","NULL","The name of a csv file with basin outlets for selecting basins using junction numbers.","An old method. You should use get_basins_from_outlets: true and basin_outlet_csv instead."};
+  
   bool_default_map["get_basins_from_outlets"] = false;
+  help_map["get_basins_from_outlets"] = {  "bool","false","Switches on the outlet based basin finding.","See BaselevelJunctions_file for format of outlets csv."};
+  
   int_default_map["search_radius_nodes"] = 8;
+  help_map["search_radius_nodes"] = {  "int","8","A parameter for snapping to the nearest channel. It will search for the largest channel (by stream order) within the pixel window.","You will want smaller pixel numbers if you have a dense channel network."};
+ 
   int_default_map["threshold_stream_order_for_snapping"] = 2;
+  help_map["threshold_stream_order_for_snapping"] = {  "int","2","If you are snapping to a channel, it will ignore channel with lower stream order than this number.","Set this to a higher number to avoid snapping to small channels."};
+  
   string_default_map["basin_outlet_csv"] = "NULL";
+  help_map["basin_outlet_csv"] = {  "string","NULL","A csv file with the lat long of basin outlets.","csv should have latitude and longitude columns and rows with basin outlets."};
+  
   bool_default_map["extend_channel_to_node_before_receiver_junction"] = true;
+  help_map["extend_channel_to_node_before_receiver_junction"] = {  "bool","true","For various basin extractions the basin snaps to the nearest junction. If this is true then the outlet of the basin is one pixel upstream of the reciever junction of the snapped channel.","If false it will pick the donor junction of the channel rather than one pixel above the reciever."};
+    
   bool_default_map["print_basin_raster"] = false;
+  help_map["print_basin_raster"] = {  "bool","false","This prints a raster where the values are the basin number.","You can combine this with python tools to get basin shapefiles."};
+    
 
   // finding major drainage divides
   bool_default_map["divide_finder"] = false;
+  help_map["divide_finder"] = {  "bool","false","An experimental tool for finding the main drainage divide. This tags strips on the edge of the DEM and then follows the tagged pixels upstream.","You can choose horizontal or vertical strips."};
+  
   bool_default_map["horizontal_strips"] = true;
+  help_map["horizontal_strips"] = {  "bool","true","For use with the divide finder. If true strips are horizontal and vertical if not.","For now you need to hope your mountain is not diagonal across the DEM."};
+ 
   int_default_map["n_row_or_col_for_strips"] = 10;
-
+  help_map["n_row_or_col_for_strips"] = {  "int","10","For use with the divide finder. Nuber of rows or columns to tag on the edges.","Make wider strips to ensure you capture all the valleys."};
+ 
   // Getting all the ridges
   bool_default_map["extract_ridges"] = false;
-
+  help_map["extract_ridges"] = {  "bool","false","Extracts the ridges and prints the ridge information to csv.","This is a basic function. You should use lsdtt-hillslope-channel-coupling for full analysis."};
+  
 
   // Tagging pixels
   bool_default_map["tag_nodes"] = false;
+  help_map["tag_nodes"] = {  "bool","false","A routine for entering a raster with value and then propigating those values down the flow network.","The raster tag values are given by tagged_raster_input_name."};
+    
   string_default_map["tagged_raster_input_name"] = "NULL";
+  help_map["tagged_raster_input_name"] = {  "strig","NULL","The name of the raster with which to tag nodes.","The returned raster will have these values tagged in the output raster."};
+  
   bool_default_map["tag_downslope_nodes"] = false;
+  help_map["tag_downslope_nodes"] = {  "bool","false","Determines if the tagging routine will follow nodes upslope or downslope.","The default is to tag nodes upslope."};
+  
   float_default_map["downslope_tagging_distance"] = 100;
+  help_map["downslope_tagging_distance"] = {  "float","100","The distance through the flow network in metres cells will be tagged.","Make this number big if you want to follow through the entire drainage network."};
+  
   float_default_map["upslope_tagging_distance"] = 100;
+  help_map["upslope_tagging_distance"] = {  "float","100","The distance through the flow network in metres cells will be tagged.","Make this number big if you want to follow through the entire drainage network."};
+ 
 
   // Some chi coordinate settings
   float_default_map["A_0"] = 1.0;
+  help_map["A_0"] = {  "float","1.0","The A_0 parameter for chi computation. See https://doi.org/10.1002/esp.3302","Usually set to 1 so that the slope in chi-elevation space is the same as k_sn"};
+   
   float_default_map["m_over_n"] = 0.5;
-  bool_default_map["print_chi_data_maps"] = false;
+  help_map["m_over_n"] = {  "float","0.5","The concavity index for chi calculations. Ususally denoted as the greek symbol theta.","Default is 0.5 but possibly 0.45 is better as Kwang and Parker suggest 0.5 leads to unrealistic behaviour in landscape evolution models."};
 
+  bool_default_map["print_chi_data_maps"] = false;
+  help_map["print_chi_data_maps"] = {  "bool","false","If true prints the chi network to csv.","csv file has chidatamaps in the filename. Has the locations of the channel pixels with their chi coordinates and other information."};
+  
   if (bool_default_map["print_chi_data_maps"] == true)
   {
     cout << "You want the chi data maps, so I am setting the basin finding to true." << endl;
@@ -273,20 +594,50 @@ int main (int nNumberofArgs,char *argv[])
 
   // The wiener filter
   bool_default_map["print_wiener_filtered_raster"] = false;
+  help_map["print_wiener_filtered_raster"] = {  "bool","false","Runs the raster through a wiener filter and prints the result.","Output file has _Wfilt in filename."};
 
   // This burns a raster value to any csv output of chi data
   // Useful for appending geology data to chi profiles
   bool_default_map["burn_raster_to_csv"] = false;
+  help_map["burn_raster_to_csv"] = {  "bool","false","Takes a raster with burn_raster_prefix and then samples that raster with the points in the csv file. The new column will be burn_data_csv_column_header.","Useful for adding raster data to csv file. Often used to add lithological information to csv data (you must rasterize the lithology data first."};
+
   string_default_map["burn_raster_prefix"] = "NULL";
+  help_map["burn_raster_prefix"] = {  "string","NULL","The prefix of the raster to burn to a csv.","No extension required."};
+
   string_default_map["burn_data_csv_column_header"] = "burned_data";
+  help_map["burn_data_csv_column_header"] = {  "string","burned_data","Column header in csv of data burned from raster.","For example lithocode."};
+
   string_default_map["csv_to_burn_name"] = "NULL";
+  help_map["csv_to_burn_name"] = {  "string","NULL","Name of csv file to which data will be burned.","You need to include the csv extension."};
 
   // This is for junction angles
   bool_default_map["print_junction_angles_to_csv"] = false;
-  float_default_map["SA_vertical_interval"] = 10;  // The vertical interval
-                                                   // for slope measurements in the
-                                                   // junction angle printing
+  help_map["print_junction_angles_to_csv"] = {  "bool","false","Prints a csv with all the locations of the junctions and associated statistics.","csv file contains junction angles; bending angles; areas; gradinets; and other information."};
 
+  float_default_map["SA_vertical_interval"] = 10;
+  help_map["SA_vertical_interval"] = {  "float","10","This is used in both slope-area routines and also junction angle routines. It sets the vertical drop over which the gradient is measured and the junction angle is measured on points between a tributary within the height and the junction.","For S-A analysis, should be greater than the vertical uncertainty of your DEM. For junction angles, if you set this to a large number it will measure angles between the junction the donor junctions and the reciever junction."};
+
+
+  // Now for connectivity
+  bool_default_map["calculate_connectivity_index"] = false;
+  help_map["calculate_connectivity_index"] = {  "bool","false","Calculatres the connectivity index.","Based on https://doi.org/10.1016/j.cageo.2017.10.009"};
+
+
+
+  //=========================================================================
+  //
+  //.#####....####...#####....####...##...##..######..######..######..#####..
+  //.##..##..##..##..##..##..##..##..###.###..##........##....##......##..##.
+  //.#####...######..#####...######..##.#.##..####......##....####....#####..
+  //.##......##..##..##..##..##..##..##...##..##........##....##......##..##.
+  //.##......##..##..##..##..##..##..##...##..######....##....######..##..##.
+  //
+  //..####...##..##..######...####...##..##...####..                         
+  //.##..##..##..##..##......##..##..##.##...##.....                         
+  //.##......######..####....##......####.....####..                         
+  //.##..##..##..##..##......##..##..##.##.......##.                         
+  //..####...##..##..######...####...##..##...####..                         
+  //============================================================================
   // Use the parameter parser to get the maps of the parameters required for the
   // analysis
   LSDPP.parse_all_parameters(float_default_map, int_default_map, bool_default_map,string_default_map);
@@ -294,6 +645,17 @@ int main (int nNumberofArgs,char *argv[])
   map<string,int> this_int_map = LSDPP.get_int_parameters();
   map<string,bool> this_bool_map = LSDPP.get_bool_parameters();
   map<string,string> this_string_map = LSDPP.get_string_parameters();
+
+  if(f_name == "cry_for_help.txt")
+  {
+    cout << "I am going to print the help and exit." << endl;
+    cout << "You can find the help in the file:" << endl;
+    cout << "./lsdtt-basic-metrics-README.csv" << endl;
+    string help_prefix = "lsdtt-basic-metrics-README";
+    LSDPP.print_help(help_map, help_prefix, version_number, citation);
+    exit(0);
+  }
+
 
   // Now print the parameters for bug checking
   cout << "PRINT THE PARAMETERS..." << endl;
@@ -321,7 +683,21 @@ int main (int nNumberofArgs,char *argv[])
   }
 
 
-  // load the  DEM
+  // Some switches to turn on the connectivity index
+  if ( this_bool_map["calculate_connectivity_index"])
+  {
+    this_bool_map["print_dinf_drainage_area_raster"] = true;    
+  }
+
+  //========================================================================
+  //
+  //.##.......####....####...#####...........#####....####...######...####..
+  //.##......##..##..##..##..##..##..........##..##..##..##....##....##..##.
+  //.##......##..##..######..##..##..........##..##..######....##....######.
+  //.##......##..##..##..##..##..##..........##..##..##..##....##....##..##.
+  //.######...####...##..##..#####...........#####...##..##....##....##..##.
+  //
+  //========================================================================
   LSDRaster topography_raster;
   if (this_bool_map["remove_seas"])
   {
@@ -348,6 +724,33 @@ int main (int nNumberofArgs,char *argv[])
     topography_raster = start_raster;
   }
   cout << "Got the dem: " <<  DATA_DIR+DEM_ID << endl;
+
+  // now for the pixel replacement. This exits upon completion
+  if (this_bool_map["replace_pixels"])
+  {
+    string pixel_if_name = DATA_DIR+this_string_map["pixels_to_replace_file"];
+
+    topography_raster.replace_pixels(pixel_if_name);
+
+    string this_raster_name = OUT_DIR+OUT_ID+"_pixels_replaced";
+    topography_raster.write_raster(this_raster_name,raster_ext);
+
+    cout << "I replaced some pixels in your DEM and am now exiting" << endl;
+    exit(0);
+  }
+
+  // Adjust the elevation of the raster
+  if (this_float_map["elevation_change"] != 0)
+  {
+    topography_raster.AdjustElevation(this_float_map["elevation_change"]);
+    cout << "Adjusted the elevation of your raster by " << this_float_map["elevation_change"] << endl;
+    topography_raster.write_raster(DATA_DIR+DEM_ID+"_elevadjusted", "bil");
+    cout << "I adjusted the elevations of your raster and printed the new raster." << endl;
+    cout << "It has the extension _elevadjusted" << endl;
+    cout << "I am now exiting." << endl;
+    exit(0);
+ }
+
 
   if(this_bool_map["only_check_parameters"])
   {
@@ -625,16 +1028,85 @@ int main (int nNumberofArgs,char *argv[])
   // ...##....##..##..######..######..######....##.............##.##...######..#####.....##....##..##.
   //
   //=========================================================================
+  // Below is just a debugging routine
+  if(this_bool_map["test_bearing_template"])
+  {
+    float i = this_float_map["test_bearing"];
+    cout << "Bearing is: " << i << endl;
+    Array2D<int> test = make_template_for_vector_bearing(float(i), this_int_map["test_scale"]);
+    //for (int i = 316; i<=360; i++)
+    //{
+    //  cout << "Bearing is: " << i << endl;
+    //  
+    // }
+  }
+  
+  
   if(this_bool_map["channel_and_valley_width_extraction"])
   {
     cout << "I am going to test some code for valley and channel widths" << endl;
 
 
     Array2D<int> test = make_template_for_vector_bearing(this_float_map["test_bearing"], this_int_map["test_scale"]);
+
+    // now I am going to use a channel to get the bearings. 
+    // I need to load the channel file
+    cout << "I am loading a channel file. " << endl;
+    LSDRasterInfo RI(topography_raster);
+    LSDSpatialCSVReader CSVFile(RI,this_string_map["valley_points_csv"]);
+
+    LSDRaster filled_topography,carved_topography;
+    // now get the flow info object
+    if ( this_bool_map["raster_is_filled"] )
+    {
+      cout << "You have chosen to use a filled raster." << endl;
+      filled_topography = topography_raster;
+    }
+    else
+    {
+      cout << "Let me fill that raster for you, the min slope is: "
+          << this_float_map["min_slope_for_fill"] << endl;
+      if(this_bool_map["carve_before_fill"])
+      {
+        carved_topography = topography_raster.Breaching_Lindsay2016();
+        filled_topography = carved_topography.fill(this_float_map["min_slope_for_fill"]);
+      }
+      else
+      {
+        filled_topography = topography_raster.fill(this_float_map["min_slope_for_fill"]);
+      }
+    }
+    LSDFlowInfo FlowInfo(boundary_conditions,filled_topography);
+    vector<int> node_list =  CSVFile.get_nodeindices_from_lat_long(FlowInfo);
+
+    vector<int> bearing_nodes;
+    vector<float> bearing_vec;
+    string bearing_fname =  OUT_DIR+OUT_ID+"_bearings.csv";
+    FlowInfo.calculate_bearings_from_nodelist(node_list, this_int_map["channel_bearing_node_spacing"], 
+                                              this_bool_map["print_channel_bearings"], 
+                                              bearing_fname,bearing_nodes, bearing_vec);
+
+    if ( this_bool_map["print_channel_bearings"] && this_bool_map["convert_csv_to_geojson"])
+    {
+      cout << "Printing the geojson of the channel_bearings" << endl;
+      string gjson_name = OUT_DIR+OUT_ID+"_bearings.geojson";
+      LSDSpatialCSVReader thiscsv(bearing_fname);
+      thiscsv.print_data_to_geojson(gjson_name);
+    }
+
   }
 
+  //=================================================================================================
   // Some tools for punching out some nodata using a secondary raster that we can use to make river
-  // pathways in noisy DEMs. 
+  // pathways in noisy DEMs.
+  //
+  //.#####...##..##..##..##...####...##..##..........##..##...####...#####....####...######...####..
+  //.##..##..##..##..###.##..##..##..##..##..........###.##..##..##..##..##..##..##....##....##..##.
+  //.#####...##..##..##.###..##......######..........##.###..##..##..##..##..######....##....######.
+  //.##......##..##..##..##..##..##..##..##..........##..##..##..##..##..##..##..##....##....##..##.
+  //.##.......####...##..##...####...##..##..........##..##...####...#####...##..##....##....##..##. 
+  //
+  //=================================================================================================
   if(this_bool_map["punch_nodata"])
   {
     cout << "I am going to punch out some nodata. " << endl;
@@ -657,9 +1129,157 @@ int main (int nNumberofArgs,char *argv[])
     LSDRaster Punched = topography_raster.mask_to_nodata_using_threshold_using_other_raster(this_float_map["punch_threshold"],this_bool_map["belowthresholdisnodata"], punch_raster_in);
 
     string punch_name = OUT_DIR+OUT_ID+"_Punched";
+    cout << "The punched raster is: " << punch_name << endl;
     Punched.write_raster(punch_name,raster_ext);
 
   }
+
+  //================================================================================================
+  //
+  //.##..##...####...##......##......######..##..##...........####....####...#####...##..##..######.
+  //.##..##..##..##..##......##......##.......####...........##..##..##..##..##..##..##..##..##.....
+  //.##..##..######..##......##......####......##............##......######..#####...##..##..####...
+  //..####...##..##..##......##......##........##............##..##..##..##..##..##...####...##.....
+  //...##....##..##..######..######..######....##.............####...##..##..##..##....##....######.
+  //
+  //================================================================================================  
+  if(this_bool_map["create_valley_trough"] || this_bool_map["get_valley_centreline"])
+  {
+    string punch_name;
+    if(this_bool_map["punch_nodata"])
+    {
+      cout << "You punched a raster already so I am using that instead of the" << endl;
+      cout << DATA_DIR+this_string_map["Punched_raster_prefix"]+".bil" << endl;
+      punch_name = OUT_DIR+OUT_ID+"_Punched";
+      cout << "The punch raster I'm using is: " <<  punch_name << endl;
+    }
+    else
+    {
+
+      punch_name = DATA_DIR+this_string_map["Punched_raster_prefix"];
+      cout << "I am going to use the raster" << endl;
+      cout << punch_name << ".bil as the punched raster." << endl;  
+    }
+           
+    LSDRaster Punched(punch_name,raster_ext);
+    
+    cout << "Grabbing rasters giving the distance and elevation of the nearest" << endl;
+    cout << "pixels in the punched area to pixels with data." << endl;
+    vector<LSDRaster> nearest_rs = Punched.get_nearest_distance_and_value_masks(topography_raster);
+
+    string distance_R_name = OUT_DIR+OUT_ID+"_DistToND";
+    string value_R_name = OUT_DIR+OUT_ID+"_ValueToND";    
+
+    nearest_rs[0].write_raster(distance_R_name,raster_ext);
+    nearest_rs[1].write_raster(value_R_name,raster_ext);
+
+    // now get the lowest value in a window
+    cout << "Now get the lowest value in a window." << endl;
+    float window_radius = this_float_map["minimum_bank_elevation_window_radius"];
+    int window_type = 1;
+    bool find_maximum = false;
+
+    cout << "Finding the lowest pixels along the river or valley edge." << endl;
+    LSDRaster minimum_river_elev = nearest_rs[1].neighbourhood_statistics_local_min_max(window_radius, window_type, find_maximum);
+    string minelev_R_name = OUT_DIR+OUT_ID+"_MinBankElev";
+    minimum_river_elev.write_raster(minelev_R_name,raster_ext);
+
+    if(this_bool_map["create_valley_trough"] || this_bool_map["get_valley_centreline"])
+    {
+      LSDRaster trough = nearest_rs[0];
+      trough.raster_multiplier(this_float_map["trough_scaling_factor"]); 
+      LSDRaster river_path = minimum_river_elev;
+      LSDRaster filled_topography;
+
+      LSDRaster add_trough = trough;
+      
+
+      // DO A FEW LOOPS
+      int n_loops = this_int_map["centreline_loops"];
+      for (int i = 0; i< n_loops; i++)
+      {  
+        cout << "Cutting and filling the river, loop number " << i << " of " << n_loops << endl;
+        river_path = river_path.MapAlgebra_subtract(trough);
+        LSDRaster carved_topography = river_path.Breaching_Lindsay2016();
+        river_path = carved_topography.fill(this_float_map["min_slope_for_fill"]);
+        
+        // We keep track of the trough additions so at the end we add these back on except for the last one
+        // this means that the depth of the middle of the trough should be set by the trough_scaling_factor
+        // and not related to the number of loops
+        if (i < n_loops-2)
+        {
+          add_trough = add_trough.MapAlgebra_add(trough);
+        }
+      }
+
+      river_path = river_path.MapAlgebra_add(add_trough);
+      river_path.AdjustElevation(this_float_map["river_depth"]);
+
+
+      // Now merge the rasters
+      cout << "Combining rasters." << endl;
+      LSDRaster topo_copy = topography_raster;
+      topo_copy.OverwriteRaster(river_path);
+
+      string imposedriver_R_name = OUT_DIR+OUT_ID+"_RiverTrough";
+      topo_copy.write_raster(imposedriver_R_name,raster_ext);    
+
+      if(this_bool_map["write_hillshade"])
+      {
+        cout << "Let me print the hillshade for you. " << endl;
+        float hs_azimuth = 315;
+        float hs_altitude = 45;
+        float hs_z_factor = 1;
+        LSDRaster hs_raster = topo_copy.hillshade(hs_altitude,hs_azimuth,hs_z_factor);
+
+        string hs_fname = OUT_DIR+OUT_ID+"_RiverTrough_hs";
+        hs_raster.write_raster(hs_fname,raster_ext);
+      }
+
+
+      if (this_bool_map["get_valley_centreline"])
+      {
+        
+        LSDRaster carved_topography = topo_copy.Breaching_Lindsay2016();
+        topo_copy = carved_topography.fill(this_float_map["min_slope_for_fill"]);
+
+        // Now we need the flow path
+        cout << "\t Flow routing for centreline. Note this is memory intensive. If your DEM is very large you may get a segmentation fault here..." << endl;
+        // get a flow info object
+        LSDFlowInfo FI(boundary_conditions,topo_copy);
+        cout << "Finished flow routing." << endl; 
+
+        // get the maximum elevation
+        int max_row,max_col;
+        float max_elev = river_path.max_elevation(max_row,max_col);
+
+        int start_ni = FI.get_NodeIndex_from_row_col(max_row,max_col);
+
+        vector<int> flow_path = FI.get_flow_path(start_ni);
+
+        cout << "I need to calculate the flow distance now." << endl;
+        LSDRaster FD = FI.distance_from_outlet();
+        LSDRaster DA = FI.write_DrainageArea_to_LSDRaster();
+
+        string fname = OUT_ID+"_valley_centreline";
+        FI.print_vector_of_nodeindices_to_csv_file_with_latlong(flow_path,OUT_DIR, fname,
+                                                                river_path, FD, DA);      
+
+        if ( this_bool_map["convert_csv_to_geojson"])
+        {
+          string gjson_name = OUT_DIR+OUT_ID+"_valley_centreline.geojson";
+          string full_csv = OUT_DIR+OUT_ID+"_valley_centreline_nodes.csv"; 
+          LSDSpatialCSVReader thiscsv(full_csv);
+          thiscsv.print_data_to_geojson(gjson_name);
+        }
+      }
+
+    }
+
+
+
+  }
+
 
   if(this_bool_map["print_nearest_to_nodata_rasters"])
   {
@@ -716,8 +1336,14 @@ int main (int nNumberofArgs,char *argv[])
 
 
   //============================================================================
-  // Raster burning
-
+  //
+  //.#####....####....####...######..######..#####...........#####...##..##..#####...##..##.
+  //.##..##..##..##..##........##....##......##..##..........##..##..##..##..##..##..###.##.
+  //.#####...######...####.....##....####....#####...........#####...##..##..#####...##.###.
+  //.##..##..##..##......##....##....##......##..##..........##..##..##..##..##..##..##..##.
+  //.##..##..##..##...####.....##....######..##..##..........#####....####...##..##..##..##.
+  //
+  //============================================================================
   // if this gets burned, do it
   if(this_bool_map["burn_raster_to_csv"])
   {
@@ -776,8 +1402,14 @@ int main (int nNumberofArgs,char *argv[])
 
 
 
-
-
+  //============================================================================
+  //
+  //.##..##..######..##......##.......####...##..##...####...#####...######.
+  //.##..##....##....##......##......##......##..##..##..##..##..##..##.....
+  //.######....##....##......##.......####...######..######..##..##..####...
+  //.##..##....##....##......##..........##..##..##..##..##..##..##..##.....
+  //.##..##..######..######..######...####...##..##..##..##..#####...######.
+  //
   //============================================================================
   // Compute hillshade and print
   //============================================================================
@@ -793,6 +1425,14 @@ int main (int nNumberofArgs,char *argv[])
     hs_raster.write_raster(hs_fname,raster_ext);
   }
 
+  //============================================================================
+  //
+  //..####...##..##..#####...######...####....####...######..........######..######..######..######..######..##..##...####..
+  //.##......##..##..##..##..##......##..##..##..##..##..............##........##......##......##......##....###.##..##.....
+  //..####...##..##..#####...####....######..##......####............####......##......##......##......##....##.###..##.###.
+  //.....##..##..##..##..##..##......##..##..##..##..##..............##........##......##......##......##....##..##..##..##.
+  //..####....####...##..##..##......##..##...####...######..........##......######....##......##....######..##..##...####..
+  //
   //============================================================================
   // The surface fitting metrics
   //============================================================================
@@ -984,7 +1624,13 @@ int main (int nNumberofArgs,char *argv[])
   }
 
   //============================================================================
-  // Print the roughness rasters
+  //
+  //.#####....####...##..##...####...##..##..##..##..######...####....####..
+  //.##..##..##..##..##..##..##......##..##..###.##..##......##......##.....
+  //.#####...##..##..##..##..##.###..######..##.###..####.....####....####..
+  //.##..##..##..##..##..##..##..##..##..##..##..##..##..........##......##.
+  //.##..##...####....####....####...##..##..##..##..######...####....####..
+  //
   //============================================================================
   if(this_bool_map["print_REI_raster"])
   {
@@ -1027,6 +1673,15 @@ int main (int nNumberofArgs,char *argv[])
     topo_test_wiener.write_raster(wiener_name,raster_ext);
   }
 
+  //============================================================================================================
+  //
+  //..####...######..##..##...####...##......######...........####...##..##...####...##..##..##..##..######..##.....
+  //.##........##....###.##..##......##......##..............##..##..##..##..##..##..###.##..###.##..##......##.....
+  //..####.....##....##.###..##.###..##......####............##......######..######..##.###..##.###..####....##.....
+  //.....##....##....##..##..##..##..##......##..............##..##..##..##..##..##..##..##..##..##..##......##.....
+  //..####...######..##..##...####...######..######...........####...##..##..##..##..##..##..##..##..######..######.
+  //
+  //============================================================================================================
   if (this_bool_map["impose_single_channel"])
   {
     cout << "I am going to impose a channel on your DEM." << endl;
@@ -1048,23 +1703,58 @@ int main (int nNumberofArgs,char *argv[])
     if(this_bool_map["buffer_single_channel"] and this_bool_map["use_XY_for_buffer"])
     {
       cout << "I am going to impose and buffer the single channel using XY coordinates." << endl;
-      RM.impose_channels_with_buffer_use_XY(single_channel_data, this_float_map["min_slope_for_fill"]*2);
+      RM.impose_channels_with_buffer_use_XY(single_channel_data, this_float_map["min_slope_for_fill"]*2, this_string_map["single_channel_elev_string"]);
     }
     else if(this_bool_map["buffer_single_channel"] and not this_bool_map["use_XY_for_buffer"])
     {
       cout << "I am going to impose and buffer the single channel using lat-long coordinates." << endl;
-      RM.impose_channels_with_buffer(single_channel_data, this_float_map["min_slope_for_fill"]*2);
+      RM.impose_channels_with_buffer(single_channel_data, this_float_map["min_slope_for_fill"]*2, this_string_map["single_channel_elev_string"]);
     }
     else
     {
       cout << "I am going to impose the single channel using lat-long coordinates, without buffering." << endl;
-      RM.impose_channels(single_channel_data);
+      RM.impose_channels(single_channel_data, this_string_map["single_channel_elev_string"]);
     }
     LSDRaster imposed_topography = RM.return_as_raster();
 
     cout << "Let me print the fill raster for you."  << endl;
     string filled_raster_name = OUT_DIR+OUT_ID+"_imposed_channels";
     imposed_topography.write_raster(filled_raster_name,raster_ext);       
+  }
+
+  if (this_bool_map["centre_and_interpolate_channel_coordinates"])
+  {
+    cout << "I am going to centre your channel nodes on the corresponding raster pixel and interpolate across any gaps." << endl;
+    cout << "This will overprint your existing XY coordinates in the channel csv file. I am assuming your channel and DEM are in UTM." << endl;
+    cout << "WARNING: Make sure your channel data is sorted by flow distance, or your final channel will look like a pretzel." << endl;  
+
+    LSDRasterInfo RI(topography_raster);
+
+    // load the channel nodes csv file, this will also print all the column names to screen
+    LSDSpatialCSVReader channel_nodes(RI, (this_string_map["fixed_channel_csv_name"]));
+
+    // assign directory and name of output files
+    string centred_csv_name = OUT_DIR+"centred_"+this_string_map["fixed_channel_csv_name"];
+    string interpolated_csv_name = OUT_DIR+"interpolated_"+this_string_map["fixed_channel_csv_name"];
+
+    string X_column_name = this_string_map["X_column_name"];
+    string Y_column_name = this_string_map["Y_column_name"];
+    string fd_column_name = this_string_map["single_channel_fd_string"];
+
+    channel_nodes.centre_XY_by_row_col(topography_raster, X_column_name, Y_column_name);
+
+    channel_nodes.print_data_to_csv(centred_csv_name);   
+    cout << "I have saved your file as " << centred_csv_name << endl;
+
+    channel_nodes.interpolate_across_gap(topography_raster, X_column_name, Y_column_name, fd_column_name);
+
+    cout << "I have interpolated, let's centre the coordinates again." << endl;
+    channel_nodes.centre_XY_by_row_col(topography_raster, X_column_name, Y_column_name);
+
+    // now print the data with the gaps filled in
+    channel_nodes.print_data_to_csv(interpolated_csv_name);
+    cout << "I have saved your file as " << interpolated_csv_name << ". Good night." << endl;
+
   }
 
   //============================================================================
@@ -1074,7 +1764,7 @@ int main (int nNumberofArgs,char *argv[])
   //.####....##......##..##..##.#.##..........#####...##..##..##..##....##......##....##.###..##.###.
   //.##......##......##..##..#######..........##..##..##..##..##..##....##......##....##..##..##..##.
   //.##......######...####....##.##...........##..##...####....####.....##....######..##..##...####..
-  //.................................................................................................
+  //
   //============================================================================
   //
   // EVERTHING BELOW THIS POINT NEEDS A FILL RASTER AND FLOW ROUTING
@@ -1103,7 +1793,8 @@ int main (int nNumberofArgs,char *argv[])
         || this_bool_map["calculate_basin_statistics"]
         || this_bool_map["divide_finder"]
         || this_bool_map["tag_nodes"]
-        || this_bool_map["extract_ridges"])
+        || this_bool_map["extract_ridges"]
+        || this_bool_map["calculate_connectivity_index"])
   {
     cout << "I will need to compute flow information, because you are getting drainage area or channel networks." << endl;
     //==========================================================================
@@ -1276,9 +1967,15 @@ int main (int nNumberofArgs,char *argv[])
     }
 
 
-
-
-    //=================================================================
+    //=======================================================================================================
+    //
+    //.#####...#####....####...######..##..##...####....####...######...........####...#####...######...####..
+    //.##..##..##..##..##..##....##....###.##..##..##..##......##..............##..##..##..##..##......##..##.
+    //.##..##..#####...######....##....##.###..######..##.###..####............######..#####...####....######.
+    //.##..##..##..##..##..##....##....##..##..##..##..##..##..##..............##..##..##..##..##......##..##.
+    //.#####...##..##..##..##..######..##..##..##..##...####...######..........##..##..##..##..######..##..##.
+    //
+    //========================================================================================================
     // Now, if you want, calculate drainage areas
     //=================================================================
     if (this_bool_map["print_dinf_drainage_area_raster"])
@@ -1395,6 +2092,15 @@ int main (int nNumberofArgs,char *argv[])
     }
 
 
+    //==============================================================
+    //
+    //..####...######..#####...######...####...##...##..........##..##..######..######.
+    //.##........##....##..##..##......##..##..###.###..........###.##..##........##...
+    //..####.....##....#####...####....######..##.#.##..........##.###..####......##...
+    //.....##....##....##..##..##......##..##..##...##..........##..##..##........##...
+    //..####.....##....##..##..######..##..##..##...##..........##..##..######....##...
+    //
+    //==============================================================    
     // This is the logic for a simple stream network
     if (this_bool_map["print_channels_to_csv"]
         || this_bool_map["print_junctions_to_csv"]
@@ -1408,7 +2114,15 @@ int main (int nNumberofArgs,char *argv[])
       cout << "\t Calculating flow accumulation (in pixels)..." << endl;
       LSDIndexRaster FlowAcc = FlowInfo.write_NContributingNodes_to_LSDIndexRaster();
 
-      // load the sources
+      //==============================================================
+      //
+      //..####....####...##..##..#####....####...######...####..
+      //.##......##..##..##..##..##..##..##..##..##......##.....
+      //..####...##..##..##..##..#####...##......####.....####..
+      //.....##..##..##..##..##..##..##..##..##..##..........##.
+      //..####....####....####...##..##...####...######...####..
+      //
+      //==============================================================
       cout << "\t Loading Sources, if you have them..." << endl;
       cout << "\t Source file is... " << CHeads_file << endl;
       vector<int> sources;
@@ -1535,6 +2249,16 @@ int main (int nNumberofArgs,char *argv[])
         }
       }   // End print sources logic
 
+
+
+      //=================================================================================
+      //.#####....####....####...######..##..##...####..
+      //.##..##..##..##..##........##....###.##..##.....
+      //.#####...######...####.....##....##.###...####..
+      //.##..##..##..##......##....##....##..##......##.
+      //.#####...##..##...####...######..##..##...####..
+      //................................................ 
+      //=================================================================================     
       // Now we check if we are going to deal with basins
       if(this_bool_map["find_basins"] ||
          this_bool_map["print_chi_data_maps"] ||
@@ -1715,7 +2439,7 @@ int main (int nNumberofArgs,char *argv[])
         }
 
 
-        // Now we get the channel segments. This information is used for plotting
+        // Now we get the channel segments. This information is used for plotting chi stuff
         vector<int> source_nodes;
         vector<int> outlet_nodes;
         vector<int> baselevel_node_of_each_basin;
@@ -1829,8 +2553,55 @@ int main (int nNumberofArgs,char *argv[])
 
       }   // end logic for basin finding
       cout << "Finished with basins" << endl;
+
+
+      //================================================================================================
+      //..####....####...##..##..##..##..######...####...######..######..##..##..######..######..##..##.
+      //.##..##..##..##..###.##..###.##..##......##..##....##......##....##..##....##......##.....####..
+      //.##......##..##..##.###..##.###..####....##........##......##....##..##....##......##......##...
+      //.##..##..##..##..##..##..##..##..##......##..##....##......##.....####.....##......##......##...
+      //..####....####...##..##..##..##..######...####.....##....######....##....######....##......##...
+      //................................................................................................
+      //================================================================================================
+      if (this_bool_map["calculate_connectivty_index"] )
+      {
+        cout << "Hello there, I am going to calculate connectivity" << endl;
+        cout << "I need some rasters and various data elements" << endl;
+
+        // Okay so here is what you need to do
+        // 1) Check if the dinf raster exists
+        // 2) Check if a channel file exists
+        // 3) Then get the "roughness" raster (which is just the standard deviation)
+        // 4) Get the average upslope roughness and the average upslope gradient
+        // 5) Then for each pixel you need to route to the nearest channel accumulating roughness and slope and flow distance
+        // 6) You will then have everything you need to calculate CI, although you won't have eliminated areas upstream of sinks
+
+        // Part 1: get the dinfinity raster. 
+        // Note that at the moment this is always recalculated
+        string Dinf_fname = OUT_DIR+OUT_ID+"_dinf_area";  
+        LSDRaster Dinf_raster(Dinf_fname,"bil");
+ 
+
+      }   // end logic for connectivity
+
+
+
     }     // end logic for tasks related to channel network extraction
     cout << "Done with channel extraction" << endl;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   }       // end logic for tasks requiring flow info and filling
   cout << "I'm all finished! Have a nice day." << endl;
 }

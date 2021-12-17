@@ -14,7 +14,7 @@
 // https://lsdtopotools.github.io/LSDTT_documentation/LSDTT_chi_analysis.html
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
-// Copyright (C) 2018 Simon M. Mudd 2018
+// Copyright (C) 2021 Simon M. Mudd 2021
 //
 // Developer can be contacted by simon.m.mudd _at_ ed.ac.uk
 //
@@ -70,15 +70,21 @@
 int main (int nNumberofArgs,char *argv[])
 {
 
+  string version_number = "0.5";
+  string citation = "http://doi.org/10.5281/zenodo.4577879";
+
   cout << "=========================================================" << endl;
   cout << "|| Welcome to the chi mapping tool!                    ||" << endl;
   cout << "|| This program has a number of options to make chi    ||" << endl;
   cout << "|| plots and to map out slopes in chi space.           ||" << endl;
   cout << "|| This program was developed by Simon M. Mudd         ||" << endl;
-  cout << "|| Fiona J. Clubb and Boris Gailleton                  ||" << endl;
+  cout << "|| Fiona J. Clubb,    Boris Gailleton                  ||" << endl;
+  cout << "|| David T Milodowski, and Declan Valters              ||" << endl;
   cout << "||  at the University of Edinburgh                     ||" << endl;  
   cout << "|| and Martin D Hurst at the University of Glasgow.    ||" << endl;
   cout << "=========================================================" << endl;   
+  cout << "|| Citation for this code is:                          ||" << endl;
+  cout << "|| " << citation << endl;
   cout << "|| If you use the k_sn routines please cite:           ||" << endl;   
   cout << "|| https://www.doi.org/10.1002/2013JF002981            ||" << endl;
   cout << "|| If you use the concavity routines please cite:      ||" << endl;   
@@ -89,12 +95,51 @@ int main (int nNumberofArgs,char *argv[])
   cout << "|| Documentation can be found at:                      ||" << endl;
   cout << "|| https://lsdtopotools.github.io/LSDTT_documentation/ ||" << endl;
   cout << "=========================================================" << endl;
+  cout << "|| This is LSDTopoTools2 version                       ||" << endl;
+  cout << "|| " << version_number << endl;
+  cout << "|| If the version number has a d at the end it is a    ||" << endl;
+  cout << "||  development version.                               ||" << endl;
+  cout << "=========================================================" << endl;
 
   // Get the arguments
   vector<string> path_and_file = DriverIngestor(nNumberofArgs,argv);
 
   string path_name = path_and_file[0];
   string f_name = path_and_file[1];
+
+  // Check if we are doing the version or the citation
+  if(f_name == "lsdtt_citation.txt")
+  {
+
+    cout << endl << endl << endl << "==============================================" << endl;
+    cout << "To cite this code, please use this citation: " << endl;
+    cout << citation << endl;
+    cout << "Copy this url to find the full citation." << endl;
+    cout << "also see above for more detailed citation information." << endl;
+    cout << "=========================================================" << endl;
+
+    ofstream ofs;
+    ofs.open("./lsdtt-chi-mapping-citation.txt");
+    ofs << citation << endl;
+    ofs.close();
+
+    exit(0);
+  }
+
+  if(f_name == "lsdtt_version.txt")
+  {
+    cout << endl << endl << endl << "==============================================" << endl;    
+    cout << "This is lsdtt-chi-mapping version number " << version_number << endl;
+    cout << "If the version contains a 'd' then you are using a development version." << endl;
+    cout << "=========================================================" << endl;
+    ofstream ofs;
+    ofs.open("./lsdtt-chi-mapping-version.txt");
+    ofs << version_number << endl;
+    ofs.close();
+
+    exit(0);
+  }
+
 
   // load parameter parser object
   LSDParameterParser LSDPP(path_name,f_name);
@@ -108,180 +153,415 @@ int main (int nNumberofArgs,char *argv[])
   map<string,bool> bool_default_map;
   map<string,string> string_default_map;
 
+  // this will contain the help file
+  map< string, vector<string> > help_map;
+
+
+  //==================================================================================
+  //
+  // .#####....####...#####....####...##...##..######..######..######..#####....####..
+  // .##..##..##..##..##..##..##..##..###.###..##........##....##......##..##..##.....
+  // .#####...######..#####...######..##.#.##..####......##....####....#####....####..
+  // .##......##..##..##..##..##..##..##...##..##........##....##......##..##......##.
+  // .##......##..##..##..##..##..##..##...##..######....##....######..##..##...####..
+  //
+  //=================================================================================
   // Basic DEM preprocessing
   float_default_map["minimum_elevation"] = 0.0;
+  help_map["minimum_elevation"] = { "float","0.0","All elevation values below this become nodata if remove_seas is true.","Ususally 0."};
+
   float_default_map["maximum_elevation"] = 30000;
+  help_map["maximum_elevation"] = {  "float","0.0","All elevation values above this become nodata if remove_seas is true.","Pick a big number."};
+
   float_default_map["min_slope_for_fill"] = 0.0001;
+  help_map["min_slope_for_fill"] = {  "float","0.0001","Minimum slope between pixels for the filling algorithm.","Best not to change the default."};
+
   bool_default_map["raster_is_filled"] = false; // assume base raster is already filled
-  bool_default_map["carve_before_fill"] = false; // Will carve your depression before applying a minimal slope
+  help_map["raster_is_filled"] = {  "bool","false","This reads a pre-existing fill raster to save time.","You need to have printed the fill raster if you set this to true."};
+
+  bool_default_map["carve_before_fill"] = false; // Implements a carving algorithm
+  help_map["carve_before_fill"] = {  "bool","false","This implements a breaching algorithm before filling.","Good for landscapes with DEM obstructions (like roads) across the channels."};
+ 
   bool_default_map["remove_seas"] = true; // elevations above minimum and maximum will be changed to nodata
-  bool_default_map["only_check_parameters"] = false;
+  help_map["remove_seas"] = {  "bool","true","Slightly misleading name; it replaces both high and low DEM values with nodata.","This gets rid of low lying areas but also is handy when the nodata is not translated from the raw DEM and it is full of funny large numbers."};
+ 
   string_default_map["CHeads_file"] = "NULL";
-  bool_default_map["print_raster_without_seas"] = false;
+  help_map["CHeads_file"] = {  "string","NULL","The name of a channel heads file.","You can output this csv file with the channel extraction algorithms. It contains latitude and longitude values of the channel heads."};
+ 
+  bool_default_map["only_check_parameters"] = false;
+  help_map["only_check_parameters"] = {  "bool","false","This just checks parameters without running an analysis.","For bug checking."};
+
+
 
 
   // Selecting basins
   int_default_map["threshold_contributing_pixels"] = 1000;
+  help_map["threshold_contributing_pixels"] = {  "int","1000","The number of contributing pixels needed to start a channel using the threshold method.","This is in pixels not drainage area. More options are in the lsdtt-channel-extraction tool."};
+
   int_default_map["minimum_basin_size_pixels"] = 5000;
+  help_map["minimum_basin_size_pixels"] = {  "int","5000","For basin finding algorithm, the minimum size of a selected basin.","Will reject basins along edge."};
+  
   int_default_map["maximum_basin_size_pixels"] = 500000;
-  bool_default_map["test_drainage_boundaries"] = true;
+  help_map["maximum_basin_size_pixels"] = {  "int","500000","For basin finding algorithm, the maximum size of a selected basin.","Will reject basins along edge."};
+  
   bool_default_map["only_take_largest_basin"] = false;
+  help_map["only_take_largest_basin"] = {  "bool","false","This only retains the largest complete basin in the raster.","Will reject basins along edge."};
+  
   string_default_map["BaselevelJunctions_file"] = "NULL";
+  help_map["BaselevelJunctions_file"] = {  "string","NULL","The name of a csv file with basin outlets for selecting basins using junction numbers.","An old method. You should use get_basins_from_outlets: true and basin_outlet_csv instead."};
+  
   bool_default_map["extend_channel_to_node_before_receiver_junction"] = true;
-  bool_default_map["remove_basins_by_outlet_elevation"] = false;
-  float_default_map["lower_outlet_elevation_threshold"] = 0;
-  float_default_map["upper_outlet_elevation_threshold"] = 25;
+  help_map["extend_channel_to_node_before_receiver_junction"] = {  "bool","true","For various basin extractions the basin snaps to the nearest junction. If this is true then the outlet of the basin is one pixel upstream of the reciever junction of the snapped channel.","If false it will pick the donor junction of the channel rather than one pixel above the reciever."};
+
   bool_default_map["get_basins_from_outlets"] = false;
+  help_map["get_basins_from_outlets"] = {  "bool","false","Switches on the outlet based basin finding.","See BaselevelJunctions_file for format of outlets csv."};
+  
   string_default_map["basin_outlet_csv"] = "NULL";
-  string_default_map["sample_ID_column_name"] = "IDs";
+  help_map["basin_outlet_csv"] = {  "string","NULL","A csv file with the lat long of basin outlets.","csv should have latitude and longitude columns and rows with basin outlets."};
+
   int_default_map["search_radius_nodes"] = 100;
+  help_map["search_radius_nodes"] = {  "int","100","A parameter for snapping to the nearest channel. It will search for the largest channel (by stream order) within the pixel window.","You will want smaller pixel numbers if you have a dense channel network."};
+
+  bool_default_map["test_drainage_boundaries"] = true;
+  help_map["test_drainage_boundaries"] = {  "bool","true","Looks for basins influenced by edge and removes them if they are.","chi coordinate must be calculated using complete basins so this tests for that."};
+  
+  bool_default_map["remove_basins_by_outlet_elevation"] = false;
+  help_map["remove_basins_by_outlet_elevation"] = {  "bool","false","Deletes basins whose outlets are above or below threshold values.","A simple way to get basins draining to a mountain front without selecting specific basins."};
+  
+  float_default_map["lower_outlet_elevation_threshold"] = 0;
+  help_map["lower_outlet_elevation_threshold"] = {  "float","0","When remove_basins_by_outlet_elevation this is minimum elevation of the basin outlet.","A simple way to get basins draining to a mountain front without selecting specific basins."};
+  
+  float_default_map["upper_outlet_elevation_threshold"] = 25;
+  help_map["upper_outlet_elevation_threshold"] = {  "float","0","When remove_basins_by_outlet_elevation this is maximum elevation of the basin outlet.","A simple way to get basins draining to a mountain front without selecting specific basins."};
 
   // IMPORTANT: S-A analysis and chi analysis wont work if you have a truncated
   // basin. For this reason the default is to test for edge effects
   bool_default_map["find_complete_basins_in_window"] = true;
+  help_map["find_complete_basins_in_window"] = {  "bool","true","Deletes basins that have pixels at the edge.","S-A analysis and chi analysis wont work if you have a truncated basin."};
+  
   bool_default_map["find_largest_complete_basins"] = false;
-  bool_default_map["print_basin_raster"] = false;
+  help_map["find_largest_complete_basins"] = {  "bool","false","Deletes basins that have pixels at the edge and nested basins.","This gets superceded by newer basin extraction."};
+  
   bool_default_map["force_all_basins"] = false;
+  help_map["force_all_basins"] = {  "bool","false","This overrides deletion of nested basins.","Breaks lots of analyses so frequently is ignored."};
+  
+  bool_default_map["print_basin_raster"] = false;
+  help_map["print_basin_raster"] = {  "bool","false","This prints a raster where the values are the basin number.","You can combine this with python tools to get basin shapefiles."};
+    
 
   // printing of rasters and data before chi analysis
-  bool_default_map["convert_csv_to_geojson"] = false;  // This converts all cv files to geojson (for easier loading in a GIS)
+  bool_default_map["convert_csv_to_geojson"] = false;
+  help_map["convert_csv_to_geojson"] = {  "bool","false","Converts csv files to geojson files","Makes csv output easier to read with a GIS. Warning: these files are much bigger than csv files."};
 
   bool_default_map["print_stream_order_raster"] = false;
-  bool_default_map["print_channels_to_csv"] = false;
-  bool_default_map["use_extended_channel_data"] = false;
-  bool_default_map["print_junction_index_raster"] = false;
-  bool_default_map["print_junctions_to_csv"] = false;
+  help_map["print_stream_order_raster"] = {  "bool","false","Prints a raster with _SO in filename with stream orders of channel in the appropriate pixel.","Generates a big file so we suggest printing the network to csv."};
+
   bool_default_map["print_fill_raster"] = false;
-  bool_default_map["print_DrainageArea_raster"] = false;
+  help_map["print_fill_raster"] = {  "bool","false","Prints the fill raster.","Filename includes _FILL"};
+
   bool_default_map["write_hillshade"] = false;
-  bool_default_map["print_basic_M_chi_map_to_csv"] = false;
-                                                                                            
+  help_map["write_hillshade"] = {  "bool","false","Write the hillshade raster.","You need this for a lot of our plotting routines. Filename includes _HS"};
+
+  bool_default_map["print_channels_to_csv"] = false;
+  help_map["print_channels_to_csv"] = {  "bool","false","Prints the channel network to a csv file.","This version produces smaller files than the raster version."};
+
+  bool_default_map["use_extended_channel_data"] = false;
+  help_map["use_extended_channel_data"] = {  "bool","false","If this is true you get more data columns in your channel network csv.","I will tell you what these columns are one day."};
+
+  bool_default_map["print_junction_index_raster"] = false;
+  help_map["print_junction_index_raster"] = {  "bool","false","Prints a raster with junctions and their number.","Makes big files. It is better to use the csv version."};
+
+  bool_default_map["print_junctions_to_csv"] = false;
+  help_map["print_junctions_to_csv"] = {  "bool","false","Prints a csv with the locations and numbers of the junctions.","This is better to use than the raster version."};
+
+  bool_default_map["print_raster_without_seas"] = false;
+  help_map["print_raster_without_seas"] = {  "bool","false","Overwrites the raster without seas.","DANGER this will replace your existing raster with the high and low points replaced by nodata. See the remove_seas flag"};
+
+  bool_default_map["print_d8_drainage_area_raster"] = false;
+  help_map["print_d8_drainage_area_raster"] = {  "bool","false","Prints d8 drainage area raster.","Raster extension is D8."};
+
+
   // knickpoint analysis. This is still under development.
   bool_default_map["ksn_knickpoint_analysis"] = false;
+  help_map["ksn_knickpoint_analysis"] = {  "bool","false","Run the knickpoint analysis","See Gailleton et al 2019 ESURF for details"};
+
   int_default_map["force_skip_knickpoint_analysis"] = 2;
+  help_map["force_skip_knickpoint_analysis"] = {  "int","2","Sets the skip value for the knickpoint analysis. This can be different from the k_sn segmentation skip","See parameter skip for details. Parameter described in Mudd et al 2014 JGR-ES"};
+
   int_default_map["force_n_iteration_knickpoint_analysis"] = 20;
+  help_map["force_n_iteration_knickpoint_analysis"] = {  "int","20","Sets the number of iterations value for the knickpoint analysis. This can be different from the k_sn segmentation n_iterations","See parameter n_iterations for details. Parameter described in Mudd et al 2014 JGR-ES"};
+
   float_default_map["force_A0_knickpoint_analysis"] = 1;
+  help_map["force_A0_knickpoint_analysis"] = {  "float","1","Set the A0 for the knickpoint analysis. This can be different from the k_sn segmentation A_0","Allows you to test the sentitivity of results to A_0"};
+
   float_default_map["MZS_threshold"] = 0.5;
+  help_map["MZS_threshold"] = {  "float","0.5","A parameter for knickpoint extraction","See Gailleton et al 2019 ESURF to see how results are sensitive to this parameter"};
+
+
   float_default_map["TVD_lambda"] = -1;
+  help_map["TVD_lambda"] = {  "float","-1","A parameter for the total variation denoising filter","See Gailleton et al 2019 ESURF to see how results are sensitive to this parameter"};
+
   float_default_map["TVD_lambda_bchi"] = 10000; // Really high, the main variations are extracted with TVD M_chi
+  help_map["TVD_lambda_bchi"] = {  "float","10000","A parameter for the total variation denoising filter. Set vary high because we don't want denoising of the step changes in elevation. But you could denoise this if you wanted.","See Gailleton et al 2019 ESURF to see how results are sensitive to this parameter"};
+
   int_default_map["kp_node_combining"] = 10;
+  help_map["kp_node_combining"] = {  "int","10","A parameter for knickpoint finding that sets how many adjacent changes in k_sn might be combined into single knickpoints","See Gailleton et al 2019 ESURF to see how results are sensitive to this parameter"};
+
   int_default_map["stepped_combining_window"] = 10;
+  help_map["stepped_combining_window"] = {  "int","10","A parameter for knickpoint finding that sets how many adjacent changes in b_chi might be combined into single knickpoints","See Gailleton et al 2019 ESURF to see how results are sensitive to this parameter"};
+
   int_default_map["window_stepped_kp_detection"] = 100;
+  help_map["window_stepped_kp_detection"] = {  "int","100","A parameter for knickpoint finding that sets over how many pixels you attempt to combine knickpoints.","See Gailleton et al 2019 ESURF to see how results are sensitive to this parameter"};
+
   float_default_map["std_dev_coeff_stepped_kp"] = 4;
+  help_map["std_dev_coeff_stepped_kp"] = {  "float","4","A parameter for knickpoint finding that sets the variation in elevation that is used to combine stepped knickpoints.","See Gailleton et al 2019 ESURF to see how results are sensitive to this parameter"};
 
   // basic parameters for calculating chi
-  float_default_map["A_0"] = 1;
+  float_default_map["A_0"] = 1.0;
+  help_map["A_0"] = {  "float","1.0","The A_0 parameter for chi computation. See https://doi.org/10.1002/esp.3302","Usually set to 1 so that the slope in chi-elevation space is the same as k_sn"};
+   
   float_default_map["m_over_n"] = 0.5;
+  help_map["m_over_n"] = {  "float","0.5","The concavity index for chi calculations. Ususally denoted as the greek symbol theta.","Default is 0.5 but possibly 0.45 is better as Kwang and Parker suggest 0.5 leads to unrealistic behaviour in landscape evolution models."};
+
   int_default_map["threshold_pixels_for_chi"] = 0;
-  int_default_map["basic_Mchi_regression_nodes"] = 11;
+  help_map["threshold_pixels_for_chi"] = {  "int","0","Minimum number of controbuting pixels for calculating chi.","You can reduce the size of the chi csv files by setting a high number."};
 
   // This burns a raster value to any csv output of chi data
-  // Useful for appending geology data to chi profiles
+  // Useful for appending geology data to chi profiles 
   bool_default_map["burn_raster_to_csv"] = false;
+  help_map["burn_raster_to_csv"] = {  "bool","false","Takes a raster with burn_raster_prefix and then samples that raster with the points in the csv file. The new column will be burn_data_csv_column_header.","Useful for adding raster data to csv file. Often used to add lithological information to csv data (you must rasterize the lithology data first."};
+
   string_default_map["burn_raster_prefix"] = "NULL";
+  help_map["burn_raster_prefix"] = {  "string","NULL","The prefix of the raster to burn to a csv.","No extension required."};
+
   string_default_map["burn_data_csv_column_header"] = "burned_data";
-    
+  help_map["burn_data_csv_column_header"] = {  "string","burned_data","Column header in csv of data burned from raster.","For example lithocode."};
+
   // This burns a secondary raster value to any csv output of chi data
   // Useful when there are two datasets, e.g., precipitation data and geology data
   bool_default_map["secondary_burn_raster_to_csv"] = false;
+  help_map["secondary_burn_raster_to_csv"] = {  "bool","false","Takes a second raster with burn_raster_prefix and then samples that raster with the points in the csv file. The new column will be burn_data_csv_column_header.","Useful for adding raster data to csv file. Often used to add lithological information to csv data (you must rasterize the lithology data first."};
+
   string_default_map["secondary_burn_raster_prefix"] = "NULL";
+  help_map["secondary_burn_raster_prefix"] = {  "string","NULL","The prefix of the second raster to burn to a csv.","No extension required."};
+
   string_default_map["secondary_burn_data_csv_column_header"] = "secondary_burned_data";
+  help_map["secondary_burn_data_csv_column_header"] = {  "string","secondary_burned_data","Column header in csv of data burned from second raster.","For example lithocode."};
 
   // parameters if you want to explore m/n ratios or slope-area analysis
   int_default_map["n_movern"] = 8;
+  help_map["n_movern"] = {  "int","8","For looping through concavity values. This is the number of values to try.","Used in concavity analysis. movern is the same as theta (the concavity index) in this context."};
+
   float_default_map["start_movern"] = 0.1;
+  help_map["start_movern"] = {  "float","0.1","For looping through concavity values. This is the lowest value of m/n or theta to try.","Used in concavity analysis. movern is the same as theta (the concavity index) in this context."};
+
   float_default_map["delta_movern"] = 0.1;
+  help_map["delta_movern"] = {  "float","0.1","For looping through concavity values. This is change in concavity index for each try. So if 0.1 then you would do 0.1 0.2 0.3 etc.","Used in concavity analysis. movern is the same as theta (the concavity index) in this context."};
+
   bool_default_map["only_use_mainstem_as_reference"] = true;
+  help_map["only_use_mainstem_as_reference"] = {  "bool","true","For looping through concavity values. Not sure if turning this off does anything--SMM.","Used in concavity analysis."};
+
 
   // these loop through m/n spitting out profies and calculating goodness of fit
   // If you want to visualise the data you need to switch both of these to true
   bool_default_map["calculate_MLE_collinearity"] = false;
+  help_map["calculate_MLE_collinearity"] = {  "bool","false","For concavity analysis. Caluculates MLE for each basin and theta for visualisation. You can just use estimate_best_fit_movern_no_bootstrap now","Used in concavity analysis."};
+
   float_default_map["collinearity_MLE_sigma"] = 1000;
+  help_map["collinearity_MLE_sigma"] = {  "float","1000","Setting for controlling the degree of uncertainty in the MLE collinearity test. We now prefer the disorder method","See mudd et al 2018 ESURF for details."};
+
   bool_default_map["print_profiles_fxn_movern_csv"] = false;
+  help_map["print_profiles_fxn_movern_csv"] = {  "bool","false","For concavity analysis, prints all the profiles. You get *a lot* of files. ","Used in concavity analysis. For visualising profile"};
+
 
   // these are routines to calculate the movern ratio using points
   bool_default_map["calculate_MLE_collinearity_with_points"] = false;
+  help_map["calculate_MLE_collinearity_with_points"] = {  "bool","false","For concavity analysis. You can now just use estimate_best_fit_movern. We tend not to use this now since we favour the disorder approach","Used in concavity analysis. See Mueed et al 2018 esurf."};
+
   bool_default_map["calculate_MLE_collinearity_with_points_MC"] = false;
+  help_map["calculate_MLE_collinearity_with_points_MC"] = {  "bool","false","For concavity analysis. This uses some random selection of poais and is computationally expensive. You can now just use estimate_best_fit_movern. We tend not to use this now since we favour the disorder approach","Used in concavity analysis. See Mueed et al 2018 esurf."};
+
   int_default_map["MC_point_fractions"] = 5;
+  help_map["MC_point_fractions"] = {  "int","5","Sets the frequency of sampling points in the calculate_MLE_collinearity_with_points_MC. But disorder works better. So you will probably not use this.","See mudd et al 2018 ESURF for details."};
+
   int_default_map["MC_point_iterations"] = 1000;
+  help_map["MC_point_iterations"] = {  "int","1000","Sets the iterations of sampling points in the calculate_MLE_collinearity_with_points_MC. But disorder works better. So you will probably not use this.","See mudd et al 2018 ESURF for details."};
+
   float_default_map["max_MC_point_fraction"] = 0.5;
+  help_map["max_MC_point_fraction"] = {  "float","0.5","Sets something about sampling points in the calculate_MLE_collinearity_with_points_MC that I have forgotten-SMM. But disorder works better. So you will probably not use this.","See mudd et al 2018 ESURF for details."};
 
   // and this is the residuals test
   bool_default_map["movern_residuals_test"] = false;
+  help_map["movern_residuals_test"] = {  "bool","false","For concavity analysis. This was a residuals routine that we found wasn't really useful. Keep false","Old routine used only in testing."};
   
   // This is the disorder test
   bool_default_map["movern_disorder_test"] = false; 
+  help_map["movern_disorder_test"] = {  "bool","false","For concavity analysis. The most useful test. Way to use this now is to set estimate_best_fit_movern_no_bootstrap","For concavity analysis see Mudd et al 2018 ESURF"};
+  
   bool_default_map["disorder_use_uncert"] = false; 
-
+  help_map["disorder_use_uncert"] = {  "bool","false","For concavity analysis. The most useful test and this one quantifies uncertainty. Way to use this now is to set estimate_best_fit_movern_no_bootstrap","For concavity analysis see Mudd et al 2018 ESURF"};
+  
   bool_default_map["MCMC_movern_analysis"] = false;
+  help_map["MCMC_movern_analysis"] = {  "bool","false","For concavity analysis. A method we no longer like. Keep false","Old method. Don't use. For concavity analysis see Mudd et al 2018 ESURF"};
+  
   float_default_map["MCMC_movern_minimum"] = 0.05;
+  help_map["MCMC_movern_minimum"] = {  "float","0.05","For concavity analysis. Legacy method. No longer used","Old method. Don't use. For concavity analysis see Mudd et al 2018 ESURF"};
+    
   float_default_map["MCMC_movern_maximum"] = 1.5;
+  help_map["MCMC_movern_maximum"] = {  "float","1.5","For concavity analysis. Legacy method. No longer used","Old method. Don't use. For concavity analysis see Mudd et al 2018 ESURF"};
+ 
   float_default_map["MCMC_chain_links"] = 5000;
+  help_map["MCMC_chain_links"] = {  "float","5000","For concavity analysis. Legacy method. No longer used","Old method. Don't use. For concavity analysis see Mudd et al 2018 ESURF"};
+ 
 
   // this switch turns on all the appropriate runs for estimating
   // the best fit m/n
   bool_default_map["estimate_best_fit_movern"] = false;
+  help_map["estimate_best_fit_movern"] = {  "bool","false","This is the key switch for concavity analysis and controls other switches. For a concavity analysis you really only have to set this one or estimate_best_fit_movern_no_bootstrap to true. This one has all the methods, the other limits to disorder","See Mudd et al 2018 ESURF. Controls other switches"};
+  
   bool_default_map["estimate_best_fit_movern_no_bootstrap"] = false;
-
+  help_map["estimate_best_fit_movern_no_bootstrap"] = {  "bool","false","This is the key switch for concavity analysis and controls other switches. For a concavity analysis you really only have to set this one or estimate_best_fit_movern to true. This one removes the bootstrap method. Bootstrap method is very computationally intensive and less reliable than disorder metric","See Mudd et al 2018 ESURF. Controls other switches"};
+  
   // S-A analysis parameters
   float_default_map["SA_vertical_interval"] = 20;
+  help_map["SA_vertical_interval"] = {  "float","20","For S--A analysis. The vertical drop in channel elevation over which gradient is calculated","Vertical drop method recommended by Wobus et al 2006. Means gradient is measured over variable lengths"};
+   
   float_default_map["log_A_bin_width"] = 0.1;
+  help_map["log_A_bin_width"] = {  "float","0.1","For S--A analysis. The width of bins in log space","Controls binning. Regressions are sensitive to this parameter"};
+ 
   bool_default_map["print_slope_area_data"] = false;
+  help_map["print_slope_area_data"] = {  "bool","false","Prints the S--A data to file so you can visualise","For S--A analysis. Chi analysis is more accurate (see many papers) but this is for completeness."};
+ 
   bool_default_map["segment_slope_area_data"] = false;
+  help_map["segment_slope_area_data"] = {  "bool","false","This uses the algorithms from Mudd et al 2014 originally used to segment data into linear segments.","For S--A analysis. An attempt to find different segments quantitatively rather than just looking at the profiles and bunging lines through them as seems to be standard in many papers."};
+ 
   int_default_map["slope_area_minimum_segment_length"] = 3;
+  help_map["slope_area_minimum_segment_length"] = {  "int","3","For the segment_slope_area_data this sets the minimum number of A bins in a segment.","For S--A analysis. An attempt to find different segments quantitatively rather than just looking at the profiles and bunging lines through them as seems to be standard in many papers."};
+ 
   bool_default_map["bootstrap_SA_data"] = false;
+  help_map["bootstrap_SA_data"] = {  "bool","false","For S--A analysis this subsamples many times to get uncertainties in theta estimates from this data.","Turn this on if you want uncertainty for S--A analysis."};
+ 
   int_default_map["N_SA_bootstrap_iterations"] = 1000;
+  help_map["N_SA_bootstrap_iterations"] = {  "int","1000","Bootstrapping S--A data subsamples and this sets the number of subsampling iterations","Higher numbers mean computation take longer but better uncertainty estimates."};
+ 
   float_default_map["SA_bootstrap_retain_node_prbability"] = 0.5;
-
+  help_map["SA_bootstrap_retain_node_prbability"] = {  "float","0.5","Bootstrapping S--A data subsamples so this is the probability you keep any data point in a bootstrap iteration.","Lower numbers mean you need more bootstrap iterations but a better idea of uncertainty."};
+ 
 
   // parameters for various chi calculations as well as slope-area
   int_default_map["n_iterations"] = 20;
+  help_map["n_iterations"] = {  "int","20","Number of interations of random sampling of chi-elevation space to make segments. Used to constrain segmentation uncertainty.","See Mudd et al 2014 JGR-ES for details.."};
+
   int_default_map["minimum_segment_length"] = 10;
+  help_map["minimum_segment_length"] = {  "int","10","The minimum number of pixels in a segment. If too short computation is very expensive.","See Mudd et al 2014 JGR-ES for details. Sensitivity testing suggest values between 8 and 14 are appropriate."};
+
   int_default_map["maximum_segment_length"] = 100000; //make super large so as not to be a factor unless user defined
+  help_map["maximum_segment_length"] = {  "int","100000","The maximum number of pixels in a segment. Usually not used so set to a very high number.","See Mudd et al 2014 JGR-ES for details."};
+
   int_default_map["n_nodes_to_visit"] = 10;
+  help_map["n_nodes_to_visit"] = {  "int","10","The number of nodes downslope of a junction to visit for segmentation across junctions.","See Mudd et al 2014 JGR-ES for details."};
+
   int_default_map["target_nodes"] = 80;
+  help_map["target_nodes"] = {  "int","80","Segmentation breaks channels into chunks of this length. It tests all combinations within that window so computation time increases a lot when this is bigger than 120.","See Mudd et al 2014 JGR-ES for details. 80 is okay. 120 will take forever. 60 too short"};
+
   int_default_map["skip"] = 2;
+  help_map["skip"] = {  "int","2","A parameter used in segmentation. This is the mean number of pixels skipped for each pixel selected. The actual number skipped in each iteration is uniformly distributed between 0 and 2*skip. This approach is taken to constrain uncertainty in segments.","See Mudd et al 2014 JGR-ES for details. A number between 2 and 4 is normal. Larger numbers can be used for lidar. "};
+
   float_default_map["sigma"] = 20;
+  help_map["sigma"] = {  "float","20","A parameter used in segmentation. This should be the geomorphic noise in metres so the topographic error plus the noise in the channels from boulders local erodibility variability etc.","See Mudd et al 2014 JGR-ES for details. Will vary between 5-20 unless you are using terrible ASTER data in which case use a bigger number. Never more than 50."};
+
 
   // switches for chi analysis
   // These just print simple chi maps
+  bool_default_map["check_chi_maps"] = false;
+  help_map["check_chi_maps"] = {  "bool","false","A debugging tool.","You don't need this unless you are Simon and you need to do some debugging."};
+  
   bool_default_map["print_chi_coordinate_raster"] = false;
+  help_map["print_chi_coordinate_raster"] = {  "bool","false","Prints the chi coordinate to a raster.","For visualisation. It looks cool when you drape the point based chi over a semitransparent rasterized chi map."};
+ 
   bool_default_map["mask_chi_coordinate_raster_with_basins"] = false;
+  help_map["mask_chi_coordinate_raster_with_basins"] = {  "bool","false","This only prints this chi coordinate raster under selected basins.","For visualisation. It looks cool when you drape the point based chi over a semitransparent rasterized chi map."};
+ 
   bool_default_map["print_simple_chi_map_to_csv"] = false;
+  help_map["print_simple_chi_map_to_csv"] = {  "bool","false","If true prints the chi network to csv.","Less data in this file than print_chi_data_maps. Use if you just want the chi coordinate and want to save file space."};
+  
   bool_default_map["print_chi_data_maps"] = false;
+  help_map["print_chi_data_maps"] = {  "bool","false","If true prints the chi network to csv.","csv file has chidatamaps in the filename. Has the locations of the channel pixels with their chi coordinates and other information."};
+
+  bool_default_map["print_simple_chi_map_with_basins_to_csv"] = false;
+  help_map["print_simple_chi_map_with_basins_to_csv"] = {  "bool","false","If true prints the chi network to csv bith basin numbers.","Less data in this file than print_chi_data_maps. Use if you just want the chi coordinate and want to save file space."};
 
 
   // these are routines that run segmentation
-  bool_default_map["print_simple_chi_map_with_basins_to_csv"] = false;
   bool_default_map["print_segmented_M_chi_map_to_csv"] = false;
+  help_map["print_segmented_M_chi_map_to_csv"] = {  "bool","false","This runs the Mudd et al 2014 JGR segmentation routine so you get all the chi slope segments.","See Mudd et al 2014 JGR-ES for details. If you want maps of k_sn this is the way to do it."};
+
   bool_default_map["print_basic_M_chi_map_to_csv"] = false;
+  help_map["print_basic_M_chi_map_to_csv"] = {  "bool","false","This smooths the chi elevation profiles and reports M_chi from smoothed profiles.","If you are in a hurry and don't want segmentation. But for publications you should segment."};
+
+  int_default_map["basic_Mchi_regression_nodes"] = 11;
+  help_map["basic_Mchi_regression_nodes"] = {  "int","11","For print_basic_M_chi_map_to_csv this is the number of pixels smoothed over which to calculate slope in chi-elevation space.","If you are in a hurry and don't want segmentation. But for publications you should segment."};
+
 
   // these print various basin and source data for visualisation
   bool_default_map["print_source_keys"] = false;
+  help_map["print_source_keys"] = {  "bool","false","Prints a csv with the location and the source key.","Each source on its own row with latitude and longitude columns with the source key printed."};
+
   bool_default_map["print_sources_to_csv"] = false;
+  help_map["print_sources_to_csv"] = {  "bool","false","Prints the sources to a csv file.","Each source on its own row with latitude and longitude columns."};
+
   bool_default_map["print_sources_to_raster"] = false;
+  help_map["print_sources_to_raster"] = {  "bool","false","If true the sources to a raster.","Inefficient so print_sources_to_csv is preferred."};
+  
   bool_default_map["print_baselevel_keys"] = false;
+  help_map["print_baselevel_keys"] = {  "bool","false","Prints a csv with the location and the baselevel keys.","Each baselevel on its own row with latitude and longitude columns with the source key printed."};
 
   // These enable calculation of chi based on discharge
   bool_default_map["use_precipitation_raster_for_chi"] = false;
+  help_map["use_precipitation_raster_for_chi"] = {  "bool","false","Reads a precipitation raster and calucates chi on the basis of accumulated precipitation.","You need to point the code to the precipitation raster with precipitation_fname."};
+
   bool_default_map["print_discharge_raster"] = false;
-  bool_default_map["print_chi_no_discharge"] = false;   // this only is used if you also
-                                                        // calculate chi with discharge so you can compare.
-  bool_default_map["check_chi_maps"] = false;
+  help_map["print_discharge_raster"] = {  "bool","false","If you ingest precipiation this prints discharge to a raster.","You need to point the code to the precipitation raster with precipitation_fname."};
+
+  bool_default_map["print_chi_no_discharge"] = false;  
+  help_map["print_chi_no_discharge"] = {  "bool","false","If you ingest precipiation this prints chi without discharge so you can compare to the chi with discharge.","Only used in conjunction with the discharge-based chi calculation."};
+                                                        
   string_default_map["precipitation_fname"] = "NULL";
+  help_map["precipitation_fname"] = {  "string","NULL","Raster prefix of the precipitation raster you will use to accumulate into discharge. Do not include extension","This is used when use_precipitation_raster_for_chi is true."};
 
 
   // These give unique IDs to each segment and then add this information to the
   // MChi and also semgent raster. We use this to map segments to other landscape
   // properties such as various hillslope metrics
   bool_default_map["print_segments"] = false;
+  help_map["print_segments"] = {  "bool","false","This will print a channel csv that includes segment numbers.","csv file will have lat-long chi and other information but also segment numbers."};
+
   bool_default_map["print_segments_raster"] = false;
+  help_map["print_segments_raster"] = {  "bool","false","Prints a raster of segment numbers.","For visualisation. The print_segments is more data efficient."};
 
   // Parameters linked to the lithology
   bool_default_map["print_litho_info"] = false;
+  help_map["print_litho_info"] = {  "bool","false","If this is true takes a lithology raster and adds the lithology code to the chi data maps.","Use litho_raster to assign the raster name."};
+
+
   string_default_map["litho_raster"] = "NULL";
+  help_map["litho_raster"] = {  "string","NULL","Raster prefix of the lithology raster you will use. It adds lithology information to the chi data maps. Do not include extension","This is used when print_litho_info is true."};
 
 
+  //=========================================================================
+  //
+  //.#####....####...#####....####...##...##..######..######..######..#####..
+  //.##..##..##..##..##..##..##..##..###.###..##........##....##......##..##.
+  //.#####...######..#####...######..##.#.##..####......##....####....#####..
+  //.##......##..##..##..##..##..##..##...##..##........##....##......##..##.
+  //.##......##..##..##..##..##..##..##...##..######....##....######..##..##.
+  //
+  //..####...##..##..######...####...##..##...####..                         
+  //.##..##..##..##..##......##..##..##.##...##.....                         
+  //.##......######..####....##......####.....####..                         
+  //.##..##..##..##..##......##..##..##.##.......##.                         
+  //..####...##..##..######...####...##..##...####..    
+  //                     
   // Use the parameter parser to get the maps of the parameters required for the
   // analysis
   LSDPP.parse_all_parameters(float_default_map, int_default_map, bool_default_map,string_default_map);
@@ -305,10 +585,16 @@ int main (int nNumberofArgs,char *argv[])
     this_int_map["threshold_contributing_pixels"] = nt;
   }
 
+  if(f_name == "cry_for_help.txt")
+  {
+    cout << "I am going to print the help and exit." << endl;
+    cout << "You can find the help in the file:" << endl;
+    cout << "./lsdtt-basic-metrics-README.csv" << endl;
+    string help_prefix = "lsdtt-chi-mapping-README";
+    LSDPP.print_help(help_map, help_prefix, version_number, citation);
+    exit(0);
+  }
 
-  // Now print the parameters for bug checking
-  //cout << "PRINT THE PARAMETERS..." << endl;
-  //LSDPP.print_parameters();
 
   // location of the files
   string DATA_DIR =  LSDPP.get_read_path();
@@ -317,7 +603,7 @@ int main (int nNumberofArgs,char *argv[])
   string OUT_ID = LSDPP.get_write_fname();
   string raster_ext =  LSDPP.get_dem_read_extension();
   vector<string> boundary_conditions = LSDPP.get_boundary_conditions();
-  
+
   cout << endl << endl << "=============================" << endl;
   cout << "Let me check on the channel heads." << endl;
   string CHeads_file = LSDPP.get_CHeads_file();
@@ -590,7 +876,15 @@ int main (int nNumberofArgs,char *argv[])
   }
 
 
-
+  //============================================================================
+  //
+  //.#####....####....####...######..######..#####...........#####...##..##..#####...##..##.
+  //.##..##..##..##..##........##....##......##..##..........##..##..##..##..##..##..###.##.
+  //.#####...######...####.....##....####....#####...........#####...##..##..#####...##.###.
+  //.##..##..##..##......##....##....##......##..##..........##..##..##..##..##..##..##..##.
+  //.##..##..##..##...####.....##....######..##..##..........#####....####...##..##..##..##.
+  //
+  //============================================================================
   //============================================================================
   // check to see if the raster for burning exists
   LSDRaster BurnRaster;
@@ -734,9 +1028,9 @@ int main (int nNumberofArgs,char *argv[])
   cout << "\t Converting to flow area..." << endl;
   LSDRaster DrainageArea = FlowInfo.write_DrainageArea_to_LSDRaster();
 
-  if (this_bool_map["print_DrainageArea_raster"])
+  if (this_bool_map["print_d8_drainage_area_raster"])
   {
-    string DA_raster_name = OUT_DIR+OUT_ID+"_DArea";
+    string DA_raster_name = OUT_DIR+OUT_ID+"_d8_area";
     DrainageArea.write_raster(DA_raster_name,raster_ext);
   }
 
@@ -866,8 +1160,7 @@ int main (int nNumberofArgs,char *argv[])
         vector<string> IDs;
         cout << "The basin file is: " << basin_outlet_fname << endl;
         LSDSpatialCSVReader Outlet_CSV_data(RI,basin_outlet_fname);
-        //IDs = Outlet_CSV_data.get_data_column(this_string_map["sample_ID_column_name"]);
-        
+
         cout << "I am reading the following samples: " << endl;
         vector<double> latitude = Outlet_CSV_data.get_latitude();
         vector<double> longitude = Outlet_CSV_data.get_longitude();
@@ -995,7 +1288,7 @@ int main (int nNumberofArgs,char *argv[])
   }
   else
   {
-    cout << "I am forcing all the basin to be analysed" << endl;
+    cout << "I am forcing all the basins to be analysed" << endl;
     BaseLevelJunctions = JunctionNetwork.get_BaseLevelJunctions();
     // BaseLevelJunctions = JunctionNetwork.Prune_Junctions_If_Nested(BaseLevelJunctions,FlowInfo,FlowAcc);
 
