@@ -70,6 +70,11 @@
 using namespace std;
 using namespace TNT;
 
+// OPEN CV
+#include "opencv2/opencv.hpp"
+
+using namespace cv;
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // create
@@ -184,6 +189,41 @@ void LSDFloodplain::create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJuncti
   FloodplainNodes = FloodplainNodes_temp;
 }
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// overloaded create function to read in an existing floodplain raster.
+// FJC 04/11/21
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDFloodplain::create(LSDRaster& ExistingRaster)
+{
+
+  /// set the protected variables
+  NRows = ExistingRaster.get_NRows();
+  NCols = ExistingRaster.get_NCols();
+  XMinimum = ExistingRaster.get_XMinimum();
+  YMinimum = ExistingRaster.get_YMinimum();
+  DataResolution = ExistingRaster.get_DataResolution();
+  NoDataValue = ExistingRaster.get_NoDataValue();
+  GeoReferencingStrings = ExistingRaster.get_GeoReferencingStrings();
+
+  //declare the arrays
+  Array2D<int> TempBinArray(NRows,NCols,0);
+  BinaryArray = TempBinArray.copy();
+
+  for (int i = 0; i < NRows; i++)
+  {
+    for (int j = 0; j < NCols; j++)
+    {
+      BinaryArray[i][j] = ExistingRaster.get_data_element(i,j);
+    }
+  }
+
+}
+
+void LSDFloodplain::create()
+{
+  
+}
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -508,7 +548,6 @@ vector<vector<float>> LSDFloodplain::calculate_valley_widths(LSDSpatialCSVReader
           right_bank_width = min_right_dist;
           //total_width = FlowInfo.get_Euclidian_distance(left_bank_node, right_bank_node);
           total_width = left_bank_width + right_bank_width;
-          count+=1;
         }
       }
       left_bank_widths.push_back(left_bank_width);
@@ -524,6 +563,7 @@ vector<vector<float>> LSDFloodplain::calculate_valley_widths(LSDSpatialCSVReader
 
       if (total_width != NoDataValue && left_latitude != NoDataValue && right_latitude != NoDataValue)
       {
+        count+=1;
         // now write the geojson with orthogonal lines
         string first_bit = "{ \"type\": \"Feature\", \"properties\": { \"total_valley_width\": ";
         //string second_bit = dtoa(latitude[i])+", \"longitude\": "+ dtoa(this_longitude);
@@ -922,429 +962,46 @@ vector<int> LSDFloodplain::remove_tributary_nodes(LSDSpatialCSVReader& channel_c
 }
 
 //----------------------------------------------------------------------------------------
-// Hopefully a better hole filling using a spiral approach
-// FJC 07/05/21
+// Fill holes in the floodplain raster using OpenCV floodfill.
+// FJC 29/10/21
 //----------------------------------------------------------------------------------------
-void LSDFloodplain::fill_holes_in_floodplain_spiral(int window_width)
+void LSDFloodplain::fill_holes_in_floodplain()
 {
-  Array2D<int> UpdatedArray = BinaryArray.copy();
+    // use OpenCV floodfill to fill holes in the floodplain raster
+    // floodfill from point (0,0)
 
-  for (int row = 0; row < NRows; row++)
-  {
-    for (int col = 0; col < NCols; col++)
-    {
-      if (BinaryArray[row][col] == 0)
-      {
-        bool found_data_n = false;
-        bool found_data_e = false;
-        bool found_data_s = false;
-        bool found_data_w = false;
-        // loop through pixels in each direction in a spiral and check for data
-        for (int i = 1; i <= window_width; i++)
-        {
-          int north = 0;
-          int east = 0;
-          int south = 0;
-          int west = 0;
-          for (int j = -i; j <= i; j++) 
-          {
-            if ((row-i) > 0 && (row+i) < NRows && (col-i) > 0 && (col+i) < NCols) { 
-              //cout << "i " << i << " j " << j << endl;
-              if (BinaryArray[row-i][col+j] == 1) { north += 1; }  // top row
-              if (BinaryArray[row+j][col+i] == 1) { east += 1; } // right column
-              if (BinaryArray[row+i][col+j] == 1) { south += 1; }  // bottom row
-              if (BinaryArray[row+j][col-i] == 1) { west += 1; }  // left column
-            }
-            if (north >= (i*2) + 1) { found_data_n = true; }
-            if (east >= (i*2) + 1) { found_data_e = true; }
-            if (south >= (i*2) + 1) { found_data_s = true; }
-            if (west >= (i*2) + 1) { found_data_w = true; }
-          }
-          // if (north != 0 && east != 0 && south != 0 && west != 0) 
-          // {
-          //   cout << north << " " << east << " " << south << " " << west << endl; 
-          //   cout << "threshold: " << (i*2) + 1 << endl; 
-          // }
-          // now check how many of the pixels had data. We need there to be pixels in all directions that had data. 
-          //int threshold = (window_width*2) + 1;
-          //if (north >= threshold && east >= threshold && south >= threshold && west >= threshold)
-          if (found_data_n && found_data_e && found_data_s && found_data_w)
-          {
-            //cout << "Filling hole" << endl;
-            UpdatedArray[row][col] = 1;
-            break;
-          }
-        } 
-      }
-    }
-  }
+    // create an OpenCV Mat object from the raster data
+    Mat img(NRows, NCols, CV_8UC1);
+    for(int i=0; i<NRows; ++i)
+         for(int j=0; j<NCols; ++j)
+              img.at<unsigned char>(Point(j, i)) = BinaryArray[i][j];
 
-  BinaryArray = UpdatedArray;
-}
+    cout << "got mat object" << endl;
+    Mat img_floodfill = img.clone();
 
-//----------------------------------------------------------------------------------------
-// Fill holes in the floodplain raster - post-processing
-// FJC 16/03/21
-//----------------------------------------------------------------------------------------
-void LSDFloodplain::fill_holes_in_floodplain(int window_width)
-{
-  // check argument
-  if(window_width <1)
-  {
-    cout << "You need a positive window width, defaulting to 1" << endl;
-    window_width = 1;
-  }
+    cv::floodFill(img_floodfill, cv::Point(0,0), 1);
+    cout << "completed flood filling" << endl;
 
-  cout << "Sweeping nodata, window width is: " << window_width << endl;
+    // // invert the array to turn 0 to 1 and 1 to 0
+    Mat img_floodfill_inv = img_floodfill.clone();
+    for(int i=0; i<img_floodfill.rows; ++i)
+     for(int j=0; j<img_floodfill.cols; ++j)
+          if (img_floodfill.at<unsigned char>(i, j) == 0) { img_floodfill_inv.at<unsigned char>(i, j) = 1; }
+          else if (img_floodfill.at<unsigned char>(i, j) == 1) { img_floodfill_inv.at<unsigned char>(i, j) = 0; }
 
-  // This function loops in alternating directions until there is no more nodata
+    cout << "inverted array" << endl;
 
-  // set up data to be
-  Array2D<int> this_sweep_data = BinaryArray.copy();;
-  Array2D<int> updated_array;
+    // // combine the two images to get the filled floodplain
+    Mat im_out = img.clone();
+    for(int i=0; i<img.rows; i++)
+      for(int j=0; j<img.cols; j++)
+        im_out.at<unsigned char>(i, j) = img.at<unsigned char>(i, j) + img_floodfill_inv.at<unsigned char>(i, j);
+    cout << "combined images to get filled floodplain" << endl;
 
-  // set the sweep number to 0
-  int nsweep = 0;
-
-  do
-  {
-    cout << "LINE 8268, Sweep number: " << nsweep << endl;
-    cout << "Line 8275, switch is: " << nsweep%4 << endl;
-
-    // copy over the updated raster
-    updated_array = this_sweep_data.copy();
-
-    // now run a sweep
-    switch(nsweep%4)
-    {
-      case(0):
-      {
-        // sweep 0
-        for (int row=0; row<NRows; ++row)
-        {
-          for(int col=0; col<NCols; ++col)
-          {
-            // if the node contains nodata, search the surrounding nodes
-            if(updated_array[row][col] == 0)
-            {
-              vector<int> counts(8,0);
-
-              for (int i = 1; i < window_width; i++)
-              {
-                //set exceptions for first or last row
-                int min_row = row-i;
-                int max_row = row+i;
-                if (min_row < 0) min_row = 0;
-                if (max_row >= NRows) max_row = NRows-1;
-
-                //set exceptions for first or last col
-                int min_col = col-i;
-                int max_col = col+i;
-                if (min_col < 0) min_col = 0;
-                if (max_col >= NCols) max_col = NCols-1;
-
-                //check whether surrounding pixels in all directions are equal to 0
-                if (updated_array[min_row][min_col]  == 1) {
-                  if (counts.at(0) == 0) {
-                    counts.at(0) = 1;
-                  }
-                }
-                if (updated_array[row][min_col]  == 1) {
-                  if (counts.at(1) == 0) {
-                    counts.at(1) = 1;
-                  }
-                }
-                if (updated_array[max_row][min_col]  == 1) {
-                  if (counts.at(2) == 0) {
-                    counts.at(2) = 1;
-                  }
-                }
-                if (updated_array[min_row][col]  == 1) {
-                  if (counts.at(3) == 0) {
-                    counts.at(3) = 1;
-                  }
-                }
-                if (updated_array[min_row][max_col]  == 1) {
-                  if (counts.at(4) == 0) {
-                    counts.at(4) = 1;
-                  }
-                }
-                if (updated_array[row][max_col]  == 1) {
-                  if (counts.at(5) == 0) {
-                    counts.at(5) = 1;
-                  }
-                }
-                if (updated_array[max_row][max_col]  == 1) {
-                  if (counts.at(6) == 0) {
-                    counts.at(6) = 1;
-                  }
-                }
-                if (updated_array[max_row][col] == 1) {
-                  if (counts.at(7) == 0) {
-                    counts.at(7) = 1;
-                  }
-                }
-
-                // if 1s surround the pixel, then fill in the pixel
-                if (counts.at(0) > 0 && counts.at(1) > 0 && counts.at(2) > 0 && counts.at(3) > 0 && counts.at(4) > 0 && counts.at(5) > 0 && counts.at(6) > 0 && counts.at(7) > 0)
-                {
-                  //cout << "total elev: " << total_elev << " N obs: " << n_obs << endl;
-                  this_sweep_data[row][col] = 1;
-                  i = window_width+1;
-                }
-              }
-            }
-          }
-        }
-        break;
-      }
-      case(1):
-      {
-        // sweep 1
-        for (int col=0; col<NCols; ++col)
-        {
-          for(int row=0; row<NRows; ++row)
-          {
-            // if the node contains nodata, search the surrounding nodes
-            if(updated_array[row][col] == 0)
-            {
-              vector<int> counts(8,0);
-
-              for (int i = 1; i < window_width; i++)
-              {
-                //set exceptions for first or last row
-                int min_row = row-i;
-                int max_row = row+i;
-                if (min_row < 0) min_row = 0;
-                if (max_row >= NRows) max_row = NRows-1;
-
-                //set exceptions for first or last col
-                int min_col = col-i;
-                int max_col = col+i;
-                if (min_col < 0) min_col = 0;
-                if (max_col >= NCols) max_col = NCols-1;
-
-                  //check whether surrounding pixels in all directions are equal to 0
-                if (updated_array[min_row][min_col] == 1) {
-                  if (counts.at(0) == 0) {
-                    counts.at(0) = 1;
-                  }
-                }
-                if (updated_array[row][min_col] == 1) {
-                  if (counts.at(1) == 0) {
-                    counts.at(1) = 1;
-                  }
-                }
-                if (updated_array[max_row][min_col] == 1) {
-                  if (counts.at(2) == 0) {
-                    counts.at(2) = 1;
-                  }
-                }
-                if (updated_array[min_row][col] == 1) {
-                  if (counts.at(3) == 0) {
-                    counts.at(3) = 1;
-                  }
-                }
-                if (updated_array[min_row][max_col] == 1) {
-                  if (counts.at(4) == 0) {
-                    counts.at(4) = 1;
-                  }
-                }
-                if (updated_array[row][max_col] == 1) {
-                  if (counts.at(5) == 0) {
-                    counts.at(5) = 1;
-                  }
-                }
-                if (updated_array[max_row][max_col] == 1) {
-                  if (counts.at(6) == 0) {
-                    counts.at(6) = 1;
-                  }
-                }
-                if (updated_array[max_row][col] == 1) {
-                  if (counts.at(7) == 0) {
-                    counts.at(7) = 1;
-                  }
-                }
-
-                // if 1s surround the pixel, then fill in the pixel
-                if (counts.at(0) > 0 && counts.at(1) > 0 && counts.at(2) > 0 && counts.at(3) > 0 && counts.at(4) > 0 && counts.at(5) > 0 && counts.at(6) > 0 && counts.at(7) > 0)
-                {
-                  this_sweep_data[row][col] = 1;
-                  i = window_width+1;
-                }
-              }
-            }
-          }
-        }
-        break;
-      }
-      case(2):
-      {
-        // sweep 2
-        for (int row=0; row<NRows; ++row)
-        {
-          for(int col=NCols-1; col>0; --col)
-          {
-           // if the node contains nodata, search the surrounding nodes
-            if(updated_array[row][col] == 0)
-            {
-              vector<int> counts(8,0);
-
-              for (int i = 1; i < window_width; i++)
-              {
-                //set exceptions for first or last row
-                int min_row = row-i;
-                int max_row = row+i;
-                if (min_row < 0) min_row = 0;
-                if (max_row >= NRows) max_row = NRows-1;
-
-                //set exceptions for first or last col
-                int min_col = col-i;
-                int max_col = col+i;
-                if (min_col < 0) min_col = 0;
-                if (max_col >= NCols) max_col = NCols-1;
-
-                  //check whether surrounding pixels in all directions are equal to 0
-                if (updated_array[min_row][min_col] == 1) {
-                  if (counts.at(0) == 0) {
-                    counts.at(0) = 1;
-                  }
-                }
-                if (updated_array[row][min_col] == 1) {
-                  if (counts.at(1) == 0) {
-                    counts.at(1) = 1;
-                  }
-                }
-                if (updated_array[max_row][min_col] == 1) {
-                  if (counts.at(2) == 0) {
-                    counts.at(2) = 1;
-                  }
-                }
-                if (updated_array[min_row][col] == 1) {
-                  if (counts.at(3) == 0) {
-                    counts.at(3) = 1;
-                  }
-                }
-                if (updated_array[min_row][max_col] == 1) {
-                  if (counts.at(4) == 0) {
-                    counts.at(4) = 1;
-                  }
-                }
-                if (updated_array[row][max_col] == 1) {
-                  if (counts.at(5) == 0) {
-                    counts.at(5) = 1;
-                  }
-                }
-                if (updated_array[max_row][max_col] == 1) {
-                  if (counts.at(6) == 0) {
-                    counts.at(6) = 1;
-                  }
-                }
-                if (updated_array[max_row][col] == 1) {
-                  if (counts.at(7) == 0) {
-                    counts.at(7) = 1;
-                  }
-                }
-                // if 1s surround the pixel, then fill in the pixel
-                if (counts.at(0) > 0 && counts.at(1) > 0 && counts.at(2) > 0 && counts.at(3) > 0 && counts.at(4) > 0 && counts.at(5) > 0 && counts.at(6) > 0 && counts.at(7) > 0)
-                {
-                  this_sweep_data[row][col] = 1;
-                  i = window_width+1;
-                }
-              }
-            }
-          }
-        }
-        break;
-      }
-      case(3):
-      {
-        // sweep 3
-        for (int col=0; col<NCols; ++col)
-        {
-          for(int row=NRows-1; row>0; --row)
-          {
-            // if the node contains nodata, search the surrounding nodes
-           // if the node contains nodata, search the surrounding nodes
-            if(updated_array[row][col] == 0)
-            {
-              vector<int> counts(8,0);
-
-              for (int i = 1; i < window_width; i++)
-              {
-                //set exceptions for first or last row
-                int min_row = row-i;
-                int max_row = row+i;
-                if (min_row < 0) min_row = 0;
-                if (max_row >= NRows) max_row = NRows-1;
-
-                //set exceptions for first or last col
-                int min_col = col-i;
-                int max_col = col+i;
-                if (min_col < 0) min_col = 0;
-                if (max_col >= NCols) max_col = NCols-1;
-
-                    //check whether surrounding pixels in all directions are equal to 0
-                if (updated_array[min_row][min_col] == 1) {
-                  if (counts.at(0) == 0) {
-                    counts.at(0) = 1;
-                  }
-                }
-                if (updated_array[row][min_col] == 1) {
-                  if (counts.at(1) == 0) {
-                    counts.at(1) = 1;
-                  }
-                }
-                if (updated_array[max_row][min_col] == 1) {
-                  if (counts.at(2) == 0) {
-                    counts.at(2) = 1;
-                  }
-                }
-                if (updated_array[min_row][col] == 1) {
-                  if (counts.at(3) == 0) {
-                    counts.at(3) = 1;
-                  }
-                }
-                if (updated_array[min_row][max_col] == 1) {
-                  if (counts.at(4) == 0) {
-                    counts.at(4) = 1;
-                  }
-                }
-                if (updated_array[row][max_col] == 1) {
-                  if (counts.at(5) == 0) {
-                    counts.at(5) = 1;
-                  }
-                }
-                if (updated_array[max_row][max_col] == 1) {
-                  if (counts.at(6) == 0) {
-                    counts.at(6) = 1;
-                  }
-                }
-                if (updated_array[max_row][col] == 1) {
-                  if (counts.at(7) == 0) {
-                    counts.at(7) = 1;
-                  }
-                }
-                // if 1s surround the pixel, then fill in the pixel
-                if (counts.at(0) > 0 && counts.at(1) > 0 && counts.at(2) > 0 && counts.at(3) > 0 && counts.at(4) > 0 && counts.at(5) > 0 && counts.at(6) > 0 && counts.at(7) > 0)
-                {
-                  this_sweep_data[row][col] = 1;
-                  i = window_width+1;
-                }
-              }
-            }
-          }
-        }
-        break;
-      }
-    }
-
-    // increment the sweep number
-    nsweep++;
-
-  } while(nsweep < 4);
-
-  BinaryArray = updated_array;
+    // write out image to the binary array
+    for(int i=0; i<im_out.rows; ++i)
+     for(int j=0; j<im_out.cols; ++j)
+          BinaryArray[i][j] = im_out.at<unsigned char>(i, j);
 }
 //----------------------------------------------------------------------------------------
 // FUNCTIONS TO GENERATE RASTERS
@@ -1454,76 +1111,6 @@ LSDRaster LSDFloodplain::Buffer_NoData_FloodplainRaster(LSDRaster& NoData_Floodp
   LSDRaster NoDataRaster(NRows,NCols, XMinimum, YMinimum, DataResolution, NoDataValue, NewRasterData, GeoReferencingStrings);
   return NoDataRaster;
 }
-
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-// This gets a flow path for the valley centreline. 
-// Like D8 trace, but just get a vector of nodeindices rather than anything
-// more fancy. It looks through the surrounding nodes to find any downslope which are 
-// part of the floodplain/channel (so it should work in regions with a discontinuous FP).
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-// vector<int> LSDFloodplain::get_centreline_flow_path(int start_ni, LSDFlowInfo& trough_FI, LSDFlowInfo& topo_FI)
-// {
-//   vector<int> node_list;
-
-//   int receiver_node, current_node, row, col, topo_row, topo_col;
-//   float X_value, Y_value;
-
-//   Array2D<float> topo_array = topo_raster.get_RasterData();
-//   cout << "got the raster data" << endl;
-
-//   current_node = start_ni;
-
-//   bool reached_end = false;
-//   while (reached_end == false)
-//   {  // need to do edge checking
-//     node_list.push_back(current_node);
-
-//     trough_FI.retrieve_receiver_information(current_node,receiver_node);
-//     // check if this is actually a base level node, or if there is another downslope node with data
-//     if (receiver_node == current_node)
-//     {
-//       cout << "getting row and col" << endl;
-//       cout << "current node" << current_node << endl;
-//       trough_FI.retrieve_current_row_and_col(current_node, row, col);
-
-//       // vector of channel nodes in the original flow info (all surrounding ones)
-//       vector<int> topo_channel_nodes, trough_channel_nodes;
-//       int topo_row, topo_col;
-//       for (int i = -1; i <= 1; i++)
-//       {
-//         for (int j = -1; j <= 1; j++)
-//         {
-//           if(BinaryArray[row-i][col-j] == 2)
-//           {
-//             trough_FI.get_x_and_y_locations(row-i, col-j, X_value, Y_value);
-//             topo_channel_nodes.push_back(topo_FI.get_node_index_of_coordinate_point(X_value, Y_value));
-//             trough_channel_nodes.push_back(trough_FI.get_NodeIndex_from_row_col(row-i, col-j));
-//           }
-//         }
-//       }
-//       int n_nodes = int(topo_channel_nodes.size());
-//       if (n_nodes == 1)
-//       {
-//         int bl = topo_FI.is_node_base_level(topo_channel_nodes[0]);
-//         if (bl == 1) { reached_end = true; }
-//         else { receiver_node = trough_channel_nodes[0]; }
-//       }
-//     //   else
-//     //   {
-//     //     // find the furthest downstream of these nodes
-//     //     for (int k = 0; k < int(channel_nodes.size(); k++))
-//     //     {
-          
-//     //     }
-//     //   }
-//     // }
-
-//     if (receiver_node == current_node) { reached_end = true; }
-//     // move to the next node
-//     current_node = receiver_node;
-//   }
-//   return node_list;
-// }
 
 ////----------------------------------------------------------------------------------------
 //// Get the raster of channel relief relative to the nearest channel reach

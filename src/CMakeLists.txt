@@ -6,13 +6,20 @@ project(LSDTopoTools)
 
 # TODO: issue FFTW3LibraryDepends.cmake missing in most fftw3 installs
 # https://github.com/FFTW/fftw3/issues/130
-#find_package(fftw3 REQUIRED)
+# find_package(fftw3 REQUIRED)
 #message(STATUS "Found fttw3: ${FFTW3_LIBRARY_DIRS}/fftw3")
+find_package(PkgConfig REQUIRED)
+pkg_search_module(FFTW REQUIRED fftw3 IMPORTED_TARGET)
+include_directories(PkgConfig::FFTW)
+link_libraries     (PkgConfig::FFTW)
 
 # TODO: check which components are needed (+ not working with pcl conda-forge)
 #find_package(pcl REQUIRED COMPONENTS)
 #message(STATUS "Found pcl: ${PCL_LIBRARY_DIRS}/pcl")
 
+# OpenCV
+find_package(OpenCV REQUIRED)
+include_directories( ${OpenCV_INCLUDE_DIRS})
 
 # Build
 # =====
@@ -70,7 +77,8 @@ foreach(src_file ${EXE_SOURCES})
   string(REGEX REPLACE "([^;]+)/([^;]+).cpp" "\\2" exe_file ${src_file})
   list(APPEND EXE_FILES ${exe_file})
   add_executable(${exe_file} ${src_file})
-  target_link_libraries(${exe_file} ${PROJECT_NAME} fftw3)
+  target_link_libraries(${exe_file} ${PROJECT_NAME} PkgConfig::FFTW)
+  target_link_libraries(${exe_file} ${PROJECT_NAME} ${OpenCV_LIBS} )
 endforeach(src_file ${EXE_SOURCES})
 
 

@@ -230,12 +230,6 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["fill_floodplain"] = false;
   help_map["fill_floodplain"] = {  "bool","false","This looks for holes in the floodplain and then fills them to get a continuous floodplain mask","Needed to make sure holes in the floodplain don't truncate the channel width."};
    
-  int_default_map["fill_loops"] = 1;
-  help_map["fill_loops"] = {  "int","1","For the floodplain filling routine this controls the number of loops that are tried to fill the floodplain.","Needed to make sure holes in the floodplain don't truncate the channel width."};
- 
-  int_default_map["fp_search_radius"] = 2;
-  help_map["fp_search_radius"] = {  "int","2","For the floodplain filling routine this controls how far the routine looks for holes.","Needed to make sure holes in the floodplain don't truncate the channel width."};
- 
   bool_default_map["get_valley_widths"] = false;
   help_map["get_valley_widths"] = {  "bool","false","Runs the valley width routines. It uses the floodplain mask to get the valley widths so will be sensitive to floodplain settings.","Will result in valley width extraction."};
     
@@ -261,6 +255,15 @@ int main (int nNumberofArgs,char *argv[])
   int_default_map["tributary_stream_order"] = 3;
   help_map["tributary_stream_order"] = {  "int","3","The tributary search only looks for tributaries this order or more.","If this is low you will get a lot of little tributaries that don't actually modify the channel width eliminated."};
  
+  // option to read in an existing floodplain raster
+  string_default_map["floodplain_raster"] = "NULL";
+  help_map["floodplain_raster"] = { "string","NULL", "If this isn't NULL it will load in an existing floodplain raster for valley width calculation."};
+
+  int_default_map["minimum_basin_size_pixels"] = 5000;
+  help_map["minimum_basin_size_pixels"] = {  "int","5000","For basin finding algorithm, the minimum size of a selected basin.","Will reject basins along edge."};
+  
+  int_default_map["maximum_basin_size_pixels"] = 500000;
+  help_map["maximum_basin_size_pixels"] = {  "int","500000","For basin finding algorithm, the maximum size of a selected basin.","Will reject basins along edge."};
 
   // terraces
   bool_default_map["get_terraces"] = false;
@@ -764,97 +767,107 @@ int main (int nNumberofArgs,char *argv[])
   cout << "This will take a bit of computation. " << endl;
   cout << "WARNING if you are using 30m data and you are not in quite a big valley this will often" << endl;
   cout << "result in channel with a single pixel." << endl;
-  //calculate the channel relief
-  LSDRaster ChannelRelief;
-  string relief_prefix = OUT_DIR+OUT_ID+"_channel_relief";
-  string relief_test_file = OUT_DIR+OUT_ID+"_channel_relief.hdr"; 
-  ifstream test_relief(relief_test_file.c_str());
-  if (test_relief)
-  {
-    cout << "I found a channel relief raster already. I'll just load that" << endl;
-    LSDRaster load_DEM(relief_prefix, DEM_extension);
-    ChannelRelief = load_DEM;
-  }
-  else
-  {
-    cout << "\t Getting relief relative to channel" << endl;
-    cout << "\t Threshold stream order = " << this_int_map["threshold_SO"] << endl;
-    ChannelRelief = ChanNetwork.calculate_relief_from_channel(filled_topography, FlowInfo, this_int_map["threshold_SO"]);
-    string relief_name = "_channel_relief";
-    ChannelRelief.write_raster((OUT_DIR+OUT_ID+relief_name), DEM_extension);
-    cout << "\t Got the relief!" << endl;
-  }
-
-  //get the slope
-  LSDRaster Slope;
-  string slope_prefix = OUT_DIR+OUT_ID+"_slope";
-  string slope_test_file = OUT_DIR+OUT_ID+"_slope.hdr"; 
-  ifstream test_slope(slope_test_file.c_str());
-  if (test_slope)
-  {
-    cout << "I found a slope raster already. I'll just load that" << endl;
-    LSDRaster load_DEM(slope_prefix, DEM_extension);
-    Slope = load_DEM;
-  }
-  else
-  {
-    cout << "\t Calculating slope..." << endl;
-    vector<LSDRaster> surface_fitting;
-    vector<int> raster_selection(8, 0);
-    raster_selection[1] = 1;             // this means you want the slope
-    surface_fitting = filled_topography.calculate_polyfit_surface_metrics(this_float_map["surface_fitting_radius"], raster_selection);
-    Slope = surface_fitting[1];
-    cout << "\t Done!" << endl;
-    string slope_name = "_slope";
-    Slope.write_raster((OUT_DIR+OUT_ID+slope_name), DEM_extension);
-  }
-
+  LSDFloodplain Floodplain;
+  LSDRaster ChannelRelief, Slope;
   float relief_threshold, slope_threshold;
-  if(this_bool_map["use_absolute_thresholds"])
+  if (this_string_map["floodplain_raster"] == "NULL")
   {
-    relief_threshold = this_int_map["relief_threshold"];
-    slope_threshold = this_float_map["slope_threshold"];
+    //calculate the channel relief
+    string relief_prefix = OUT_DIR+OUT_ID+"_channel_relief";
+    string relief_test_file = OUT_DIR+OUT_ID+"_channel_relief.hdr"; 
+    ifstream test_relief(relief_test_file.c_str());
+    if (test_relief)
+    {
+      cout << "I found a channel relief raster already. I'll just load that" << endl;
+      LSDRaster load_DEM(relief_prefix, DEM_extension);
+      ChannelRelief = load_DEM;
+    }
+    else
+    {
+      cout << "\t Getting relief relative to channel" << endl;
+      cout << "\t Threshold stream order = " << this_int_map["threshold_SO"] << endl;
+      ChannelRelief = ChanNetwork.calculate_relief_from_channel(filled_topography, FlowInfo, this_int_map["threshold_SO"]);
+      string relief_name = "_channel_relief";
+      ChannelRelief.write_raster((OUT_DIR+OUT_ID+relief_name), DEM_extension);
+      cout << "\t Got the relief!" << endl;
+    }
+
+    //get the slope
+    string slope_prefix = OUT_DIR+OUT_ID+"_slope";
+    string slope_test_file = OUT_DIR+OUT_ID+"_slope.hdr"; 
+    ifstream test_slope(slope_test_file.c_str());
+    if (test_slope)
+    {
+      cout << "I found a slope raster already. I'll just load that" << endl;
+      LSDRaster load_DEM(slope_prefix, DEM_extension);
+      Slope = load_DEM;
+    }
+    else
+    {
+      cout << "\t Calculating slope..." << endl;
+      vector<LSDRaster> surface_fitting;
+      vector<int> raster_selection(8, 0);
+      raster_selection[1] = 1;             // this means you want the slope
+      surface_fitting = filled_topography.calculate_polyfit_surface_metrics(this_float_map["surface_fitting_radius"], raster_selection);
+      Slope = surface_fitting[1];
+      cout << "\t Done!" << endl;
+      string slope_name = "_slope";
+      Slope.write_raster((OUT_DIR+OUT_ID+slope_name), DEM_extension);
+    }
+
+    if(this_bool_map["use_absolute_thresholds"])
+    {
+      relief_threshold = this_int_map["relief_threshold"];
+      slope_threshold = this_float_map["slope_threshold"];
+    }
+    else
+    {
+      // get the channel relief and slope_threshold using quantile-quantile plots
+      cout << "Getting channel relief_threshold from QQ plots" << endl;
+      string qq_fname = DATA_DIR+DEM_ID+"_qq_relief.txt";
+      relief_threshold = ChannelRelief.get_threshold_for_floodplain_QQ(qq_fname, this_float_map["QQ_threshold"], this_int_map["relief_lower_percentile"], this_int_map["relief_upper_percentile"]);
+
+      cout << "Getting slope_threshold from QQ plots" << endl;
+      string qq_slope = path_name+DEM_ID+"_qq_slope.txt";
+      slope_threshold = Slope.get_threshold_for_floodplain_QQ(qq_slope, this_float_map["QQ_threshold"], this_int_map["slope_lower_percentile"], this_int_map["slope_upper_percentile"]);
+    }
+
+    cout << "relief_threshold: " << relief_threshold << " slope_threshold: " << slope_threshold << endl;
+
+    // get the floodplain object
+    cout << "Getting the floodplain object" << endl;
+    LSDFloodplain ThisFloodplain(ChannelRelief, Slope, ChanNetwork, FlowInfo, relief_threshold, slope_threshold, this_int_map["minimum_patch_size"], this_int_map["threshold_SO"]);
+
+    Floodplain = ThisFloodplain;
+    //print connected components
+    //LSDIndexRaster CC = Floodplain.print_ConnectedComponents_to_Raster();
+    //string cc_ext = "_CC";
+    //CC.write_raster((OUT_DIR+OUT_ID+cc_ext), DEM_extension);
+
+    // fill holes in floodplain raster
+    if (this_bool_map["fill_floodplain"])
+    {
+      cout << "I'm going to fill holes in the floodplain for you..." << endl;
+      Floodplain.fill_holes_in_floodplain();
+    }
+
   }
   else
   {
-    // get the channel relief and slope_threshold using quantile-quantile plots
-    cout << "Getting channel relief_threshold from QQ plots" << endl;
-    string qq_fname = DATA_DIR+DEM_ID+"_qq_relief.txt";
-    relief_threshold = ChannelRelief.get_threshold_for_floodplain_QQ(qq_fname, this_float_map["QQ_threshold"], this_int_map["relief_lower_percentile"], this_int_map["relief_upper_percentile"]);
-
-    cout << "Getting slope_threshold from QQ plots" << endl;
-    string qq_slope = path_name+DEM_ID+"_qq_slope.txt";
-    slope_threshold = Slope.get_threshold_for_floodplain_QQ(qq_slope, this_float_map["QQ_threshold"], this_int_map["slope_lower_percentile"], this_int_map["slope_upper_percentile"]);
+    cout << "You have specified that you have an existing floodplain raster that you wish to use." << endl;
+    cout << "I'm reading it in to LSDTT..." << endl;
+    // read the existing raster to an LSDRaster
+    LSDRaster ExistingRaster(DATA_DIR+this_string_map["floodplain_raster"], DEM_extension);
+    // create the floodplain object. 
+    LSDFloodplain ThisFloodplain(ExistingRaster);
+    Floodplain = ThisFloodplain;
   }
-
-  cout << "relief_threshold: " << relief_threshold << " slope_threshold: " << slope_threshold << endl;
-
-  // get the floodplain object
-  cout << "Getting the floodplain object" << endl;
-  LSDFloodplain Floodplain(ChannelRelief, Slope, ChanNetwork, FlowInfo, relief_threshold, slope_threshold, this_int_map["minimum_patch_size"], this_int_map["threshold_SO"]);
-
-  //print connected components
-  //LSDIndexRaster CC = Floodplain.print_ConnectedComponents_to_Raster();
-  //string cc_ext = "_CC";
-  //CC.write_raster((OUT_DIR+OUT_ID+cc_ext), DEM_extension);
 
   // print a binary raster: valley = 1, non-valley = 0
   LSDIndexRaster BinaryRaster = Floodplain.print_BinaryRaster();
   string bin_ext = "_valley";
   BinaryRaster.write_raster((OUT_DIR+OUT_ID+bin_ext), DEM_extension);
 
-  // fill holes in floodplain raster
-  if (this_bool_map["fill_floodplain"])
-  {
-    cout << "I'm going to fill holes in the floodplain for you..." << endl;
-    for (int i = 0; i < this_int_map["fill_loops"]; i++)
-    {
-      Floodplain.fill_holes_in_floodplain(this_int_map["fp_search_radius"]);
-    }
-    LSDIndexRaster FilledRaster = Floodplain.print_BinaryRaster();
-    string bin_ext = "_valley_FILLED";
-    FilledRaster.write_raster((OUT_DIR+OUT_ID+bin_ext), DEM_extension);
-  }
   cout << "Finished with the floodplain extraction" << endl;
   cout << "=========================================================" << endl << endl;
 
@@ -1132,6 +1145,11 @@ int main (int nNumberofArgs,char *argv[])
 
       // basin junctions
       vector<int> basin_junctions = ChanNetwork.get_BaseLevelJunctions();
+      // remove basins which are influenced by the edge of the DEM
+      //cout << endl << endl << "I am going to remove basins draining to the edge." << endl;
+      //vector<int> basin_junctions = ChanNetwork.Prune_Junctions_By_Contributing_Pixel_Window_Remove_Nested_And_Nodata(FlowInfo, filled_topography, FlowAcc,
+      //                                          this_int_map["minimum_basin_size_pixels"],this_int_map["maximum_basin_size_pixels"]);
+      //vector<int> basin_junctions = ChanNetwork.Prune_To_Largest_Complete_Basins(starting_junctions, FlowInfo, filled_topography, FlowAcc);
       cout << "The number of junctions I will analyse is: " << basin_junctions.size() << endl;
 
       // now get the valley widths
