@@ -579,6 +579,11 @@ class LSDIndexRaster
   /// @date 30/10/15
   LSDIndexRaster remove_checkerboard_pattern();
 
+  /// @brief More complex nodatafiller for binary raster
+  /// @author FJC
+  /// @date 29/03/21
+  LSDIndexRaster alternating_direction_nodata_fill_binary_raster(int window_width);
+
 	/// @brief Function to calculate the reliability of floodplain method
   /// @param ActualRaster raster of actual values
   /// @author FJC

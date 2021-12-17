@@ -49,6 +49,7 @@
 #include "LSDSpatialCSVReader.hpp"
 #include "LSDParticleColumn.hpp"
 #include "LSDCRNParameters.hpp"
+#include "LSDLithoCube.hpp"
 using namespace std;
 using namespace TNT;
 
@@ -177,6 +178,13 @@ class LSDRasterModel: public LSDRasterSpectral
   void random_surface_noise( float min, float max );
 
   /// @brief Adds random noise to each pixel using the noise data member
+  /// checks no data and you feed it a see
+  /// @param seed the seed to the random number (if you give the same seed you should get the same results)
+  /// @author SMM
+  /// @date 17/06/2014
+  void random_surface_noise(long seed);
+
+  /// @brief Adds random noise to each pixel using the noise data member
   /// @author SMM
   /// @date 17/06/2014
   void random_surface_noise();
@@ -243,6 +251,7 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @date 25/08/2017
   void raise_and_fill_raster();
   void raise_and_fill_raster(float min_slope_for_fill);
+  void fill_raster(float min_slope_for_fill);
 
   /// @brief CHanges the elevation of all nodata nodes by adjustment
   /// @param adjustment the elevation to change
@@ -250,7 +259,22 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @date 08/02/2021
   void add_fixed_elevation(float adjustment);
   
+  /// @brief This takes the surface topography and subtracts from it the cumulative uplift, 
+  ///  in order to calculate the total exhumation and surface for the lithocube
+  /// @param Cumulative_uplift the raster containing the cumulative uplift of this step in m
+  /// @return a raster with the exhumation surface for the lithocube
+  /// @date 06/05/2021
+  /// @author SMM
+  LSDRaster calculate_exhumation_surface_from_cumulative_uplft(LSDRaster& Cumulative_uplift);
 
+  /// @brief This updates the cumulative uplift
+  /// @param Cumulative_uplift the raster containing the cumulative uplift of this step in m
+  ///  passed by reference as this raster is updated in the function
+  /// @param Uplift_raster the uplift for the timestep
+  /// @param timestep The timestep in years
+  /// @date 07/05/2021
+  /// @author SMM
+  void update_cumulative_uplift(LSDRaster& Cumulative_uplift, LSDRaster& Uplift_raster, float timestep);
 
   /// @brief Looks at another raster, checks to see if it the same dimensions as the 
   ///  model data, and then replaces any pixel in the model data with nodata
@@ -329,6 +353,34 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @author SMM
   /// @date 08/02/2021
   float calculate_bl_drop_rate( vector<float> phase_start, vector<float> phase_rates);
+
+  /// @brief This takes some "phases" with rates and calculates the rate
+  ///  for a given phase of incision
+  /// @param phase_start A vector or starting times for each phase
+  /// @param phase_rates A vector of vectors with drop rates at specific pixels
+  /// @return a vector of rates for a given time (the time is within the data member current_time)
+  /// @author SMM
+  /// @date 23/04/2021
+  vector<float> calculate_bl_drop_rate( vector<float> phase_start, vector< vector<float> > phase_rates);
+
+  /// @brief This takes some "phases" with elevations calculates the rate
+  ///  for a given phase of incision
+  /// @param phase_start A vector or starting times for each phase
+  /// @param phase_elevations A vector of vectors with elevations of the base level
+  /// @return a rate for a given time (the time is within the data member current_time)
+  /// @author SMM
+  /// @date 07/08/2021
+  float calculate_bl_drop_rate_from_elevations( vector<float> phase_start, vector<float> phase_elevations);
+
+  /// @brief This takes some "phases" with elevations and calculates the rates between those phases
+  /// @param phase_start A vector or starting times for each phase
+  /// @param phase_rates A vector of vectors with elevations at specific pixels
+  /// @return a vector of vectors with rates that correspond to the phases 
+  /// @date 23/04/2021
+  vector< vector<float> > calculate_phase_rates_from_elevations( vector<float> phase_start, vector< vector<float> > phase_elevations);
+
+
+
 
 
   //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -429,16 +481,28 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @brief This fixes a channel, derived from source points data
   ///  onto the model DEM
   /// @param source_points_data an LSDSpatialCSVReader object. It needs lat and long and elevation columns
+  /// @param column_name the name of the elevation column
   /// @author SMM
   /// @date 04/03/2020
-  void impose_channels(LSDSpatialCSVReader& source_points_data);
+  void impose_channels(LSDSpatialCSVReader& source_points_data, string column_name);
+
+  /// @brief This fixes a channel, derived from source points data
+  ///  onto the model DEM
+  /// @param source_points_data an LSDSpatialCSVReader object. It needs lat and long and elevation columns
+  /// @param column_name the name of the elevation column
+  /// @param bl_code a code for baselevel nodes. Usually there is a baselevel code that indicates the node is to be ignored
+  /// @author SMM
+  /// @date 04/03/2020
+  void impose_channels(LSDSpatialCSVReader& source_points_data, string column_name, vector<int> bl_code);
+
 
   /// @brief This fixes a channel, derived from source points data
   ///  onto the model DEM. It also lifts the raster so no pixels in the raster are lower than
   /// @param source_points_data an LSDSpatialCSVReader object. It needs lat and long and elevation columns
+  /// @param tcolumn_name he name of the elevation column
   /// @author SMM
   /// @date 09//2020
-  void impose_channels_and_lift_raster(LSDSpatialCSVReader& source_points_data);
+  void impose_channels_and_lift_raster(LSDSpatialCSVReader& source_points_data, string column_name);
 
   /// @brief Takes a model step and gets an LSDSpatialCSVReader object for later use
   /// @param contributing_pixels for the channel network
@@ -467,6 +531,15 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @author JAJ  updated SMM
   /// @date 01/01/2014  updated 01/07/2014
   Array2D<float> calculate_erosion_rates( void );
+
+  /// @brief Simple function that creates an array with the erosion rates for a given
+  /// timestep. It doesn't do anything with NoData cells, 
+  /// and uses an uplift raster
+  /// @param Uplift_raster a raster of uplift values in m/yr
+  /// @return an array with the erosion rates
+  /// @author SMM
+  /// @date 6/05/2021
+  Array2D<float> calculate_erosion_rates( LSDRaster& Uplift_raster );
 
   /// @brief This calculates the erosion rate for individual cells.
   /// Currently it assumes that the zeta_old data member is from the previous
@@ -684,11 +757,111 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @param source_points_data some points to serve as base level nodes
   /// @param phase_time a vector of times for different base level fall rates
   /// @param phase_rates a vector of base level fall rates
+  /// @param column_name the name of the elevation column
   /// @author SMM
   /// @date 08/02/2021
   void run_components_combined_imposed_baselevel( LSDRaster& URaster, LSDRaster& KRaster, 
                                           bool use_adaptive_timestep, LSDSpatialCSVReader& source_points_data,
-                                          vector<float> phase_time, vector<float> phase_rates);
+                                          vector<float> phase_time, vector<float> phase_rates, string column_name);
+
+
+  /// @brief This is a wrapper similar to run_components but sends the
+  /// fluvial and uplfit fields to the nonlinear solver.
+  /// This one allows you to put in a base level
+  /// And include transience. This one has transience at mulitiple pixels
+  /// @detail Variable U and K rasters can be used.
+  /// @param URaster A raster of uplift rates
+  /// @param KRaster A raster of K values
+  /// @param use_adaptive_timestep If true, an adaptive timestep is used
+  /// @param source_points_data some points to serve as base level nodes
+  /// @param phase_time a vector of times for different base level fall rates
+  /// @param phase_eleations a vec vec of base level elevations from which rates are calculated. 
+    /// @param minimum_slope the minimum slope for elevation change between pixels. This replaces overexcavated nodes
+  /// @param column_name the name of the elevation column
+  /// @author SMM
+  /// @date 23/04/2021
+  void run_components_combined_imposed_baselevel( LSDRaster& URaster, LSDRaster& KRaster, 
+                                          bool use_adaptive_timestep, LSDSpatialCSVReader& source_points_data,
+                                          vector<float> phase_time, vector< vector<float> > phase_elevations, 
+                                          float minimum_slope, string column_name);
+
+
+  /// @brief This is a wrapper similar to run_components but sends the
+  /// fluvial and uplfit fields to the nonlinear solver.
+  /// This one allows you to put in a base level
+  /// And include transience. This one has transience at mulitiple pixels
+  /// It also has the lithocube. 
+  /// It is a beast, really
+  /// @detail Variable U and K rasters can be used.
+  /// @param URaster A raster of uplift rates
+  /// @param use_adaptive_timestep If true, an adaptive timestep is used
+  /// @param source_points_data some points to serve as base level nodes
+  /// @param phase_time a vector of times for different base level fall rates
+  /// @param phase_eleations a vec vec of base level elevations from which rates are calculated. 
+  /// @oaram cumulative_uplift a raster of cumulative uplift for exhumation calculations
+  /// @param LSDLC a lithocube object
+  /// @param forbidden_lithocodes a list of lithocodes that will be set to the default value
+  /// @param print_lithocode_raster a bool when true print the lithocode raster at the printing timesteps
+  /// @param use_hillslope_hybrid if true, turns on the hybrid model that does linear diffusion but uses a critical
+  ///  slope if too steep
+  /// @param threshold_contributing_pixels Number of pixels to designate as hillslopes for the hillslope model
+  /// @param minimum_slope the minimum slope for elevation change between pixels. This replaces overexcavated nodes
+  /// @param print_exhumation_and_cumulative_uplift if true prints the exhumation surface and cumulative uplift
+  /// @param column_name the name of the elevation column
+  /// @author SMM
+  /// @date 06/05/2021
+  void run_components_combined_imposed_baselevel( LSDRaster& URaster, 
+                                          bool use_adaptive_timestep, LSDSpatialCSVReader& source_points_data,
+                                          vector<float> phase_time, vector< vector<float> > phase_elevations,
+                                          LSDRaster& cumulative_uplift, 
+                                          LSDLithoCube& LSDLC, list<int> forbidden_lithocodes, 
+                                          bool print_lithocode_raster,
+                                          bool use_hillslope_hybrid,
+                                          int threshold_contributing_pixels, 
+                                          float minimum_slope,
+                                          bool print_exhumation_and_cumulative_uplift,
+                                          string column_name);
+
+
+  /// @brief This is a wrapper similar to run_components but sends the
+  /// fluvial and uplfit fields to the nonlinear solver.
+  /// This one allows you to put in a base level
+  /// And include transience. This one has transience at mulitiple pixels
+  /// It also has the lithocube. 
+  /// It is a beast, really
+  /// @detail Variable U and K rasters can be used.
+  /// @param URaster A raster of uplift rates
+  /// @param use_adaptive_timestep If true, an adaptive timestep is used
+  /// @param source_points_data some points to serve as base level nodes
+  /// @param phase_time a vector of times for different base level fall rates
+  /// @param outlet_elevations is a vector of elevations at the outlet 
+  /// @oaram cumulative_uplift a raster of cumulative uplift for exhumation calculations
+  /// @param LSDLC a lithocube object
+  /// @param forbidden_lithocodes a list of lithocodes that will be set to the default value
+  /// @param print_lithocode_raster a bool when true print the lithocode raster at the printing timesteps
+  /// @param use_hillslope_hybrid if true, turns on the hybrid model that does linear diffusion but uses a critical
+  ///  slope if too steep
+  /// @param threshold_contributing_pixels Number of pixels to designate as hillslopes for the hillslope model
+  /// @param minimum_slope the minimum slope for elevation change between pixels. This replaces overexcavated nodes
+  /// @param print_exhumation_and_cumulative_uplift if true prints the exhumation surface and cumulative uplift
+  /// @param column_name the name of the elevation column
+  /// @author SMM
+  /// @date 07/08/2021
+  void run_components_combined_imposed_baselevel( LSDRaster& URaster, 
+                                          bool use_adaptive_timestep, LSDSpatialCSVReader& source_points_data,
+                                          vector<float> phase_time, vector< float > outlet_elevations,
+                                          LSDRaster& cumulative_uplift, 
+                                          LSDLithoCube& LSDLC, list<int> forbidden_lithocodes, 
+                                          bool print_lithocode_raster,
+                                          bool use_hillslope_hybrid,
+                                          int threshold_contributing_pixels, 
+                                          float minimum_slope,
+                                          bool print_exhumation_and_cumulative_uplift,
+                                          string column_name);
+
+
+
+
 
   /// @brief This is a wrapper that runs the model but includes CRN columns
   /// fluvial and uplfit fields to the nonlinear solver
@@ -772,9 +945,16 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @brief This smooths the model DEM and returns this smoothed surface as a raster
   /// @param central_pixel_weighting A float that give the weighting of the central pixel. 
   ///   The higher this number, the less smoothing. 2 is probably a good starting value. 
+  /// @return The smoothed elevation
   /// @author SMM
   /// @date 16/12/2019
   LSDRaster basic_smooth(float central_pixel_weighting);
+
+  /// @brief Calucaltes the laplacian on the surface. Can be used in the hillslope module
+  /// @return The laplacian curvature as a raster
+  /// @author SMM
+  /// @date 07/05/2021
+  LSDRaster basic_curvature();
 
   /// @brief This checks for rivers (using a drainage area threshold) and then any remaining pixels
   ///  are popped to a critical slope. Creates a river network with striaght slopes in between
@@ -802,20 +982,34 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @param U_values a raster of uplift
   /// @param Source_points_data a spatialc csv reader with the appropriate file
   /// @param carve_before_fill if true, run the carving algorithm before the filling algorithm
+  /// @param column_name the name of the elevation column
   /// @author SMM
   /// @date 01/10/2019
-  void fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_values, LSDRaster& U_values, LSDSpatialCSVReader& Source_points_data, bool carve_before_fill);
+  void fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_values, LSDRaster& U_values, 
+                                                    LSDSpatialCSVReader& Source_points_data, 
+                                                    bool carve_before_fill, string column_name);
 
-  /// @brief This method snaps to steady with spatially variable uplift and erodibility fields
-  ///  It also allows fixed base level. 
-  /// @detail In this version the base level is read from a csv file
-  /// @param K_values a raster of erodiblity
+
+  /// @brief This is a hybrid model that calculates hillslope diffusion as well as a critical slope
+  ///  so the diffused hillslopes cannot exceed a critical slope 
+  /// @detail Must be used after the fluvial step
+  /// @param Sc_values a raster of critical slopes
   /// @param U_values a raster of uplift
-  /// @param csv_points_file the full path to a fiel with the elevation and node index data
-  /// @param carve_before_fill if true, run the carving algorithm before the filling algorithm
+  /// @param threshold_pixels The number of contributing pixels must be less than this to snap the hillslope
+  /// @param Source_points_data a list of baselevel nodes to ignore
   /// @author SMM
-  /// @date 03/10/2019
-  void fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_values, LSDRaster& U_values, string csv_of_fixed_channel, bool carve_before_fill);
+  /// @date 11/05/2021
+  void hillslope_hybrid_module(LSDRaster& Sc_values, LSDRaster& Uplift, 
+                               int threshold_pixels,LSDSpatialCSVReader& Source_points_data);
+
+
+  /// @brief A hillslope snapping routine based on the stack. 
+  /// @param Sc_values a raster of critical slopes
+  /// @param carve_before_fill if true, run the carving algorithm before the filling algorithm
+  /// @param threshold_pixels The number of contributing pixels must be less than this to snap the hillslope
+  /// @author SMM
+  /// @date 06/05/2021
+  void hillslope_snap_to_steady_variable_Sc(LSDRaster& Sc_values, bool carve_before_fill, int threshold_pixels);
 
   /// @brief This method instantaneously tilts the landscape by a certain angle.
   /// @param angle the tilt angle in degrees
@@ -883,6 +1077,38 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @date 06/09/2017
   void fluvial_incision_with_variable_uplift_and_variable_K_adaptive_timestep( LSDRaster& Uplift_rate, LSDRaster& K_raster );
 
+  /// @brief This is used to process a transient base level file
+  /// @param source_points_data a spatial csv object that has the correct elevation input
+  /// @param timing_prefix the prefix of a time column in the csv
+  /// @param timing_multiplier how many years are in the each number of timestep (so, say t5 = 5000 year, then the 
+  ///   multiplier is 1000)
+  /// @param n_time_columns The number of time columns to attempt to read
+  /// @param phase_steps How many steps there are between phases. So if you have t5, then t10, then t15 the steps would be 5
+  /// @author SMM
+  /// @date 22/04/2021
+  void process_baselevel( LSDSpatialCSVReader& source_points_data, string timing_prefix, 
+                                        float timing_multiplier, int n_time_columns, int phase_steps,
+                                        vector<float>& phases_vec, vector< vector<float> >& elevation_vecvec);
+
+
+  /// @brief This is used to process a transient base level file using only a single elevation value
+  /// @param transient_infile_name name of the transient input file including csv
+  /// @param phases Replaced in code these are the times
+  /// @param outlet_elevations these are the elevations at the fixed times of the outlet
+  /// @author SMM
+  /// @date 07/08/2021
+  void process_transient_file(string transient_infile_name, vector<float>& phases,vector<float>& outlet_elevations);
+
+
+  /// @brief This is a little helper to tag specific nodes with a baselelvel switch
+  /// @detail creates a boolean column where 0 is an area node and 1 is a node that lowers at a fixed rate. 
+  /// @param source_points_data a spatial csv object that has the correct elevation input
+  /// @param column_name The name of the column to test against a criteria. 
+  /// @author SMM
+  /// @date 26/04/2021
+  void baselevel_run_area_switch( LSDSpatialCSVReader& source_points_data, string column_name);
+
+
   /// @brief Fastscape, implicit finite difference solver for stream power equations
   /// O(n)
   /// Method takes the K value from a raster fed to it
@@ -894,13 +1120,42 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @param K_raster the raster of K values.
   /// @param Uplift_rate a raster of uplift rates in m/yr
   /// @param source_points_data a spatial csv object that has the correct elevation input
-  /// @param the rate the basse level is falling. Need a rate rather than a fixed elevation because
+  /// @param the rate the base level is falling. Need a rate rather than a fixed elevation because
   ///  of the adaptive timestep
+  /// @param let_timestep_increase a boolean that when true allows the timestep to increase. Make false
+  ///   when you need to ensure the timestep lands on a specific time. 
+  /// @param column_name the name of the elevation column
   /// @author SMM
   /// @date 08/02/2021
   void fluvial_incision_with_variable_uplift_and_variable_K_adaptive_timestep_impose_baselevel( LSDRaster& Urate_raster, 
                                  LSDRaster& K_raster, LSDSpatialCSVReader& source_points_data,
-                                 float bl_fall_rate );
+                                 float bl_fall_rate, bool let_timestep_increase, string column_name);
+
+  /// @brief Fastscape, implicit finite difference solver for stream power equations
+  /// O(n)
+  /// Method takes the K value from a raster fed to it
+  /// and also take a raster of the uplift rates
+  /// and solves the stream power equation at a future timestep in linear time
+  /// This version includes the current uplift, so you do not need to call
+  /// uplift after this has finished. Uses an adaptive timestep.
+  /// This version allows you to impose a base level
+  /// @param K_raster the raster of K values.
+  /// @param Uplift_rate a raster of uplift rates in m/yr
+  /// @param source_points_data a spatial csv object that has the correct elevation input
+  /// @param the rate the base level is falling. Need a rate rather than a fixed elevation because
+  ///  of the adaptive timestep. This has baselevel rate at a vector of baselevel nodes. 
+  /// @param let_timestep_increase a boolean that when true allows the timestep to increase. Make false
+  ///   when you need to ensure the timestep lands on a specific time. 
+  /// @param column_name the name of the elevation columns
+  /// @author SMM
+  /// @date 08/02/2021
+  void fluvial_incision_with_variable_uplift_and_variable_K_adaptive_timestep_impose_baselevel( LSDRaster& Urate_raster, 
+                                 LSDRaster& K_raster, LSDSpatialCSVReader& source_points_data, 
+                                 vector<float> bl_fall_rate,
+                                 bool let_timestep_increase,
+                                 bool use_adaptive_timestep,
+                                 float minimum_slope,
+                                 string column_name);                               
 
   /// @brief This function is more or less identical to fluvial_incision above, but it
   /// Returns a raster with the erosion rate and takes arguments rather
@@ -1194,10 +1449,10 @@ class LSDRasterModel: public LSDRasterSpectral
   void snap_periodicity( void );
 
   /// set the print interval
-  void set_print_interval( int num_steps )    { print_interval = num_steps; }
+  void set_print_interval( int num_steps )    { print_interval = num_steps; float_print_interval = float(num_steps)*timeStep;  }
 
   /// set the float print interval
-  void set_float_print_interval( float float_dt_print )    { float_print_interval = float_dt_print; }
+  //void set_float_print_interval( float float_dt_print )    { float_print_interval = float_dt_print; }
 
   /// set the float print interval
   void set_next_printing_time ( float next_float_dt_print )    { next_printing_time = next_float_dt_print; }
@@ -1208,6 +1463,13 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @date 16/12/2019
   void set_raster_data(LSDRaster& Raster);
 
+
+  /// @brief makes a raster with a constant value
+  /// @detail a brute force way to make K and U rasters when those are needed
+  /// @param value the value that the raster pixels will take. 
+  /// @author SMM
+  /// @date 24/06/2021
+  LSDRaster make_constant_raster(float value);
 
 
   /// @brief this sets the K mode
@@ -1378,6 +1640,9 @@ class LSDRasterModel: public LSDRasterSpectral
 
   /// @brief Gets the timestep
   float get_timeStep( void)        { return timeStep; }
+
+  /// @brief Gets the print interval in years
+  float get_float_print_interval( void)        { return float_print_interval; }
 
   /// @brief Gets the maximum timestep
   float get_maxtimeStep( void )    { return maxtimeStep; }

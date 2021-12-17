@@ -139,6 +139,81 @@ vector<string> DriverIngestor(int nNumberofArgs,char *argv[])
   path_and_file.push_back(path_name);
   path_and_file.push_back(file_name);
 
+  if (path_and_file[0] == "-h" || path_and_file[0] == "--h" || 
+      path_and_file[0] == "-H" || path_and_file[0] == "--H" || 
+      path_and_file[0] == "--help" || path_and_file[0] == "-help"  ||
+      path_and_file[0] == "help" || path_and_file[0] == "Help"  ||
+      path_and_file[0] == "HELP" || path_and_file[0] == "-help"  ||
+      path_and_file[0] == "-WTF" ||
+      path_and_file[1] == "-h" || path_and_file[1] == "--h" || 
+      path_and_file[0] == "-H" || path_and_file[0] == "--H" || 
+      path_and_file[1] == "--help" || path_and_file[1] == "-help"  ||
+      path_and_file[1] == "help" || path_and_file[1] == "Help"  ||
+      path_and_file[1] == "HELP" || path_and_file[1] == "-help"  ||
+      path_and_file[1] == "-WTF")
+  {
+    cout << "I am going to print a help file. There will be a .csv and a .html version. " << endl;
+    cout << "These files have README in the filename." << endl;
+    path_and_file[0] = "./";
+    path_and_file[1] = "cry_for_help.txt";
+
+    ofstream ofs;
+    ofs.open("./cry_for_help.txt");
+    ofs << "# The user has cried for help. " << endl;
+    ofs << "# You can find the help file with README in the filename." << endl;
+    ofs.close();
+  }
+
+
+  if (path_and_file[0] == "-c" || path_and_file[0] == "--c" || 
+      path_and_file[0] == "--C" || path_and_file[0] == "-C"  ||
+      path_and_file[0] == "cite" || path_and_file[0] == "Cite"  ||
+      path_and_file[0] == "-cite" || path_and_file[0] == "-Cite"  ||
+      path_and_file[0] == "--cite" || path_and_file[0] == "--Cite"  ||
+      path_and_file[0] == "citation" || path_and_file[0] == "Citation"  ||
+      path_and_file[0] == "-citation" || path_and_file[0] == "-Citation"  ||
+      path_and_file[0] == "--citation" || path_and_file[0] == "--Citation"  ||
+      path_and_file[1] == "-c" || path_and_file[0] == "--c" || 
+      path_and_file[1] == "--C" || path_and_file[0] == "-C"  ||
+      path_and_file[1] == "cite" || path_and_file[0] == "Cite"  ||
+      path_and_file[1] == "-cite" || path_and_file[0] == "-Cite"  ||
+      path_and_file[1] == "--cite" || path_and_file[0] == "--Cite"  ||
+      path_and_file[1] == "citation" || path_and_file[0] == "Citation"  ||
+      path_and_file[1] == "-citation" || path_and_file[0] == "-Citation"  ||
+      path_and_file[1] == "--citation" || path_and_file[0] == "--Citation" )
+  {
+    //cout << "You have chosen to print the citation information. " << endl;
+    path_and_file[0] = "./";
+    path_and_file[1] = "lsdtt_citation.txt";
+
+    ofstream ofs;
+    ofs.open("./lsdtt_citation.txt");
+    ofs << "# The user has asked for a citation. " << endl;
+    ofs.close();
+  }
+
+  if (path_and_file[0] == "-v" || path_and_file[0] == "--v" || 
+      path_and_file[0] == "-V" || path_and_file[0] == "--V"  ||
+      path_and_file[0] == "version" || path_and_file[0] == "Version"  ||
+      path_and_file[0] == "-version" || path_and_file[0] == "-Version"  ||
+      path_and_file[0] == "--version" || path_and_file[0] == "--Version"  ||
+      path_and_file[1] == "-v" || path_and_file[0] == "--v" || 
+      path_and_file[1] == "-V" || path_and_file[0] == "--V"  ||
+      path_and_file[1] == "version" || path_and_file[0] == "Version"  ||
+      path_and_file[1] == "-version" || path_and_file[0] == "-Version"  ||
+      path_and_file[1] == "--version" || path_and_file[0] == "--Version" )
+  {
+    //cout << "You have chosen to print the version. " << endl;
+    path_and_file[0] = "./";
+    path_and_file[1] = "lsdtt_version.txt";
+
+    ofstream ofs;
+    ofs.open("./lsdtt_version.txt");
+    ofs << "# The user has asked for the version. " << endl;
+    ofs.close();
+  }
+
+
   return path_and_file;
 
 }
@@ -193,8 +268,9 @@ void LSDParameterParser::create(string PathName, string FileName)
 void LSDParameterParser::force_bil_extension()
 {
   cout << "===============================" << endl;
-  cout << "WARNING!!! This program requires georeferencing so only bil format" << endl;
+  cout << "WARNING!!! This program requires georeferencing so only ENVI bil format" << endl;
   cout << "Topographic data will be allowed!!" << endl;
+  cout << "This is not the same as ESRI bil. In gdal use -of ENVI to ouput to ENVI bil" << endl;
   cout << "===============================" << endl;
   dem_read_extension = "bil";
   dem_write_extension = "bil";
@@ -392,10 +468,7 @@ void LSDParameterParser::parse_file_IO()
     }
     found_cheads = true;
   }
-  else
-  {
-    cout << "I didn't find CHeads_file in the parameter map" << endl;
-  }
+
 
 
   if(parameter_map.find("channel heads fname") != parameter_map.end())
@@ -494,6 +567,9 @@ void LSDParameterParser::parse_all_parameters(map<string,float> default_map_f,
 
 }
 
+
+
+
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // This parses all the default parameter maps.
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -507,6 +583,112 @@ void LSDParameterParser::parse_all_parameters(map<string,float> default_map_f,
   parse_bool_parameters(default_map_b);
   parse_string_parameters(default_map_s);
   parse_double_parameters(default_map_d);
+
+}
+
+
+void LSDParameterParser::print_help(map< string, vector<string> > help_map, string help_prefix, string version, string citation)
+{
+  
+  // Open the help file
+  ofstream help_ofs;
+  string help_fname = write_path+help_prefix+".csv";
+
+  help_ofs.open(help_fname.c_str());
+  vector<string> this_string_vec;
+
+  help_ofs << "name,type,default,description,guidance" << endl;
+  help_ofs <<"version,"<< version << ",citation,"<< citation << ", please also look at statements printed by code for citations to specific routines." << endl;
+
+  // get the parameters
+  vector<string> these_keys = extract_keys(parameters_read_map);
+  //cout << "The number of read keys are: " << these_keys.size() << endl;
+
+  vector<string> more_keys = extract_keys(defaults_used_map);
+  //cout << "The number of defaults are: " << more_keys.size() << endl;
+
+  these_keys.insert( these_keys.end(), more_keys.begin(), more_keys.end() );
+  //cout << "The updated size is: " << these_keys.size() << endl;
+  for(int i = 0; i< int(these_keys.size()); i++)
+  {
+    //cout << "The key is: " <<  these_keys[i] << endl;
+    if ( help_map.find( these_keys[i] ) == help_map.end() ) 
+    {
+      help_ofs << these_keys[i] << ",not available,not available,not available,not available" << endl;
+    } 
+    else 
+    {
+      this_string_vec = help_map[ these_keys[i] ];
+      help_ofs << these_keys[i] << "," << this_string_vec[0] << ","
+               << this_string_vec[1] << "," << this_string_vec[2] << ","
+               << this_string_vec[3] << endl;
+    }
+
+  }
+
+  help_ofs.close();
+
+
+  // Now we do the html file
+  ofstream help_ofs_html;
+  string help_fname_html = write_path+help_prefix+".html";
+  help_ofs_html.open(help_fname_html.c_str());
+
+  cout << "Printing the help files to: " << endl;
+  cout << help_fname << endl;
+  cout << help_fname_html << endl;
+
+  help_ofs_html << "<!DOCTYPE html>\n<html>\n<head>\n\t<title>Help information for " << help_prefix << "</title>";
+  help_ofs_html << "<style>table, th, td {\n\tborder: 1px solid black;\n\tborder-collapse: collapse;\n}\n</style>\n</head>\n<body>" << endl << endl;
+
+  help_ofs_html << "<h1>Help information for " << help_prefix << "</h1>" << endl << endl;
+  help_ofs_html << "<p>You are using version " << version << " of this software.</p>" << endl; 
+  help_ofs_html << "<p>If the use of this software results in a publication, please cite <a href=\"" << citation << "\">" << citation << "</a>. In addition please also look at statements printed by the code for citations to specific routines and algorithms.</p>" << endl; 
+
+  help_ofs_html << "<h2>Making the parameter file</h2>" << endl;
+  help_ofs_html << "<p>You call lsdtt command line tools with a parameter file. This file can be made in a text editor. ";
+  help_ofs_html << "The programs read ENVI bil format rasters projected into UTM (the WGS84 version). You must convert and project your DEM before using these tools. "; 
+  help_ofs_html << "You should have a line of your parameter file that reads:.</p>" << endl; 
+  help_ofs_html << "<p>read fname: FILE_PREFIX</p>" << endl; 
+  help_ofs_html << "<p>where FILE_PREFIX is the name of the raster without the .bil extension</p>" << endl;
+  help_ofs_html << "<p>The rest of the parameter file has the format:</p>\n<p>PARAMETER_NAME: VALUE</p><p>That is, there needs to be a colon and a space after the parameter name." << endl;
+  help_ofs_html << "The default parameter value will be used if you don't give the parameter file the name and value of a parameter</p>" << endl << endl;
+
+  // And now for the table. 
+  // First the header
+  help_ofs_html << "<h2>Parameter table</h2>" << endl;
+  help_ofs_html << "<table>\n\t<colgroup>\n\t\t<col span=\"1\" style=\"width: 15%;\">"
+                << "\n\t\t<col span=\"1\" style=\"width: 10%;\">"
+                << "\n\t\t<col span=\"1\" style=\"width: 15%;\">"
+                << "\n\t\t<col span=\"1\" style=\"width: 30%;\">"
+                << "\n\t\t<col span=\"1\" style=\"width: 30%;\">"
+                << "\n\t</colgroup>" << endl;
+  
+  help_ofs_html << "\n\t<tbody>\n\t<tr>\n\t\t<th>param name</th>\n\t\t<th>type</th>\n\t\t<th>default</th>\n\t\t<th>description</th>\n\t\t<th>guidance</th>\n\t</tr>" << endl;
+
+  // And now for the rest of it. 
+  for(int i = 0; i< int(these_keys.size()); i++)
+  {
+    //cout << "The key is: " <<  these_keys[i] << endl;
+    if ( help_map.find( these_keys[i] ) == help_map.end() ) 
+    {
+      help_ofs_html << "\t<tr>\n\t\t<td>" << these_keys[i] << "</td>\n\t\t<td>not available</td>\n\t\t<td>not available</td>\n\t\t<td>not available</td>\n\t\t<td>not available</td>\n\t</tr>" << endl;
+    } 
+    else 
+    {
+      this_string_vec = help_map[ these_keys[i] ];
+
+      help_ofs_html << "\t<tr>\n\t\t<td>" << these_keys[i] << "</td>\n\t\t<td>" << this_string_vec[0] << "</td>\n\t\t<td>" 
+                    << this_string_vec[1] << "</td>\n\t\t<td>" << this_string_vec[2] << "</td>\n\t\t<td>"
+                    << this_string_vec[3] <<"</td>\n\t</tr>" << endl;
+    }
+
+  }
+
+  // and now the end
+  help_ofs_html << "\n\t<tbody>\n\t</table>\n\t</body>\n</html>" << endl;
+
+  help_ofs_html.close();
 
 }
 
@@ -524,17 +706,17 @@ void LSDParameterParser::parse_float_parameters(map<string,float> default_map)
   int n_keys = int(these_keys.size());
   for(int i = 0; i<n_keys; i++)
   {
-    cout << "Key is: " << these_keys[i] << endl;
+    //cout << "Key is: " << these_keys[i] << endl;
 
     // If the key is contained in the parsed parameters, use the parsed parameter
     if(parameter_map.find(these_keys[i]) != parameter_map.end())
     {
-      cout << "Found key " << these_keys[i];
+      //cout << "Found key " << these_keys[i];
 
       // convert the value to float
       float_parameters[these_keys[i]] = atof(parameter_map[these_keys[i]].c_str());
       parameters_read_map[these_keys[i]] = parameter_map[these_keys[i]];
-      cout << " it is: " << parameter_map[these_keys[i]] << " check: " << float_parameters[these_keys[i]] << endl;
+      //cout << " it is: " << parameter_map[these_keys[i]] << " check: " << float_parameters[these_keys[i]] << endl;
 
     }
     else  // the key is not in the parsed parameters. Use the default.
@@ -560,17 +742,17 @@ void LSDParameterParser::parse_double_parameters(map<string,double> default_map)
   int n_keys = int(these_keys.size());
   for(int i = 0; i<n_keys; i++)
   {
-    cout << "Key is: " << these_keys[i] << endl;
+    //cout << "Key is: " << these_keys[i] << endl;
 
     // If the key is contained in the parsed parameters, use the parsed parameter
     if(parameter_map.find(these_keys[i]) != parameter_map.end())
     {
-      cout << "Found key " << these_keys[i];
+      //cout << "Found key " << these_keys[i];
 
       // convert the value to float
       double_parameters[these_keys[i]] = atof(parameter_map[these_keys[i]].c_str());
       parameters_read_map[these_keys[i]] = parameter_map[these_keys[i]];
-      cout << " it is: " << parameter_map[these_keys[i]] << " check: " << double_parameters[these_keys[i]] << endl;
+      //cout << " it is: " << parameter_map[these_keys[i]] << " check: " << double_parameters[these_keys[i]] << endl;
 
     }
     else  // the key is not in the parsed parameters. Use the default.
@@ -593,7 +775,7 @@ void LSDParameterParser::parse_int_parameters(map<string,int> default_map)
   int n_keys = int(these_keys.size());
   for(int i = 0; i<n_keys; i++)
   {
-    cout << "Key is: " << these_keys[i] << endl;
+    //cout << "Key is: " << these_keys[i] << endl;
 
     // If the key is contained in the parsed parameters, use the parsed parameter
     if(parameter_map.find(these_keys[i]) != parameter_map.end())
@@ -623,7 +805,7 @@ void LSDParameterParser::parse_bool_parameters(map<string,bool> default_map)
   int n_keys = int(these_keys.size());
   for(int i = 0; i<n_keys; i++)
   {
-    cout << "Key is: " << these_keys[i] << endl;
+    //cout << "Key is: " << these_keys[i] << endl;
 
     // If the key is contained in the parsed parameters, use the parsed parameter
     if(parameter_map.find(these_keys[i]) != parameter_map.end())
@@ -660,7 +842,7 @@ void LSDParameterParser::parse_string_parameters(map<string,string> default_map)
   int n_keys = int(these_keys.size());
   for(int i = 0; i<n_keys; i++)
   {
-    cout << "Key is: " << these_keys[i] << endl;
+    //cout << "Key is: " << these_keys[i] << endl;
 
     // If the key is contained in the parsed parameters, use the parsed parameter
     if(parameter_map.find(these_keys[i]) != parameter_map.end())
@@ -785,7 +967,7 @@ void LSDParameterParser::check_boundary_conditions()
 {
   if( int(boundary_conditions.size()) != 4)
   {
-    cout << "Boundary conditions not assigned! Defaulting to no flux."  << endl;
+    //cout << "Boundary conditions not assigned! Defaulting to no flux."  << endl;
     vector<string> temp_bc(4);
     for (int i = 0; i< 4; i++)
     {
@@ -794,10 +976,10 @@ void LSDParameterParser::check_boundary_conditions()
     boundary_conditions = temp_bc;
   }
 
-  for (int i =0; i< 4; i++)
-  {
-    cout << "Boundary["<<i<<"]: "<<boundary_conditions[i]<< endl;
-  }
+  //for (int i =0; i< 4; i++)
+  //{
+  //  cout << "Boundary["<<i<<"]: "<<boundary_conditions[i]<< endl;
+  //}
 }
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
@@ -813,8 +995,8 @@ void LSDParameterParser::check_file_extensions_and_paths()
   if (dem_read_extension != "asc"  && dem_read_extension != "flt" && dem_read_extension != "bil" &&
       dem_write_extension != "asc"  && dem_write_extension != "flt" && dem_write_extension != "bil")
   {
-    cout << "LSDParameterParser Raster file extension not assigned! Defaulting to bil format." << endl;
-    cout << "You entered: " << dem_read_extension << "!" <<endl;
+    //cout << "LSDParameterParser Raster file extension not assigned! Defaulting to bil format." << endl;
+    //cout << "You entered: " << dem_read_extension << "!" <<endl;
     dem_read_extension = "bil";
     dem_write_extension = "bil";
   }
@@ -822,7 +1004,7 @@ void LSDParameterParser::check_file_extensions_and_paths()
   {
     if (dem_read_extension != "asc"  && dem_read_extension != "flt" && dem_read_extension != "bil")
     {
-      cout << "DEM read extension not assigned, defaulting to write extension." << endl;
+      //cout << "DEM read extension not assigned, defaulting to write extension." << endl;
       dem_read_extension = dem_write_extension;
     }
     else
@@ -875,8 +1057,8 @@ void LSDParameterParser::check_file_extensions_and_paths()
 
   cout << "The full read fname is:\n " << read_path+read_fname << endl;
   cout << "The full write fname is:\n " << write_path+write_fname << endl;
-  cout << "The read and write extensions are: " << dem_read_extension
-       << " " << dem_write_extension << endl;
+  //cout << "The read and write extensions are: " << dem_read_extension
+  //     << " " << dem_write_extension << endl;
 
 }
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

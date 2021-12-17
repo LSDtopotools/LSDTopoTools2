@@ -229,6 +229,9 @@ void LSDJunctionNetwork::create(vector<int> Sources, LSDFlowInfo& FlowInfo)
     current_col = FlowInfo.ColIndex[current_node];
     receiver_node = FlowInfo.ReceiverVector[current_node];
 
+    //cout << "current node " << current_node << endl;  
+    //cout << "current row " << current_row << " current col " << current_col << endl;
+
     current_stream_order = 1;
 
     if (current_node == receiver_node)
@@ -389,6 +392,8 @@ void LSDJunctionNetwork::create(vector<int> Sources, LSDFlowInfo& FlowInfo)
 
       // get the next current node, which is this nodes receiver
       current_node = FlowInfo.ReceiverVector[current_node];
+     // cout << "receiver node " << current_node << endl;
+     // cout << "receiver row " << current_row << " receiver col " << current_col << endl;
 
       // get the next receiver node, which is the next node
       receiver_node = FlowInfo.ReceiverVector[current_node];
@@ -425,8 +430,8 @@ void LSDJunctionNetwork::create(vector<int> Sources, LSDFlowInfo& FlowInfo)
     current_col = FlowInfo.ColIndex[current_node];
     receiver_node = FlowInfo.ReceiverVector[current_node];
 
-    //cout << "LINE 257 ChNet, SOURCE: " << src <<  " n_src: " << n_sources << " current_node: " << current_node
-    //     << " and rnode: " << receiver_node << endl;
+    // cout << "LINE 257 ChNet, SOURCE: " << src <<  " n_src: " << n_sources << " current_node: " << current_node
+    //      << " and rnode: " << receiver_node << endl;
 
     //each source is a junction node. Push back the junction vector
     JunctionVector.push_back(current_node);
@@ -455,7 +460,7 @@ void LSDJunctionNetwork::create(vector<int> Sources, LSDFlowInfo& FlowInfo)
     // the next element is the receiver junction, we need to follow the path to this receiver
     // the routine continues until the junction has been visited or until it hits
     // a baselevel node
-    //cout << "LINE 280" << endl;
+    //cout << "LINE 463" << endl;
     while (baselevel_switch == 0 && junction_switch <2)
     {
       //cout << "Line 283" << endl;
@@ -516,8 +521,8 @@ void LSDJunctionNetwork::create(vector<int> Sources, LSDFlowInfo& FlowInfo)
         // is a visited junction
         if(JunctionArray[current_row][current_col] != NoDataValue)
         {
-          //cout << "LINE 338, found a junction at node: " << current_node
-          //	 << " JArray: " << JunctionArray[current_row][current_col]  << endl;
+          // cout << "LINE 524, found a junction at node: " << current_node
+          // 	 << " JArray: " << JunctionArray[current_row][current_col]  << endl;
           junction_switch = JunctionArray[current_row][current_col];
           JunctionArray[current_row][current_col] ++;		// increment the junction array
                         // it will be greater than 1 if
@@ -554,8 +559,8 @@ void LSDJunctionNetwork::create(vector<int> Sources, LSDFlowInfo& FlowInfo)
     }       // end baselevel logic
   }         // end sources loop
 
-  //cout << "ChanNet; LINE 368; sz ReceiverVec: " << ReceiverVector.size() << " sz JuncVec: " << JunctionVector.size()
-  //   << " sz SOVec: " << StreamOrderVector.size() << endl;
+  // cout << "ChanNet; LINE 562; sz ReceiverVec: " << ReceiverVector.size() << " sz JuncVec: " << JunctionVector.size()
+  //    << " sz SOVec: " << StreamOrderVector.size() << endl;
 
   //for(int i = 0; i< int(BaseLevelJunctions.size()); i++)
   //{
@@ -5542,7 +5547,7 @@ map<int,int> LSDJunctionNetwork::ExtractAllRidges(LSDFlowInfo& FlowInfo)
     vector<int> external_nodes;
     for (int usn = 0; usn < int(upslope_junc_nodes.size()); usn++)
     {
-      if(not is_internal[usn])
+      if(is_internal[usn] == false)
       {
         // These are from an old version that made a raster and kept here for reference if you
         // want to replicate the code elsewhere
@@ -5598,7 +5603,7 @@ map<int,int> LSDJunctionNetwork::ExtractAllRidges(LSDFlowInfo& FlowInfo, string 
     vector<int> external_nodes;
     for (int usn = 0; usn < int(upslope_junc_nodes.size()); usn++)
     {
-      if(not is_internal[usn])
+      if(is_internal[usn] == false)
       {
 
 
@@ -8420,6 +8425,175 @@ int LSDJunctionNetwork::get_nodeindex_of_nearest_channel_for_specified_coordinat
   return NearestChannel;
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// GET node index of nearest channel using a pixel nodeindex
+//
+// SMM 02/07/2021
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+int LSDJunctionNetwork::get_nodeindex_of_nearest_channel(int starting_nodeindex, int threshold_stream_order, LSDFlowInfo& FlowInfo)
+{
+
+    int ReceiverRow, ReceiverCol, ReceiverNode, CurrentCol, CurrentRow;
+    int chan_node;
+    int this_SO;
+
+    bool found_channel;
+
+    int CurrentNode = starting_nodeindex;
+
+    while (found_channel == false)
+    {
+      FlowInfo.retrieve_receiver_information(CurrentNode, ReceiverNode, ReceiverRow, ReceiverCol);
+
+      if (ReceiverNode == CurrentNode)
+      {
+        // This is a baselevel
+        chan_node = NoDataValue;
+        found_channel = true;
+      }
+      else
+      {
+        this_SO = StreamOrderArray[ReceiverRow][ReceiverCol];
+        if (this_SO >= threshold_stream_order)
+        {
+          chan_node = ReceiverNode;
+          found_channel == true;
+        }  
+        else
+        {
+          CurrentNode = ReceiverNode;
+        }       
+      }
+    }
+
+  return chan_node;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// GET node index of nearest channel using a pixel nodeindex
+//
+// SMM 02/07/2021
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+float LSDJunctionNetwork::get_distance_to_nearest_channel(int starting_nodeindex, int threshold_stream_order, LSDFlowInfo& FlowInfo, LSDRaster& FlowDist)
+{
+  int channel_node = get_nodeindex_of_nearest_channel(starting_nodeindex, threshold_stream_order, FlowInfo);
+  float dist_to_channel = float(NoDataValue);
+
+  int this_row,this_col, chan_row,chan_col;
+
+  if (channel_node != NoDataValue)
+  {
+    FlowInfo.retrieve_current_row_and_col(starting_nodeindex,this_row,this_col);
+    FlowInfo.retrieve_current_row_and_col(channel_node,chan_row,chan_col);
+
+    dist_to_channel = FlowDist.get_data_element(this_row,this_col) - FlowDist.get_data_element(chan_row,chan_col);
+  }
+
+  return dist_to_channel;
+
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// GET distance to nearest channel as a raster
+//
+// SMM 02/07/2021
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+LSDRaster LSDJunctionNetwork::get_distance_to_nearest_channel_raster(int threshold_stream_order, LSDFlowInfo& FlowInfo, LSDRaster& FlowDist)
+{
+  Array2D<float> distance_to_channel_raster(NRows,NCols,float(NoDataValue));
+
+  int NNodes = FlowInfo.get_NDataNodes();
+  int this_row,this_col;
+  float this_distance;
+
+  for(int i = 0; i< NNodes; i++)
+  {
+    FlowInfo.retrieve_current_row_and_col(i,this_row,this_col);
+    this_distance = get_distance_to_nearest_channel(i, threshold_stream_order, FlowInfo, FlowDist);
+    distance_to_channel_raster[this_row][this_col] = this_distance;
+  }
+
+
+  LSDRaster distance_raster(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,distance_to_channel_raster,GeoReferencingStrings);
+  return distance_raster;
+}
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// GET relief to nearest channel using a pixel nodeindex
+//
+// SMM 02/07/2021
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+float LSDJunctionNetwork::get_relief_to_nearest_channel(int starting_nodeindex, int threshold_stream_order, LSDFlowInfo& FlowInfo, LSDRaster& Elevation)
+{
+  int channel_node = get_nodeindex_of_nearest_channel(starting_nodeindex, threshold_stream_order, FlowInfo);
+  float elev = float(NoDataValue);
+
+  int this_row,this_col, chan_row,chan_col;
+
+  if (channel_node != NoDataValue)
+  {
+    FlowInfo.retrieve_current_row_and_col(starting_nodeindex,this_row,this_col);
+    FlowInfo.retrieve_current_row_and_col(channel_node,chan_row,chan_col);
+
+    elev = Elevation.get_data_element(this_row,this_col) - Elevation.get_data_element(chan_row,chan_col);
+  }
+
+  return elev;
+
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// GET relief to nearest channel as a raster
+//
+// SMM 02/07/2021
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+LSDRaster LSDJunctionNetwork::get_relief_to_nearest_channel_raster(int threshold_stream_order, LSDFlowInfo& FlowInfo, LSDRaster& Elevation)
+{
+  Array2D<float> relief_to_channel_raster(NRows,NCols,float(NoDataValue));
+
+  int NNodes = FlowInfo.get_NDataNodes();
+  int this_row,this_col;
+  float this_relief;
+
+  for(int i = 0; i< NNodes; i++)
+  {
+    FlowInfo.retrieve_current_row_and_col(i,this_row,this_col);
+    this_relief = get_relief_to_nearest_channel(i, threshold_stream_order, FlowInfo, Elevation);
+    relief_to_channel_raster[this_row][this_col] = this_relief;
+  }
+
+
+  LSDRaster relief_raster(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,relief_to_channel_raster,GeoReferencingStrings);
+  return relief_raster;
+}
+
+
+
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-

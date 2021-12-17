@@ -38,6 +38,9 @@ class LSDLithoCube
 {
   public:
 
+    /// Assignment operator.
+    LSDLithoCube& operator=(const LSDLithoCube& LSDLC);
+
     /// @brief Constructor. 
     /// @return LSDLithoCube
     LSDLithoCube()
@@ -54,8 +57,6 @@ class LSDLithoCube
       create(An_LSDRaster);
     }
 
-
-
     /// @brief Constructor. Create an LSDLithoCube from a file.
     /// Uses a filename and file extension
     /// @return LSDLithoCube
@@ -65,6 +66,52 @@ class LSDLithoCube
     {
       create(filename);
     }
+
+    // Get functions
+    // Need these for the copy constructor
+    /// @return Number of rows as an integer.
+    int get_NRows() const        { return NRows; }
+    /// @return Number of columns as an integer.
+    int get_NCols() const        { return NCols; }
+    /// @return Number of layers as an integer.
+    int get_NLayers() const        { return NLayers; }
+    /// @return Minimum X coordinate as a float.
+    float get_XMinimum() const      { return XMinimum; }
+    /// @return Minimum Y coordinate as a float.
+    float get_YMinimum() const      { return YMinimum; }
+    /// @return Minimum Z coordinate as a float.
+    float get_ZMinimum() const      { return ZMinimum; }
+
+    /// @return Data resolution as a float.
+    float get_DataResolution() const  { return DataResolution; }
+
+    /// @return X spacing as a float.
+    float get_XSpacing() const      { return XSpacing; }
+    /// @return X spacing as a float.
+    float get_YSpacing() const      { return YSpacing; }
+    /// @return X spacing as a float.
+    float get_ZSpacing() const      { return ZSpacing; }
+
+    /// @return Return the bool flag that we loaded the vo file
+    bool get_loaded_vo_file() const   { return loaded_vo_file; }
+
+    /// @return No Data Value as an integer.
+    int get_NoDataValue() const      { return NoDataValue; }
+
+    /// @return map containing the georeferencing strings
+    map<string,string> get_GeoReferencingStrings() const { return GeoReferencingStrings; }
+
+    /// @return the integer arrays that have the lithocodes (this is the main dataset)
+    vector< Array2D<int> > get_LithoLayers() const  { return LithoLayers; }
+    /// @return a float vector of the elevations of the bottom of each layer
+    vector<float> get_bottom_elevations() const  { return bottom_elevations; }
+    /// @return a float vector of the layer thicknesses
+    vector<float> get_layer_thicknesses() const   { return layer_thicknesses; }
+
+    /// @return a map that connects lithocodes to K values
+    map<int,float> get_StratiToK() const  { return StratiToK; }
+    /// @return a map that connects lithocodes to Sc values
+    map<int,float> get_StratiToSc() const    { return StratiToSc; }
 
     /// @brief This takes a litho layer and writes the layer to a raster
     /// @param layer The layer number you want
@@ -140,6 +187,28 @@ class LSDLithoCube
     /// @date 30/01/2020
     int get_layer_from_elevation(float elevation);
 
+    /// @brief Gets the elevation from the layer number
+    /// @param layer_number - the number of the layer. the layer's number. the number belonging to the layer
+    /// @return the elevation
+    /// @author ELSG
+    /// @date 14/04/2021
+    float get_elevation_from_layer(int layer_number);
+
+
+    /// @brief Gets the elevation raster of the lithocube surface (or any given layer raster really)
+    /// @param SurfaceLayerRaster - a raster of layer numbers (e.g. representing the topographic surface of the lithocube)
+    /// @return an elevation raster
+    /// @author ELSG
+    /// @date 14/04/2021
+    LSDRaster get_lithocube_surface_elevation(LSDIndexRaster& SurfaceLayerRaster);
+
+    /// @brief Gets the layer raster of the lithocube surface
+    /// @param forbidden_codes - a list of litho codes that do not represent bedrock in the lithocube
+    /// @return a raster of the layer numbers representing the lithocube surface
+    /// @author ELSG
+    /// @date 14/04/2021
+    LSDIndexRaster get_lithocube_surface_layers(list<int> forbidden_codes);
+
     /// @brief Gets the lithocode from a location. 
     /// @detail Includes logic to drill through forbidden lithocode values until
     ///  it finds a valid value
@@ -152,6 +221,19 @@ class LSDLithoCube
     /// @author SMM
     /// @date 31/08/2020
     int get_lithocode_from_location(int LLayer, int LRow, int LCol, list<int> forbidden_codes);
+
+    /// @brief Gets the layer from a location. 
+    /// @detail Includes logic to drill through forbidden lithocode values until
+    ///  it finds a valid value
+    /// @param LLayer the starting layer
+    /// @param LRow the row in the lithocube
+    /// @param LCol the col in the lithocube
+    /// @param forbidden_codes the list of codes that are not allowed to be returned
+    ///  for example if you want to remove "air" or quaternary pixels in the lithocube
+    /// @return the layer
+    /// @author ELSG
+    /// @date 14/04/2021
+    int get_layer_from_location(int LLayer, int LRow, int LCol, list<int> forbidden_codes);
 
     /// @brief Takes an elevation raster and returns an erodibility raster
     /// @param ElevationRaster A raster of elevations
@@ -301,6 +383,12 @@ class LSDLithoCube
 
     /// @brief Make a rastermaker from another raster
     void create(LSDRaster& An_LSDRaster);
+
+    void create(int nrows, int ncols, int nlayers, float xmin, float ymin, float zmin,
+                          float cellsize, float xspace, float yspace, float zspace, 
+                          bool loaded, int ndv, map<string,string> temp_GRS,
+                          vector< Array2D<int> > ll, vector<float> be, vector<float> lt, 
+                          map<int,float> StK, map<int,float> StS);
 
 
 };

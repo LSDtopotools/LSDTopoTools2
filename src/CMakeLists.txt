@@ -25,28 +25,30 @@ set(LIB_HEADERS
   LSDBasin.hpp
   LSDChiTools.hpp
   LSDChiNetwork.hpp
-  LSDChannel.hpp 
+  LSDChannel.hpp
   LSDCosmoData.hpp
-  LSDCosmoRaster.hpp 
-  LSDCRNParameters.hpp 
+  LSDCosmoRaster.hpp
+  LSDCRNParameters.hpp
   LSDFlowInfo.hpp
   LSDIndexChannel.hpp
   LSDIndexChannelTree.hpp
-  LSDIndexRaster.hpp 
-  LSDJunctionNetwork.hpp   
-  LSDMostLikelyPartitionsFinder.hpp  
-  LSDParameterParser.hpp 
+  LSDIndexRaster.hpp
+  LSDJunctionNetwork.hpp
+  LSDMostLikelyPartitionsFinder.hpp
+  LSDParameterParser.hpp
   LSDParticle.hpp
   LSDRaster.hpp
   LSDRasterAggregator.hpp
   LSDRasterInfo.hpp
-  LSDRasterMaker.hpp 
-  LSDRasterSpectral.hpp  
+  LSDRasterMaker.hpp
+  LSDRasterSpectral.hpp
   LSDSoilHydroRaster.hpp
   LSDStatsTools.hpp
-  LSDShapeTools.hpp 
+  LSDShapeTools.hpp
   LSDSpatialCSVReader.hpp
   LSDStrahlerLinks.hpp
+  LSDFloodplain.hpp
+  LSDTerrace.hpp
 )
 
 string(REGEX REPLACE "([^;]+).hpp" "\\1.cpp" LIB_SOURCES "${LIB_HEADERS}")
@@ -57,6 +59,7 @@ set(EXE_SOURCES
   lsdtt-drivers/lsdtt-chi-mapping.cpp
   lsdtt-drivers/lsdtt-cosmo-tool.cpp
   lsdtt-drivers/lsdtt-hillslope-channel-coupling.cpp
+  lsdtt-drivers/lsdtt-valley-metrics.cpp
 )
 
 set(EXE_FILES)

@@ -39,6 +39,7 @@
 #include <fstream>
 #include <iomanip>
 #include <vector>
+#include <algorithm>
 #include <string>
 #include <math.h>
 #include <string.h>
@@ -241,7 +242,6 @@ void LSDRasterModel::default_parameters( void )
   set_S_c( 1.0 );              // 45 degrees, slope of 1
 
   set_print_interval( 10 );            // number of timesteps
-  set_float_print_interval (5000);    // this is in years
   set_next_printing_time (0);
 
   set_steady_state_tolerance( 0.00001 );
@@ -297,6 +297,25 @@ void LSDRasterModel::set_raster_data(LSDRaster& Raster)
 }
 
 
+LSDRaster LSDRasterModel::make_constant_raster(float value)
+{
+
+  Array2D<float> temp_data = RasterData.copy();
+  for(int row = 0; row< NRows; row++)
+  {
+    for (int col = 0; col < NCols; col++)
+    {
+      temp_data[row][col]= value;
+    }
+  }
+
+  LSDRaster NewRaster(NRows, NCols, XMinimum, YMinimum,
+                      DataResolution, NoDataValue, temp_data,
+                      GeoReferencingStrings);
+  return NewRaster;
+
+}
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This adds a path to the run name and the report name
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -324,6 +343,9 @@ void LSDRasterModel::add_path_to_names( string pathname)
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // Some tools for transient model runs
+// The phase_rates are derived from elevations through time. 
+// These you obtain from the function 
+// LSDRasterModel::calculate_phase_rates_from_elevations
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 float LSDRasterModel::calculate_bl_drop_rate( vector<float> phase_start, vector<float> phase_rates)
 {
@@ -366,8 +388,147 @@ float LSDRasterModel::calculate_bl_drop_rate( vector<float> phase_start, vector<
 }
 
 
+float LSDRasterModel::calculate_bl_drop_rate_from_elevations( vector<float> phase_start, vector<float> phase_elevations)
+{
+
+  int n_phases = int(phase_start.size());
+  // get the current time
+
+  float this_rate;
+  if (n_phases == 1)
+  {
+    cout << "You need an initial elevation and a final elevation. You only have one data points. FATAL" << endl;
+    cout << "Check your transient baselevel fall file." << endl;
+    exit(0);
+  }
+  else
+  {
+    if (current_time >= phase_start[n_phases-1])
+    {
+      // Negative is because lowering elevations are positive in our convention
+      this_rate = -(phase_elevations[n_phases-1]-phase_elevations[n_phases-2])/(phase_start[n_phases-1]-phase_start[n_phases-2]);
+    }
+    else
+    {
+      bool not_got_rate = true;
+      int phase = 0;
+      do
+      {
+        if (current_time >= phase_start[phase] && current_time < phase_start[phase+1])
+        {
+          not_got_rate = false;
+          // Negative is because lowering elevations are positive in our convention
+          this_rate =  -(phase_elevations[phase+1]-phase_elevations[phase])/(phase_start[phase+1]-phase_start[phase]);
+        }
+        else
+        {
+          phase++;
+        }
+        
+      } while (not_got_rate);    
+    }
+  }
+  return this_rate;
+  
+}
 
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This gets a vecvec of drop rates. 
+// The convention here is that if the base level is lowering, 
+// the rate is positive. 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector< vector<float> > LSDRasterModel::calculate_phase_rates_from_elevations( vector<float> phase_start, vector< vector<float> > phase_elevations)
+{
+  int n_phases = int(phase_start.size());
+  int n_nodes = int(  phase_elevations[0].size() );
+  float dt;
+
+  vector<float> empty_vec;
+  vector<float> rate_vec;
+  vector<float> last_elev;
+  vector<float> next_elev;
+  vector< vector<float> > rate_vecvec;
+
+  if (n_phases == 1)
+  {
+    cout << "I can't run the channel elevation rate extration routine with only one phase." << endl;
+    cout << "Exiting" << endl;
+    exit(0);
+  }
+  for(int i = 0; i< n_phases-1; i++)
+  {
+    last_elev= phase_elevations[i];
+    next_elev = phase_elevations[i+1];
+
+    dt = phase_start[i+1]-phase_start[i];
+    cout << "Phase " << i << ", dt: " << dt << endl;
+
+    rate_vec = empty_vec;
+    
+    for (int n = 0; n<n_nodes; n++)
+    {
+      rate_vec.push_back(  (last_elev[n]-next_elev[n])/dt );
+    }
+    rate_vecvec.push_back(rate_vec);
+  }  
+  rate_vecvec.push_back(rate_vec); // This gets the rate after the last phase, which is the same as the rate in the last phase. 
+  return rate_vecvec;
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This gets the phase rates after processing by calculate_phase_rates_from_elevations
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<float> LSDRasterModel::calculate_bl_drop_rate( vector<float> phase_start, vector< vector<float> > phase_rates)
+{
+
+  //cout << "This is the vecvec version of the routine. " << endl;
+  int n_phases = int(phase_start.size());
+  int n_nodes = int(  phase_rates[0].size() );
+  int accepted_phase = 0;
+
+  //cout << "N phases: " << n_phases << " and n_nodes: " << n_nodes << endl;
+  vector<float> zero_vec(n_nodes,0.0);
+  vector<float> rate_vec;
+
+  // get the current time
+  float this_rate;
+  if (n_phases == 1)
+  {
+    rate_vec = zero_vec;
+  }
+  else
+  {
+    if (current_time >= phase_start[n_phases-1])
+    {
+      rate_vec = phase_rates[n_phases-1];
+      accepted_phase = n_phases-1;
+    }
+    else
+    {
+      bool not_got_rate = true;
+      int phase = 0;
+      do
+      {
+        if (current_time >= phase_start[phase] && current_time < phase_start[phase+1])
+        {
+          not_got_rate = false;
+          rate_vec = phase_rates[phase];
+          accepted_phase = phase;
+        }
+        else
+        {
+          phase++;
+        }
+        
+      } while (not_got_rate);    
+    }
+  }
+  //cout << "This time is " << current_time << " and the phase is: " << accepted_phase << endl;
+  return rate_vec;
+  
+}
 
 
 
@@ -677,6 +838,44 @@ void LSDRasterModel::random_surface_noise()
   }
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// Similar to above, but uses the noise parameter stored in the object
+// but understands nodata and you pass it a seed
+// SMM 24/6/2021
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDRasterModel::random_surface_noise(long seed)
+{
+  // check on the noise data member. It needs to be bigger than 10-6)
+  // if not set 1 mm as default
+  if (noise < 0.000001)
+  {
+    noise = 0.001;
+  }
+
+  // we set the min and max between zero and noise. We don't go between
+  // -noise/2 and noise/2 just because we don't want negative elevations near
+  // a base level node.
+  float min = 0;
+  float max = noise;
+
+
+  // Add random float to each pixel
+  for(int row = 0; row < NRows; row++)
+  {
+    for (int col = 0; col < NCols; col++)
+    {
+      if (RasterData[row][col] != NoDataValue)
+      {
+        RasterData[row][col] += ran3(&seed)*(max-min) + min;
+      }
+    }
+  }
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // initializes a parabolic surface with elevations on the north and south edges at zero and
@@ -1092,21 +1291,27 @@ void LSDRasterModel::raise_and_fill_raster()
   {
     for(int col = 0; col<NCols; col++)
     {
-      if (zeta[row][col] < MinElev)
+      if (zeta[row][col] != NoDataValue)
       {
-        MinElev = zeta[row][col];
+        if (zeta[row][col] < MinElev)
+        {
+          MinElev = zeta[row][col];
+        }
       }
     }
   }
   cout << "Raising raster. Found the mininum elevation, it is: " << MinElev << endl;
 
 
-  // now adjust elevations so the lowst points are at zero elevation
+  // now adjust elevations so the lowest points are at zero elevation
   for(int row = 0; row<NRows; row++)
   {
     for(int col = 0; col<NCols; col++)
     {
-      zeta[row][col] = zeta[row][col]-MinElev;
+      if (zeta[row][col] != NoDataValue)
+      {
+        zeta[row][col] = zeta[row][col]-MinElev;
+      }
     }
   }
 
@@ -1140,9 +1345,12 @@ void LSDRasterModel::raise_and_fill_raster(float min_slope_for_fill)
   {
     for(int col = 0; col<NCols; col++)
     {
-      if (zeta[row][col] < MinElev)
+      if (zeta[row][col] != NoDataValue)
       {
-        MinElev = zeta[row][col];
+        if (zeta[row][col] < MinElev)
+        {
+          MinElev = zeta[row][col];
+        }
       }
     }
   }
@@ -1154,7 +1362,10 @@ void LSDRasterModel::raise_and_fill_raster(float min_slope_for_fill)
   {
     for(int col = 0; col<NCols; col++)
     {
-      zeta[row][col] = zeta[row][col]-MinElev;
+      if (zeta[row][col] != NoDataValue)
+      {
+        zeta[row][col] = zeta[row][col]-MinElev;
+      }
     }
   }
 
@@ -1167,6 +1378,19 @@ void LSDRasterModel::raise_and_fill_raster(float min_slope_for_fill)
   RasterData = temp->get_RasterData();
   delete temp;
 
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This fills the DEM
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterModel::fill_raster(float min_slope_for_fill)
+{
+  //cout << "Now I am filling the data" << endl;
+  LSDRaster *temp;
+  temp = new LSDRaster(*this);
+  *temp = fill(min_slope_for_fill);
+  RasterData = temp->get_RasterData();
+  delete temp;
 }
 
 
@@ -1189,7 +1413,47 @@ void LSDRasterModel::add_fixed_elevation(float adjustment)
   RasterData = zeta.copy();
 }
 
+// This function subtracts the cumulative uplift from the topography to 
+// see how deeply the lithocube has been exhumed
+LSDRaster LSDRasterModel::calculate_exhumation_surface_from_cumulative_uplft(LSDRaster& Cumulative_uplift)
+{
+  Array2D<float> zeta=RasterData.copy();
 
+  for(int row = 0; row<NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      if (zeta[row][col] != NoDataValue)
+      {
+        zeta[row][col] = zeta[row][col]-Cumulative_uplift.get_data_element(row,col);
+      }
+    }
+  }
+
+  LSDRaster output_raster(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);  
+  return output_raster;
+}
+
+// Updated the cumulative uplift, used in conjunction with the lithocube to calculate exhumation
+void LSDRasterModel::update_cumulative_uplift(LSDRaster& Cumulative_uplift, LSDRaster& Uplift_raster, float timestep)
+{
+
+  int CU_NRows = Cumulative_uplift.get_NRows();
+  int CU_NCols = Cumulative_uplift.get_NCols();
+  float CU_ndv = Cumulative_uplift.get_NoDataValue();
+  float Updated_CU;
+  for(int row = 0; row<CU_NRows; row++)
+  {
+    for(int col = 0; col<CU_NCols; col++)
+    {
+      if (Cumulative_uplift.get_data_element(row,col) != NoDataValue)
+      {
+        Updated_CU = Cumulative_uplift.get_data_element(row,col)+Uplift_raster.get_data_element(row,col)*timestep;
+        Cumulative_uplift.set_data_element(row,col,Updated_CU); 
+      }
+    }
+  } 
+}
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This takes another raster, does boundfs checking, 
@@ -1966,13 +2230,10 @@ float LSDRasterModel::find_max_boundary(int boundary_number)
 //// impose_channels: this imposes channels onto the landscape
 //// You need to print a channel to csv and then load the data
 ////------------------------------------------------------------------------------
-void LSDRasterModel::impose_channels(LSDSpatialCSVReader& source_points_data)
+void LSDRasterModel::impose_channels(LSDSpatialCSVReader& source_points_data, string column_name)
 {
 
-  string column_name = "elevation(m)";
-
-  
-
+  // string column_name = "elevation(m)";
 
   Array2D<float> zeta=RasterData.copy();
 
@@ -1983,11 +2244,11 @@ void LSDRasterModel::impose_channels(LSDSpatialCSVReader& source_points_data)
   //vector<int> ni = source_points_data.get_nodeindices_from_lat_long(flow);
   vector<float> elev = source_points_data.data_column_to_float(column_name);
   // make the map
-  cout << "I am making an elevation map. This will not work if points in the raster lie outside of the csv channel points." << endl;
+  //cout << "I am making an elevation map. This will not work if points in the raster lie outside of the csv channel points." << endl;
   int row,col;
   for(int i = 0; i< int(elev.size()); i++)
   {
-
+    
     source_points_data.get_row_and_col_of_a_point(UTME[i],UTMN[i],row, col);
 
     if(zeta[row][col] == NoDataValue)
@@ -2002,8 +2263,83 @@ void LSDRasterModel::impose_channels(LSDSpatialCSVReader& source_points_data)
     zeta[row][col] = elev[i];
   }
 
+  RasterData = zeta.copy();
+}
 
-  this->RasterData = zeta.copy();
+
+////------------------------------------------------------------------------------
+//// impose_channels: this imposes channels onto the landscape
+//// You need to print a channel to csv and then load the data
+////------------------------------------------------------------------------------
+void LSDRasterModel::impose_channels(LSDSpatialCSVReader& source_points_data, string column_name, vector<int> bl_code)
+{
+
+  // string column_name = "elevation(m)";
+
+  Array2D<float> zeta=RasterData.copy();
+
+  // Get the local node index as well as the elevations
+  vector<float> UTME, UTMN;
+  source_points_data.get_x_and_y_from_latlong(UTME,UTMN);
+
+
+  // check to see if bl_code vector makes sense
+  if ( UTME.size() != bl_code.size())
+  {
+    cout << "Fatal error, the baselevel code vector is not the same size as the number of nodes in the channel points file." << endl;
+    exit(0);
+  }
+
+  //vector<int> ni = source_points_data.get_nodeindices_from_lat_long(flow);
+  vector<float> elev = source_points_data.data_column_to_float(column_name);
+  // make the map
+  //cout << "I am making an elevation map. This will not work if points in the raster lie outside of the csv channel points." << endl;
+  int row,col;
+
+  
+  //cout << "IMPOSING CHANNELS, the crazy node has an elevation of: " << zeta[617][761] << endl;
+
+  float zurich_crazy_node_elev = zeta[617][761];
+
+  for(int i = 0; i< int(elev.size()); i++)
+  {
+
+
+
+    source_points_data.get_row_and_col_of_a_point(UTME[i],UTMN[i],row, col);
+
+    //if (i == 0)
+    //{
+    //  cout << "Outlet, elevation is: " << elev[i] << " and bl_code is " << bl_code[i] << endl;
+    //  cout << "r,c of outlet is: " << row << "," << col << endl;
+    //}
+
+    if(row == 617 && col == 761)
+    {
+      cout << endl << endl << "==================================================" << endl;
+      cout << "WARNING" << endl; 
+      cout << "In the NAGRA zurich scenario the pixel at 617,761 does crazy things that have no explanation." << endl;
+      cout << "I have to force the elevation of this pixel." << endl;
+      cout << "If you are getting this message it means you might get some breakage in your imposed channel" << endl;
+      cout << "==================================================" << endl << endl;
+
+    }
+
+    if(zeta[row][col] == NoDataValue)
+    {
+      cout << "Imposing channels, I seem to be on a nodata node. Check your single channel data." << endl;
+    }
+    else if (bl_code[i] == 0)
+    {
+      //cout << "Setting BL node to " << elev[i] << endl;
+      zeta[row][col] = elev[i];
+    }
+  }
+
+
+  //cout << "DONE IMPOSING CHANNELS, the crazy node has an elevation of: " << zeta[617][761] << endl;
+  //cout << "FORCING THE ZURICH CRAZY NODE." << endl;
+  zeta[617][761] =  zurich_crazy_node_elev;
 
   RasterData = zeta.copy();
 }
@@ -2013,10 +2349,10 @@ void LSDRasterModel::impose_channels(LSDSpatialCSVReader& source_points_data)
 //// impose_channels: this imposes channels onto the landscape
 //// You need to print a channel to csv and then load the data
 ////------------------------------------------------------------------------------
-void LSDRasterModel::impose_channels_and_lift_raster(LSDSpatialCSVReader& source_points_data)
+void LSDRasterModel::impose_channels_and_lift_raster(LSDSpatialCSVReader& source_points_data, string column_name)
 {
 
-  string column_name = "elevation(m)";
+  // string column_name = "elevation(m)";
  
   Array2D<float> zeta=RasterData.copy();
 
@@ -2196,6 +2532,44 @@ Array2D<float> LSDRasterModel::calculate_erosion_rates( void )
   return ErosionRateArray;
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// CALCULATE EROSION RATES
+// Simple function that creates an array with the erosion rates for a given
+// timestep, calculated by diffencing elevation rasters with consecutive
+// timesteps.
+// Uses an uplift raster instead of calculating from a model uplift field
+//------------------------------------------------------------------------------
+Array2D<float> LSDRasterModel::calculate_erosion_rates( LSDRaster& Uplift_raster )
+{
+  // create the erosion array
+  Array2D<float> ErosionRateArray(NRows,NCols,NoDataValue);
+
+  // first check to see if zeta_old exists
+  if (zeta_old.dim1() != NRows || zeta_old.dim2() != NCols)
+  {
+    cout << "LSDRasterModel::calculate_erosion_rates, WARNING zeta_old doesn't exist" << endl;
+  }
+  else
+  {
+    // loop through all the raster data getting erosion rate using the
+    // get_erosion_at_cell data member
+    for(int row=0; row<NRows; ++row)
+    {
+      for(int col=0; col<NCols; ++col)
+      {
+        if(RasterData[row][col]!=NoDataValue  && Uplift_raster.get_data_element(row,col) != NoDataValue)
+        {
+          ErosionRateArray[row][col] = (zeta_old[row][col]-RasterData[row][col]+Uplift_raster.get_data_element(row,col))/timeStep;
+        }
+      }
+    }
+  }
+  return ErosionRateArray;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This function does the actual calculation of the erosion rates cell by cell
@@ -3671,7 +4045,7 @@ void LSDRasterModel::run_components_combined( LSDRaster& URaster, LSDRaster& KRa
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDRasterModel::run_components_combined_imposed_baselevel( LSDRaster& URaster, LSDRaster& KRaster, 
                                           bool use_adaptive_timestep, LSDSpatialCSVReader& source_points_data,
-                                          vector<float> phase_time, vector<float> phase_rates)
+                                          vector<float> phase_time, vector<float> phase_rates, string column_name)
 {
   //recording = false;
   cycle_number = 1;
@@ -3690,15 +4064,43 @@ void LSDRasterModel::run_components_combined_imposed_baselevel( LSDRaster& URast
   // set the frame to the current frame plus 1
   int timestep_counter = 0;   // for debugging
   int frame = current_frame;
+
+  int n_phases = int(phase_time.size());
+
+
+  cout << "Starting the transient loop. " << endl;
+  cout << "The starting time is: " << current_time << endl;
+  cout << "The timestep is: " << timeStep << endl;
+
+  float next_time;
+  int next_time_ticker = 1;
+  if (n_phases == 1)
+  {
+    next_time = endTime+10*timeStep;
+  }
+  else
+  {
+    next_time = phase_time[1];
+  }
+
+  if (current_time > next_time)
+  {
+    cout << "Your rate comes from the future! current_time > next_time. " << endl;
+    cout << "I don't know how to deal with this and need to exit. " << endl;
+    exit(0);
+  }
+  
+  bool let_timestep_increase;
   do
   {
+
     // Get the current baselevel fall rate
     float fall_rate = calculate_bl_drop_rate( phase_time, phase_rates);
 
-    if (timestep_counter % 100  == 0)
-    {
-      cout << "Time: " << current_time << " and fall rate: " << fall_rate << endl;
-    }
+    //if (timestep_counter % 100  == 0)
+    //{
+    //  cout << "Time: " << current_time << " and fall rate: " << fall_rate << endl;
+    //}
     
     
     // Record current topography
@@ -3734,12 +4136,47 @@ void LSDRasterModel::run_components_combined_imposed_baselevel( LSDRaster& URast
 
       //cout << "I am using an adaptive timestep" << endl;
       //fluvial_incision_with_variable_uplift_and_variable_K_adaptive_timestep( URaster, KRaster );
+
+      let_timestep_increase = true;
+      if (next_time - current_time == timeStep)
+      {
+        let_timestep_increase = false;
+      }
+
       fluvial_incision_with_variable_uplift_and_variable_K_adaptive_timestep_impose_baselevel(  URaster, KRaster, 
-                                                        source_points_data,fall_rate);
+                                                        source_points_data,fall_rate, let_timestep_increase, column_name);
     }
 
     //update the time
     current_time += timeStep;
+
+
+
+    // Manage the timestepping
+    if( current_time >= next_time-timeStep)
+    {
+      cout << "Updating the next time." << endl;
+      cout << "current time: " << current_time << " with timestep " << timeStep <<  endl;
+      timeStep = next_time - current_time;
+      cout << "Updated timeStep: " << timeStep << endl;
+
+      if (current_time > next_time)
+      {
+        cout << "WARNING: I have overshot!!" << endl;
+      }
+
+      next_time_ticker++;
+      if(next_time_ticker > n_phases -1)
+      {
+        next_time = endTime+10*timeStep;
+      }
+      else
+      {
+        next_time = phase_time[next_time_ticker];
+      }
+      
+    }
+
 
     // now see if the time has exceeded the next print time
     if (current_time > next_printing_time)
@@ -3759,6 +4196,788 @@ void LSDRasterModel::run_components_combined_imposed_baselevel( LSDRaster& URast
   current_frame = frame;
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This is a wrapper function used to drive a model run
+// it checks parameters and flags from the data members
+//
+// Similar to run_componets but instead of running fluvial
+// and uplift in seperate steps it inserts the fluvial
+// and uplift matrices into the nonlinear hillslope
+// solver.
+//
+// This version allows variable K and U rasters to be used.
+// You can also switch on an adaptive timestep
+//
+// It also allows an imposed base level
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterModel::run_components_combined_imposed_baselevel( LSDRaster& URaster, LSDRaster& KRaster, 
+                                          bool use_adaptive_timestep, LSDSpatialCSVReader& source_points_data,
+                                          vector<float> phase_time, vector< vector<float> > phase_elevations,
+                                          float minimum_slope, string column_name)
+{
+  //recording = false;
+  cycle_number = 1;
+  total_erosion = 0;
+  max_erosion = 0;
+  min_erosion = -99;
+  switch_delay = 0;
+  time_delay = 0;
+
+  stringstream ss, ss_root;
+
+  // some fields for uplift and fluvial incision
+  Array2D<float> uplift_field;
+  Array2D<float> fluvial_incision_rate_field;
+
+  // set the frame to the current frame plus 1
+  int timestep_counter = 0;   // for debugging
+  int frame = current_frame;
+
+  int n_phases = int(phase_time.size());
+
+  // get the rate vecvec
+  cout << "Let me get the phase rates" << endl;
+  vector< vector<float> > phase_rates_vecvec = calculate_phase_rates_from_elevations( phase_time, phase_elevations);
+  cout << "Okay, I have got the phase rates. " << endl;
+  cout << "There are " << n_phases << " phases." << endl;
+  cout << "confirming with the vecvec, which has " << phase_rates_vecvec.size() << " phases." << endl;
+
+  // This fixes the first timestep
+  bool fix_step_0 = true;
+  if (fix_step_0)
+  {
+    cout << endl << endl << "==============================" << endl;
+    cout << "WARNING. I am fixing the first elevation timestep." << endl;
+    cout << "This is only for a particular version of the initial channel file as of 26/04/2021." << endl;
+
+    cout << "Getting the baselevel code." << endl;
+    string bl_switch = "baselevel_code";
+    vector<int> bl_code = source_points_data.data_column_to_int(bl_switch);
+
+    phase_rates_vecvec[0] = phase_rates_vecvec[1];
+    vector<float> update_elev = phase_elevations[1];
+    vector<float> start_elev = phase_elevations[0];
+    float phase_dt = phase_time[1] - phase_time[0];
+    vector<float> this_pr = phase_rates_vecvec[0];
+    for(int i = 0; i< int(update_elev.size()); i++)
+    {
+      if( bl_code[i] == 0)      // this is for places you use the reported elevations
+      {
+        update_elev[i] = update_elev[i]+this_pr[i]*phase_dt;
+      }
+      else      // for these nodes we only retain the area. This is tuned to actual data at Jura ost and isn't general
+      {
+        update_elev[i] = start_elev[i]+2.6;
+      }
+      
+    }
+
+    string column_name = "elevation(m)";
+    source_points_data.data_column_replace(column_name, update_elev);       
+  }
+
+  cout << "Starting the transient loop. " << endl;
+  cout << "The starting time is: " << current_time << endl;
+  cout << "The timestep is: " << timeStep << endl;
+
+  float next_time;
+  int next_time_ticker = 1;
+  if (n_phases == 1)
+  {
+    next_time = endTime+10*timeStep;
+  }
+  else
+  {
+    next_time = phase_time[1];
+  }
+
+  if (current_time > next_time)
+  {
+    cout << "Your rate comes from the future! current_time > next_time. " << endl;
+    cout << "I don't know how to deal with this and need to exit. " << endl;
+    exit(0);
+  }
+
+  cout << "The next time is: " << next_time << endl;
+
+
+  
+  bool let_timestep_increase;
+  do
+  {
+
+    // Get the current baselevel fall rate
+    cout << "Getting the fall rates." << endl;
+    vector<float> fall_rate = calculate_bl_drop_rate( phase_time, phase_rates_vecvec);
+
+    int n_fr_nodes = int(fall_rate.size());
+    cout << "The fall rates at 5 and 10 : " << fall_rate[5] << ", " << fall_rate[10] << endl;
+    //for (int n = 0; n<n_fr_nodes; n++)
+    //{
+    //  cout << fall_rate[n] << endl;
+    // }
+    
+    
+    // Record current topography
+    zeta_old = RasterData.copy();
+
+    // run active model components
+    // first diffuse the hillslopes. Currently two options. Perhaps a flag could be
+    // added so that we don't have to keep adding if statements as more
+    // hillslope rules are added?
+    if (hillslope)
+    {
+      if (nonlinear)
+      {
+        //soil_diffusion_fv_nonlinear();
+        MuddPILE_nl_soil_diffusion_nouplift();
+      }
+      else
+      {
+        soil_diffusion_fd_linear();
+      }
+    }
+
+    // sediment will have moved into channels. This is assumed to
+    // be immediately removed by fluvial processes, so we use the
+    // 'wash out' member function
+    wash_out();
+
+    // now for fluvial erosion
+    if (fluvial)
+    {
+      // currently the only option is stream power using the FASTSCAPE
+      // algorithm so there are no choices here
+
+      //cout << "I am using an adaptive timestep" << endl;
+      //fluvial_incision_with_variable_uplift_and_variable_K_adaptive_timestep( URaster, KRaster );
+
+      let_timestep_increase = true;
+      if (next_time - current_time == timeStep)
+      {
+        cout << "I'm close to the next time so I'm stopping the timestep from increaseing." << endl;
+        let_timestep_increase = false;
+      }
+
+      //cout << "Doing a timestep" << endl;
+      fluvial_incision_with_variable_uplift_and_variable_K_adaptive_timestep_impose_baselevel(  URaster, KRaster, 
+                                                        source_points_data,fall_rate, 
+                                                        let_timestep_increase,use_adaptive_timestep, minimum_slope, column_name);
+    }
+
+    //update the time
+    current_time += timeStep;
+
+
+
+    // Manage the timestepping
+    if( current_time >= next_time-timeStep)
+    {
+      cout << endl << endl << "======================================================" << endl;
+      cout << "Updating the next time for the incision and/or uplift phasing." << endl;
+      cout << "current time: " << current_time << " with timestep " << timeStep <<  endl;
+      timeStep = next_time - current_time;
+      cout << "Updated timeStep: " << timeStep << endl;
+
+      if (current_time > next_time)
+      {
+        cout << "WARNING: I have overshot!!" << endl;
+      }
+
+      next_time_ticker++;
+      if(next_time_ticker > n_phases -1)
+      {
+        next_time = endTime+10*timeStep;
+      }
+      else
+      {
+        next_time = phase_time[next_time_ticker];
+      }
+      
+    }
+
+
+    // now see if the time has exceeded the next print time
+    print_erosion = true;
+    if (current_time > next_printing_time)
+    {
+      do
+      {
+        next_printing_time+=float_print_interval;
+      } while(next_printing_time < current_time);
+      print_rasters_and_csv( frame );
+      ++frame;
+    }
+    if (quiet == false) cout << "\rTime: " << current_time << " years" << flush;
+
+  } while (check_end_condition() == false);
+
+  // reset the current frame
+  current_frame = frame;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+
+
+
+
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This is a wrapper function used to drive a model run
+// it checks parameters and flags from the data members
+//
+// Similar to run_componets but instead of running fluvial
+// and uplift in seperate steps it inserts the fluvial
+// and uplift matrices into the nonlinear hillslope
+// solver.
+//
+// This version allows variable K and U rasters to be used.
+// You can also switch on an adaptive timestep
+//
+// It also allows an imposed base level
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterModel::run_components_combined_imposed_baselevel( LSDRaster& URaster, 
+                                          bool use_adaptive_timestep, LSDSpatialCSVReader& source_points_data,
+                                          vector<float> phase_time, vector< vector<float> > phase_elevations,
+                                          LSDRaster& cumulative_uplift, 
+                                          LSDLithoCube& LSDLC, list<int> forbidden_lithocodes, 
+                                          bool print_lithocode_raster,
+                                          bool use_hillslope_hybrid,
+                                          int threshold_contributing_pixels,
+                                          float minimum_slope,
+                                          bool print_exhumation_and_cumulative_uplift, 
+                                          string column_name)
+{
+  
+  //cout << endl << endl << "I am checking the baselevel again LINE 4270" << endl;
+  //Array2D<float> zeta=RasterData.copy();
+  //LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta);
+  //cout << "The nodatavalue is: " << NoDataValue << endl;
+  //LSDFlowInfo FI(boundary_conditions, temp);
+  //cout <<  "Number of BL nodes is: " << FI.get_NBaseLevelNodes() << endl << endl << endl;  
+  
+  //recording = false;
+  cycle_number = 1;
+  total_erosion = 0;
+  max_erosion = 0;
+  min_erosion = -99;
+  switch_delay = 0;
+  time_delay = 0;
+
+  // These are for imposing all the lithocode information
+  LSDIndexRaster lithocodes_index_raster;
+  LSDRaster K_values;
+  LSDRaster Sc_values;
+
+  LSDRaster exhumation_surface;
+
+  stringstream ss, ss_root;
+
+  // some fields for uplift and fluvial incision
+  Array2D<float> uplift_field;
+  Array2D<float> fluvial_incision_rate_field;
+
+  // set the frame to the current frame plus 1
+  int timestep_counter = 0;   // for debugging
+  int frame = current_frame;
+
+  int n_phases = int(phase_time.size());
+
+  // get the rate vecvec
+  cout << "Let me get the phase rates" << endl;
+  vector< vector<float> > phase_rates_vecvec = calculate_phase_rates_from_elevations( phase_time, phase_elevations);
+  cout << "Okay, I have got the phase rates. " << endl;
+  cout << "There are " << n_phases << " phases." << endl;
+  cout << "confirming with the vecvec, which has " << phase_rates_vecvec.size() << " phases." << endl;
+
+  cout << "Starting the transient loop. " << endl;
+  cout << "The starting time is: " << current_time << endl;
+  cout << "The timestep is: " << timeStep << endl;
+
+  float next_time;
+  int next_time_ticker = 1;
+  if (n_phases == 1)
+  {
+    next_time = endTime+10*timeStep;
+  }
+  else
+  {
+    next_time = phase_time[1];
+  }
+
+  if (current_time > next_time)
+  {
+    cout << "Your rate comes from the future! current_time > next_time. " << endl;
+    cout << "I don't know how to deal with this and need to exit. " << endl;
+    exit(0);
+  }
+
+  cout << "The next time I will update the baselevel fall rate is: " << next_time << endl;
+  
+  bool let_timestep_increase;
+  do
+  {
+
+    // Get the current baselevel fall rate
+    //cout << "Getting the fall rates." << endl;
+    vector<float> fall_rate = calculate_bl_drop_rate( phase_time, phase_rates_vecvec);
+ 
+    // Record current topography
+    zeta_old = RasterData.copy();
+
+    // run active model components
+    // first diffuse the hillslopes. Currently two options. Perhaps a flag could be
+    // added so that we don't have to keep adding if statements as more
+    // hillslope rules are added?
+    if (hillslope)
+    {
+      if (nonlinear)
+      {
+        //soil_diffusion_fv_nonlinear();
+        MuddPILE_nl_soil_diffusion_nouplift();
+      }
+      else
+      {
+        soil_diffusion_fd_linear();
+      }
+    }
+
+    // sediment will have moved into channels. This is assumed to
+    // be immediately removed by fluvial processes, so we use the
+    // 'wash out' member function
+    wash_out();
+
+    // now for fluvial erosion
+    if (fluvial)
+    {
+      // currently the only option is stream power using the FASTSCAPE
+      // algorithm so there are no choices here
+
+      //cout << "I am using an adaptive timestep" << endl;
+      //fluvial_incision_with_variable_uplift_and_variable_K_adaptive_timestep( URaster, KRaster );
+
+      let_timestep_increase = true;
+      if (next_time - current_time == timeStep)
+      {
+        cout << "I'm close to the next time so I'm stopping the timestep from increaseing." << endl;
+        let_timestep_increase = false;
+      }
+
+      // This calculates the exhumation surface for the lithocube.
+      // It is the elevation minus the cumulative uplift (so you dig into deeper lithocube
+      // laytes to simulate the additional exhumation from uplfit)
+      exhumation_surface = calculate_exhumation_surface_from_cumulative_uplft(cumulative_uplift);
+
+      //cout << "Now I'll check where in the lithocube we are and make a raster of lithocodes." << endl;
+      lithocodes_index_raster = LSDLC.get_lithology_codes_from_raster(exhumation_surface,forbidden_lithocodes);
+
+      //cout << "Converting the litho codes to K values" << endl;
+      K_values = LSDLC.index_to_K(lithocodes_index_raster, 0.000003);
+
+
+      //cout << "Doing a timestep" << endl;
+      //cout << "Entering timestep, the fall rate in the outlet is: " << fall_rate[0] << endl;
+      fluvial_incision_with_variable_uplift_and_variable_K_adaptive_timestep_impose_baselevel(  URaster, K_values, 
+                                                        source_points_data,fall_rate, 
+                                                        let_timestep_increase,use_adaptive_timestep,
+                                                        minimum_slope, column_name);
+
+      //cout << "Finished fluvial timestep, the Raster pixel upstream of outlet is: " << RasterData[627][1] << endl;
+
+    }
+
+    if(use_hillslope_hybrid)
+    {
+      //cout << "Using hillslope hybrid!" << endl;
+      Sc_values = LSDLC.index_to_Sc(lithocodes_index_raster, 0.21); 
+      bool carve_before_fill = true;
+      hillslope_hybrid_module(Sc_values, URaster, threshold_contributing_pixels, source_points_data);
+
+      //cout << "Finished hillslope timestep, the Raster pixel upstream of outlet is: " << RasterData[627][1] << endl;
+
+    }
+
+
+
+    // need a function to calculate the cumulative uplift here
+    update_cumulative_uplift(cumulative_uplift, URaster, timeStep);
+
+    //update the time
+    current_time += timeStep;
+
+
+
+    // Manage the timestepping
+    if( current_time >= next_time-timeStep)
+    {
+      cout << endl << endl << "======================================================" << endl;
+      cout << "Updating the next time for the incision and/or uplift phasing." << endl;
+      cout << "current time: " << current_time << " with timestep " << timeStep <<  endl;
+      timeStep = next_time - current_time;
+      cout << "Updated timeStep: " << timeStep << endl;
+
+      if (current_time > next_time)
+      {
+        cout << "WARNING: I have overshot!!" << endl;
+      }
+
+      next_time_ticker++;
+      if(next_time_ticker > n_phases -1)
+      {
+        next_time = endTime+10*timeStep;
+      }
+      else
+      {
+        next_time = phase_time[next_time_ticker];
+      }
+      
+    }
+
+
+    // now see if the time has exceeded the next print time
+    print_erosion = true;
+    if (current_time > next_printing_time)
+    {
+
+      // We fill and impose the base level 
+      //fill_raster(minimum_slope);
+      //impose_channels(source_points_data, column_name);
+
+      do
+      {
+        next_printing_time+=float_print_interval;
+      } while(next_printing_time < current_time);
+      print_rasters_and_csv( frame );
+
+      if (print_exhumation_and_cumulative_uplift)
+      {
+        string CU_fname = name+"_cumulativeuplift_"+itoa(frame);  
+        string exhu_fname = name+"_exhumationsurface_"+itoa(frame);    
+
+        cumulative_uplift.write_raster(CU_fname,"bil");
+        exhumation_surface.write_raster(exhu_fname,"bil"); 
+      }
+
+      if (print_lithocode_raster)
+      {
+        string litho_fname = name+"_lithocode_"+itoa(frame);
+        lithocodes_index_raster.write_raster(litho_fname,"bil");
+      }
+
+      ++frame;
+    }
+    if (quiet == false) cout << "\rTime: " << current_time << " years" << flush;
+
+  } while (check_end_condition() == false);
+
+  // reset the current frame
+  current_frame = frame;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+
+
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This is a wrapper function used to drive a model run
+// it checks parameters and flags from the data members
+//
+// Similar to run_componets but instead of running fluvial
+// and uplift in seperate steps it inserts the fluvial
+// and uplift matrices into the nonlinear hillslope
+// solver.
+//
+// This version allows variable K and U rasters to be used.
+// You can also switch on an adaptive timestep
+//
+// It also allows an imposed base level
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterModel::run_components_combined_imposed_baselevel( LSDRaster& URaster, 
+                                          bool use_adaptive_timestep, LSDSpatialCSVReader& source_points_data,
+                                          vector<float> phase_time, vector< float > outlet_elevations,
+                                          LSDRaster& cumulative_uplift, 
+                                          LSDLithoCube& LSDLC, list<int> forbidden_lithocodes, 
+                                          bool print_lithocode_raster,
+                                          bool use_hillslope_hybrid,
+                                          int threshold_contributing_pixels,
+                                          float minimum_slope, 
+                                          bool print_exhumation_and_cumulative_uplift,
+                                          string column_name)
+{
+  
+  //cout << endl << endl << "I am checking the baselevel again LINE 4270" << endl;
+  //Array2D<float> zeta=RasterData.copy();
+  //LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta);
+  //cout << "The nodatavalue is: " << NoDataValue << endl;
+  //LSDFlowInfo FI(boundary_conditions, temp);
+  //cout <<  "Number of BL nodes is: " << FI.get_NBaseLevelNodes() << endl << endl << endl;  
+  
+  //recording = false;
+  cycle_number = 1;
+  total_erosion = 0;
+  max_erosion = 0;
+  min_erosion = -99;
+  switch_delay = 0;
+  time_delay = 0;
+
+  // These are for imposing all the lithocode information
+  LSDIndexRaster lithocodes_index_raster;
+  LSDRaster K_values;
+  LSDRaster Sc_values;
+
+  LSDRaster exhumation_surface;
+
+  stringstream ss, ss_root;
+
+  // some fields for uplift and fluvial incision
+  Array2D<float> uplift_field;
+  Array2D<float> fluvial_incision_rate_field;
+
+  // set the frame to the current frame plus 1
+  int timestep_counter = 0;   // for debugging
+  int frame = current_frame;
+
+  int n_phases = int(phase_time.size());
+
+  // get the baselevel codes
+  cout << "Getting the baselevel code." << endl;
+  string bl_switch = "baselevel_code";
+  vector<int> bl_code = source_points_data.data_column_to_int(bl_switch);
+
+
+  cout << "Starting the transient loop. " << endl;
+  cout << "The starting time is: " << current_time << endl;
+  cout << "The timestep is: " << timeStep << endl;
+
+  float next_time;
+  int next_time_ticker = 1;
+  if (n_phases == 1)
+  {
+    next_time = endTime+10*timeStep;
+  }
+  else
+  {
+    next_time = phase_time[1];
+  }
+
+  if (current_time > next_time)
+  {
+    cout << "Your rate comes from the future! current_time > next_time. " << endl;
+    cout << "I don't know how to deal with this and need to exit. " << endl;
+    exit(0);
+  }
+
+  cout << "The next time I will update the baselevel fall rate is: " << next_time << endl;
+
+ 
+  bool let_timestep_increase;
+  do
+  {
+
+    // Get the current baselevel fall rate
+    //cout << "Getting the fall rates." << endl;
+    float this_fall_rate = calculate_bl_drop_rate_from_elevations( phase_time, outlet_elevations);
+    vector<float> fall_rate;
+
+    int n_fr_nodes = 1;
+    // We just set all the fall rates the same. 
+    // Only the pixels with the correct base level code will fall at this rate
+    int n_bl_nodes = int(bl_code.size());
+    for (int bl_node = 0; bl_node<n_bl_nodes; bl_node++)
+    {
+      fall_rate.push_back(this_fall_rate);
+    }
+ 
+    // Record current topography
+    zeta_old = RasterData.copy();
+
+    // run active model components
+    // first diffuse the hillslopes. Currently two options. Perhaps a flag could be
+    // added so that we don't have to keep adding if statements as more
+    // hillslope rules are added?
+    if (hillslope)
+    {
+      if (nonlinear)
+      {
+        //soil_diffusion_fv_nonlinear();
+        MuddPILE_nl_soil_diffusion_nouplift();
+      }
+      else
+      {
+        soil_diffusion_fd_linear();
+      }
+    }
+
+    // sediment will have moved into channels. This is assumed to
+    // be immediately removed by fluvial processes, so we use the
+    // 'wash out' member function
+    wash_out();
+
+    // now for fluvial erosion
+    if (fluvial)
+    {
+      // currently the only option is stream power using the FASTSCAPE
+      // algorithm so there are no choices here
+
+      //cout << "I am using an adaptive timestep" << endl;
+      //fluvial_incision_with_variable_uplift_and_variable_K_adaptive_timestep( URaster, KRaster );
+
+      let_timestep_increase = true;
+      if (next_time - current_time == timeStep)
+      {
+        cout << "I'm close to the next time so I'm stopping the timestep from increasing." << endl;
+        let_timestep_increase = false;
+      }
+
+      // This calculates the exhumation surface for the lithocube.
+      // It is the elevation minus the cumulative uplift (so you dig into deeper lithocube
+      // laytes to simulate the additional exhumation from uplfit)
+      exhumation_surface = calculate_exhumation_surface_from_cumulative_uplft(cumulative_uplift);
+
+      //cout << "Now I'll check where in the lithocube we are and make a raster of lithocodes." << endl;
+      lithocodes_index_raster = LSDLC.get_lithology_codes_from_raster(exhumation_surface,forbidden_lithocodes);
+
+      //cout << "Converting the litho codes to K values" << endl;
+      K_values = LSDLC.index_to_K(lithocodes_index_raster, 0.000003);
+
+
+      //cout << "Doing a timestep" << endl;
+      fluvial_incision_with_variable_uplift_and_variable_K_adaptive_timestep_impose_baselevel(  URaster, K_values, 
+                                                        source_points_data,fall_rate, 
+                                                        let_timestep_increase,use_adaptive_timestep,
+                                                        minimum_slope, column_name);
+
+    }
+
+    if(use_hillslope_hybrid)
+    {
+      //cout << "Using hillslope hybrid!" << endl;
+      Sc_values = LSDLC.index_to_Sc(lithocodes_index_raster, 0.21); 
+      bool carve_before_fill = true;
+      hillslope_hybrid_module(Sc_values, URaster, threshold_contributing_pixels,source_points_data);
+    }
+
+
+
+    // need a function to calculate the cumulative uplift here
+    update_cumulative_uplift(cumulative_uplift, URaster, timeStep);
+
+    //update the time
+    current_time += timeStep;
+
+
+
+    // Manage the timestepping
+    if( current_time >= next_time-timeStep)
+    {
+      cout << endl << endl << "======================================================" << endl;
+      cout << "Updating the next time for the incision and/or uplift phasing." << endl;
+      cout << "current time: " << current_time << " with timestep " << timeStep <<  endl;
+      timeStep = next_time - current_time;
+      cout << "Updated timeStep: " << timeStep << endl;
+
+      if (current_time > next_time)
+      {
+        cout << "WARNING: I have overshot!!" << endl;
+      }
+
+      next_time_ticker++;
+      if(next_time_ticker > n_phases -1)
+      {
+        next_time = endTime+10*timeStep;
+      }
+      else
+      {
+        next_time = phase_time[next_time_ticker];
+      }
+      
+    }
+
+    // now see if the time has exceeded the next print time
+    print_erosion = true;
+    if (current_time > next_printing_time)
+    {
+
+      // We fill and impose the base level 
+      fill_raster(minimum_slope);
+      impose_channels(source_points_data, column_name);
+
+      do
+      {
+        next_printing_time+=float_print_interval;
+      } while(next_printing_time < current_time);
+      print_rasters_and_csv( frame );
+
+      if (print_lithocode_raster)
+      {
+        string litho_fname = name+"_lithocode_"+itoa(frame);
+        lithocodes_index_raster.write_raster(litho_fname,"bil");
+      }
+
+      if (print_exhumation_and_cumulative_uplift)
+      {
+        string CU_fname = name+"_cumulativeuplift_"+itoa(frame);  
+        string exhu_fname = name+"_exhumationsurface_"+itoa(frame);    
+
+        cumulative_uplift.write_raster(CU_fname,"bil");
+        exhumation_surface.write_raster(exhu_fname,"bil"); 
+      }
+
+      ++frame;
+    }
+    if (quiet == false) cout << "\rTime: " << current_time << " years" << flush;
+
+  } while (check_end_condition() == false);
+
+  // reset the current frame
+  current_frame = frame;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4872,13 +6091,13 @@ void LSDRasterModel::fluvial_snap_to_steady_state(float U)
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 void LSDRasterModel::fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_values, 
                                   LSDRaster& U_values, LSDSpatialCSVReader& source_points_data, 
-                                  bool carve_before_fill)
+                                  bool carve_before_fill, string column_name)
 {
 
-  string column_name = "elevation(m)";
+  // string column_name = "elevation(m)";
 
   // impose the channel before you fill
-  impose_channels(source_points_data);
+  impose_channels(source_points_data, column_name);
 
 
   Array2D<float> zeta=RasterData.copy();
@@ -5001,27 +6220,135 @@ void LSDRasterModel::fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_v
 }
 
 
+
+void LSDRasterModel::hillslope_hybrid_module(LSDRaster& Sc_values, LSDRaster& Uplift, int threshold_pixels,LSDSpatialCSVReader& source_points_data)
+{
+  //cout << "I'm in the hillslope routine, ZNO node is: " << RasterData[627][1] << endl; 
+  
+  // we use the old zeta as this is meant to be used after the fluvial step
+  Array2D<float> zeta_fluvial=RasterData.copy();
+  Array2D<float> zeta_new=zeta_old.copy();
+  Array2D<float> zeta_test=zeta_old.copy();
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta_new, GeoReferencingStrings);
+
+  // Create the laplacian function
+  // This is from the updated data
+  LSDRaster curvature = basic_curvature();
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDFlowInfo flow(boundary_conditions, temp);
+  vector<int> ni = source_points_data.get_nodeindices_from_lat_long(flow);
+  vector<int>::iterator it;
+
+  cout << "HS NBaseLevel: " << flow.get_NBaseLevelNodes() << endl;
+
+  //float FP_NDV = K_values.get_NoDataValue();
+  float Sc_value, receiver_elev;
+
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  vector <int> nodeList = flow.get_SVector();
+  int numNodes = nodeList.size();
+  int node, row, col, receiver, receiver_row, receiver_col, contributing_pixels;
+  float dx;
+
+  // these save a bit of computational expense.
+  float root_2 = pow(2, 0.5);
+  float dx_root2 = root_2*DataResolution;
+  float DR2 = DataResolution*DataResolution;
+
+  // Step two calculate new height
+  //for (int i=numNodes-1; i>=0; --i)
+  float new_zeta;
+  for (int i=0; i<numNodes; ++i)
+  {
+
+    // get the information about node relationships from the flow info object
+    node = nodeList[i];
+    flow.retrieve_current_row_and_col(node, row, col);
+    flow.retrieve_receiver_information(node, receiver, receiver_row, receiver_col);
+    contributing_pixels = flow.retrieve_contributing_pixels_of_node(node);
+
+    // Find baselevel nodes to ignore
+    if (find (ni.begin(), ni.end(), node) != ni.end())
+    {
+      //cout << "Found baselevel, setting cp above threshold " << endl;
+      contributing_pixels = threshold_pixels+1;
+    }
+
+    // Get the data from the individual points
+    Sc_value = Sc_values.get_data_element(row,col);
+
+    // get the distance between nodes. Depends on flow direction
+    switch (flow.retrieve_flow_length_code_of_node(node))
+    {
+      case 0:
+        dx = -99;
+      break;
+      case 1:
+        dx = DataResolution;
+      break;
+      case 2:
+        dx = dx_root2;
+      break;
+      default:
+        dx = -99;
+      break;
+    }
+
+    if (contributing_pixels<threshold_pixels)
+    {
+
+      // Check the elevation based on the curvature
+      // this includes uplift as we are ignoring the fluvial component here. 
+      // Add the curvature term since the curvature will be negative on convex hillslopes
+      zeta_test[row][col] = zeta_old[row][col] + curvature.get_data_element(row,col)*K_soil*timeStep + Uplift.get_data_element(row,col)*timeStep;
+
+      // now we check the elevation using the critical slope snapping
+      // If it is a base level node set zeta new to something large so that we always get the diffused node
+      if (node != receiver)
+      {
+        receiver_elev = zeta_new[receiver_row][receiver_col];
+        zeta_new[row][col] = receiver_elev+ dx*Sc_value;
+      }
+      else
+      {
+        zeta_new[row][col] = 99999;
+      }
+      
+
+      if ( zeta_test[row][col] < zeta_new[row][col] )  // check if this is a baselevel node
+      {
+        zeta_new[row][col] = zeta_test[row][col]; 
+      }
+
+      // we need to ensure pits don't grow so we have a minimum slope between these
+      //if ( zeta_new[row][col] < receiver_elev)
+      //{
+      //  zeta_new[row][col] = receiver_elev+dx*0.0001;
+      //}
+
+    }
+    else
+    {
+      zeta_new[row][col] = zeta_fluvial[row][col];
+    }
+  }
+  //return LSDRasterModel(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta);
+  this->RasterData = zeta_new.copy();
+
+}
+
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // This snaps to steady based on an input file with elevations and node indicies
 // overloaded from the previous function
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-void LSDRasterModel::fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_values, LSDRaster& U_values, string csv_of_fixed_channel, bool carve_before_fill)
+void LSDRasterModel::hillslope_snap_to_steady_variable_Sc(LSDRaster& Sc_values, bool carve_before_fill, int threshold_pixels)
 {
-  LSDRasterInfo RI(K_values);
-
-  cout << "I am reading points from the file: "+ csv_of_fixed_channel << endl;
-  LSDSpatialCSVReader source_points_data( RI,csv_of_fixed_channel );
-
-  // impose the channel before you fill
-  impose_channels(source_points_data);
-
-  //*****************************
-  // Working from here
-  // Need to get out map that has key as node index and value as elevation
-  //******************************
-  string column_name = "elevation(m)";
-
-
   Array2D<float> zeta=RasterData.copy();
 
   // Step one, create donor "stack" etc. via FlowInfo
@@ -5046,31 +6373,15 @@ void LSDRasterModel::fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_v
   // update the raster
   zeta = filled_topography.get_RasterData();
 
-
-  // Get the local node index as well as the elevations
-  vector<int> ni = source_points_data.get_nodeindices_from_lat_long(flow);
-  vector<float> elev = source_points_data.data_column_to_float(column_name);
-  // make the map
-  cout << "I am making an elevation map. This will not work if points in the raster lie outside of the csv channel points." << endl;
-  map<int,float> elevation_map;
-  for(int i = 0; i< int(ni.size()); i++)
-  {
-    elevation_map[ ni[i] ] =  elev[i]; 
-  }
-
-  float m_exp = get_m();
-  float n_exp = get_n();
-  float one_over_n = 1/n_exp;
-
   //float FP_NDV = K_values.get_NoDataValue();
-  float FP_value, K_value, U_value, receiver_elev, parenth_term, area_pow;
+  float Sc_value, receiver_elev;
 
 
   // Step one, create donor "stack" etc. via FlowInfo
   vector <int> nodeList = flow.get_SVector();
   int numNodes = nodeList.size();
-  int node, row, col, receiver, receiver_row, receiver_col;
-  float drainageArea, dx;
+  int node, row, col, receiver, receiver_row, receiver_col, contributing_pixels;
+  float dx;
 
   // these save a bit of computational expense.
   float root_2 = pow(2, 0.5);
@@ -5087,25 +6398,17 @@ void LSDRasterModel::fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_v
     node = nodeList[i];
     flow.retrieve_current_row_and_col(node, row, col);
     flow.retrieve_receiver_information(node, receiver, receiver_row, receiver_col);
-    drainageArea = flow.retrieve_contributing_pixels_of_node(node) *  DR2;
-
+    contributing_pixels = flow.retrieve_contributing_pixels_of_node(node);
 
     // check if this is a baselevel node
     if(node == receiver)
     {
       //cout << "This is a base level node. I don't update this node." << endl;
     }
-    else if(elevation_map.find(node) != elevation_map.end())
-    {
-      //cout << "This is one of the fixed channel nodes. I don't update this node." << endl;
-      FP_value = elevation_map[node];
-      zeta[row][col]= FP_value;
-    }
     else
     {
       // Get the data from the individual points
-      K_value = K_values.get_data_element(row,col);
-      U_value = U_values.get_data_element(row,col);
+      Sc_value = Sc_values.get_data_element(row,col);
 
       // get the distance between nodes. Depends on flow direction
       switch (flow.retrieve_flow_length_code_of_node(node))
@@ -5124,26 +6427,24 @@ void LSDRasterModel::fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_v
         break;
       }
 
-
-      receiver_elev = zeta[receiver_row][receiver_col];
-      area_pow = pow(drainageArea,m_exp);
-      parenth_term = U_value/(K_value*area_pow);
-      new_zeta = receiver_elev+ dx*( pow(parenth_term,one_over_n));
-
-      // now check to make sure the new zeta is not above the fixed channel
-
-
+      if (contributing_pixels<threshold_pixels)
+      {
+        receiver_elev = zeta[receiver_row][receiver_col];
+        zeta[row][col] = receiver_elev+ dx*Sc_value;
+      }
     }
-    
-
-
-
   }
   //return LSDRasterModel(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta);
   this->RasterData = zeta.copy();
 
   RasterData = zeta.copy();
 }
+
+
+
+
+
+
 
 
 
@@ -5484,6 +6785,77 @@ LSDRaster LSDRasterModel::basic_valley_fill_critical_slope(float critical_slope,
   cout << "Right, all finished. Generating the output raster" << endl;
   LSDRaster output_raster(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, output, GeoReferencingStrings);  
   return output_raster;
+}
+
+
+// A basic laplacian function
+LSDRaster LSDRasterModel::basic_curvature()
+{
+  Array2D<float> new_data(NRows,NCols,NoDataValue);
+
+
+  // These are the north, south, east and west slopes
+  float f_N, f_S, f_E, f_W;
+  float dxsquared = DataResolution*DataResolution;
+
+  for(int row = 0; row < NRows; row++)
+  {
+    for(int col = 0; col < NCols; col++)
+    {
+      if (RasterData[row][col] != NoDataValue)
+      {
+        // Northern pixel (remember row 0 is the north and row NRows-1 is the south)
+        if ( row == 0 || RasterData[row-1][col] == NoDataValue)
+        {
+          f_N = RasterData[row][col];
+        }
+        else
+        {
+          f_N = RasterData[row-1][col];
+        }
+        
+        // Southern pixel (remember row 0 is the north and row NRows-1 is the south)
+        if ( row == NRows-1 || RasterData[row+1][col] == NoDataValue)
+        {
+          f_S = RasterData[row][col];
+        }
+        else
+        {
+          f_S = RasterData[row+1][col];
+        }   
+
+        // eastern pixel
+        if ( col == 0 || RasterData[row][col-1] == NoDataValue)
+        {
+          f_E = RasterData[row][col];
+        }
+        else
+        {
+          f_E = RasterData[row][col-1];
+        }  
+
+        // western pixel
+        if ( col == NRows-1 || RasterData[row][col+1] == NoDataValue)
+        {
+          f_W = RasterData[row][col];
+        }
+        else
+        {
+          f_W = RasterData[row][col+1];
+        }    
+
+        new_data[row][col] = (f_N+f_S+f_E+f_W - 4*RasterData[row][col] ) /  dxsquared;       
+
+
+
+
+      }
+    }
+  }
+
+  LSDRaster output_raster(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, new_data, GeoReferencingStrings);  
+  return output_raster;
+
 }
 
 
@@ -6793,15 +8165,161 @@ void LSDRasterModel::fluvial_incision_with_variable_uplift_and_variable_K_adapti
 
 
 
+void LSDRasterModel::process_transient_file(string transient_infile_name, vector<float>& phases,vector<float>& outlet_elevations)
+{
+  vector<float> these_phases;
+  vector<float> these_elevs;
+  
+  // make sure the filename works
+  ifstream ifs(transient_infile_name.c_str());
+  if( ifs.fail() )
+  {
+    cout << "\nFATAL ERROR: Trying to load csv data file, but the file" << transient_infile_name
+         << " doesn't exist;  LSDRasterModel::process_transient_file" << endl;
+    exit(EXIT_FAILURE);
+  }
+  else
+  {
+    cout << "I have opened the csv file." << endl;
+  }
+
+  // initiate the string to hold the file
+  string line_from_file;
+  vector<string> empty_string_vec;
+  vector<string> this_string_vec;
+  string temp_string;
+
+  // get the headers from the first line
+  getline(ifs, line_from_file);
+
+  // reset the string vec
+  this_string_vec = empty_string_vec;
+
+  // now loop through the rest of the lines, getting the data.
+  while( getline(ifs, line_from_file))
+  {
+    //cout << "Getting line, it is: " << line_from_file << endl;
+    // reset the string vec
+    this_string_vec = empty_string_vec;
+
+    // create a stringstream
+    stringstream ss(line_from_file);
+
+    while( ss.good() )
+    {
+      string substr;
+      getline( ss, substr, ',' );
+
+      // remove the spaces
+      substr.erase(remove_if(substr.begin(), substr.end(), ::isspace), substr.end());
+
+      // remove control characters
+      substr.erase(remove_if(substr.begin(), substr.end(), ::iscntrl), substr.end());
+
+      // add the string to the string vec
+      this_string_vec.push_back( substr );
+    }
+
+    these_phases.push_back( atof( this_string_vec[0].c_str() ) );
+    these_elevs.push_back( atof( this_string_vec[1].c_str() ) );
 
 
+  }
 
 
+  ifs.close();
+  phases = these_phases;
+  outlet_elevations = these_elevs;
+
+}
 
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This processes the baselevel file so you get the timesteps and a vector of
+// vectors with the elevations of the channel at each time
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterModel::process_baselevel( LSDSpatialCSVReader& source_points_data, string timing_prefix, 
+                                        float timing_multiplier, int n_time_columns, int phase_steps, 
+                                        vector<float>& phases_vec, vector< vector<float> >& elevation_vecvec)
+{
+  // loop through the timings 
+
+  cout << endl << endl << "===================================" << endl;
+  cout << "Processing baselevel. I will give you the outlet only" << endl;
+
+  vector< vector<float> > elevations;
+  vector<float> phases;
+
+  string num_string;
+  string col_string;
+  float this_phase;
+  vector<float> this_elevation;
+
+  string elevation_string = "elevation(m)";
+
+  phases.push_back(0);
+  elevations.push_back(source_points_data.data_column_to_float(elevation_string));
+
+  for (int i = 1 ; i <= n_time_columns; i++)
+  {
+    num_string = itoa(i*phase_steps);
+    col_string = timing_prefix+num_string;
+
+    this_phase = float(i*phase_steps)*timing_multiplier;
+    
+    if (source_points_data.is_column_in_csv(col_string))
+    {
+      //cout << "I found the column: " << col_string << " that is at time: " << this_phase << endl;
+
+      phases.push_back(this_phase);
+      this_elevation = source_points_data.data_column_to_float(col_string);
+      elevations.push_back( this_elevation  );
+
+      cout << "Phase: " << this_phase << " and outlet elevation: " << this_elevation[0] << endl;
+    }
+
+    cout << "==========================================" << endl << endl;
 
 
+    
+  }
 
+  phases_vec = phases;
+  elevation_vecvec = elevations;
+
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This processes the baselevel file so you get the timesteps and a vector of
+// vectors with the elevations of the channel at each time
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterModel::baselevel_run_area_switch( LSDSpatialCSVReader& source_points_data, string column_name)
+{
+
+  vector<float> category_vector = source_points_data.data_column_to_float(column_name);
+  vector<string> category_switch; 
+
+  cout << endl << endl << "==========================================" << endl;
+  cout << "Setting baselevel category, I am using column: " << column_name << endl;
+  cout << "Any values in this column that are less than or equal to 0 will lead to a baselevel channel." << endl;
+  cout << "==========================================" << endl << endl << endl;
+
+  for (int i = 0; i< int(category_vector.size()); i++)
+  {
+    //cout << i << ": " << category_vector[i] << endl;
+    
+    if (category_vector[i] <= 0)
+    {
+      category_switch.push_back("0");
+    } 
+    else
+    {
+      category_switch.push_back("1");
+    }   
+  }
+  source_points_data.add_data_column("baselevel_code", category_switch);
+}
 
 
 
@@ -6812,15 +8330,19 @@ void LSDRasterModel::fluvial_incision_with_variable_uplift_and_variable_K_adapti
 // This is the component of the model that is solved using the
 // FASTSCAPE algorithm of Willett and Braun (2013)
 // Uses Newton's method to solve incision if the slope exponent != 1
+//
+// IMPORTANT: Convention is that the fall rate is positive for a dropping base level
+// So positive fall rates will lower the base level nodes
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDRasterModel::fluvial_incision_with_variable_uplift_and_variable_K_adaptive_timestep_impose_baselevel( LSDRaster& Urate_raster, 
-                                 LSDRaster& K_raster, LSDSpatialCSVReader& source_points_data,
-                                 float bl_fall_rate )
+                                 LSDRaster& K_raster, LSDSpatialCSVReader& source_points_data, 
+                                 float bl_fall_rate,
+                                 bool let_timestep_increase, string column_name)
 {
   
 
   // We need to impose the baselevel channels first
-  impose_channels(source_points_data);
+  impose_channels(source_points_data, column_name);
 
   // now we get the raster
   Array2D<float> zeta=RasterData.copy();
@@ -6831,10 +8353,11 @@ void LSDRasterModel::fluvial_incision_with_variable_uplift_and_variable_K_adapti
   LSDFlowInfo flow(boundary_conditions, temp);
 
   // We need to get the node indices from the channel
-  string column_name = "elevation(m)";
+  // string column_name = "elevation(m)";
   float bl_drop;
   vector<int> ni = source_points_data.get_nodeindices_from_lat_long(flow);
   vector<float> start_elev = source_points_data.data_column_to_float(column_name);  
+  vector<float> end_elev = start_elev;
 
   vector <int> nodeList = flow.get_SVector();
   int numNodes = nodeList.size();
@@ -6875,13 +8398,17 @@ void LSDRasterModel::fluvial_incision_with_variable_uplift_and_variable_K_adapti
     zeta=RasterData.copy();
 
     bl_drop = timeStep*bl_fall_rate;
+    //cout << "Timestep is: " << timeStep << " and bl_drop is: " << bl_drop << endl;
+    //cout << "Elevation of node 10 is: " << start_elev[10] << endl;
 
     // Make a map! Map map map. This speeds the searching
+    // Also gets the final state of the imposed baselevel nodes
     map<int,float> bl_map;
     map<int,float>::iterator it;
     for (int n = 0; n < int(ni.size()); n++)
     {
       bl_map[ ni[n] ] = start_elev[n] - bl_drop;
+      end_elev[n] = start_elev[n] - bl_drop;
     }
   
     // Calculate new heights
@@ -7051,18 +8578,523 @@ void LSDRasterModel::fluvial_incision_with_variable_uplift_and_variable_K_adapti
 
   // if the model didn't overexcavate at all, then increase the timestep.
   //cout << "The timestep iterator is: " << timestep_iterator << endl;
-  if(timestep_iterator ==0)
+  if(let_timestep_increase)
   {
-    timeStep = 2*timeStep;
-    if (timeStep > maxtimeStep)
+    if(timestep_iterator ==0)
     {
-      timeStep = maxtimeStep;
+      timeStep = 2*timeStep;
+      if (timeStep > maxtimeStep)
+      {
+        timeStep = maxtimeStep;
+      }
     }
   }
 
   // we need to update the baselevel nodes
   source_points_data.data_column_add_float(column_name, -bl_drop);
 
+  this->RasterData = zeta.copy();
+}
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This is the component of the model that is solved using the
+// FASTSCAPE algorithm of Willett and Braun (2013)
+// Uses Newton's method to solve incision if the slope exponent != 1
+//
+// IMPORTANT: Convention is that the fall rate is positive for a dropping base level
+// So positive fall rates will lower the base level nodes
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterModel::fluvial_incision_with_variable_uplift_and_variable_K_adaptive_timestep_impose_baselevel( LSDRaster& Urate_raster, 
+                                 LSDRaster& K_raster, LSDSpatialCSVReader& source_points_data, 
+                                 vector<float> bl_fall_rate,
+                                 bool let_timestep_increase,bool use_adaptive_timestep,
+                                 float minimum_slope, string column_name)
+{
+  //cout << endl << endl << "ENTERING incision with timestep " << timeStep << endl;
+
+  // We need to impose the baselevel channels first
+  // This frequently has the effect of creating loads of baselevel nodes because the 
+  // source points do not have enforced slopes
+  string bl_col_name = "baselevel_code";
+  vector<int> bl_code = source_points_data.data_column_to_int(bl_col_name);
+
+  //Array2D<float> zubu=RasterData.copy();
+  //cout << "Y1111111 the value at crazy node is: " << zubu[617][761] << endl;
+
+  // we need to fill the raster and then impose the channels
+  fill_raster(minimum_slope);
+
+  //Array2D<float> waba=RasterData.copy();
+  //cout << "WAAAAAA the value at crazy node is: " << waba[617][761] << endl;
+
+  //cout << "BL code of outlet is: " << bl_code[0] << endl;
+  //cout << "BL code of next pixel is: " << bl_code[1] << endl;
+  impose_channels(source_points_data, column_name, bl_code);
+
+  // now we get the raster
+  Array2D<float> zeta=RasterData.copy();
+  zeta_old = RasterData.copy();
+
+  //cout << "YoYoYo the value at crazy node is: " << zeta[617][761] << endl;
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta);
+  //cout << "The nodatavalue is: " << NoDataValue << endl;
+  LSDFlowInfo flow(boundary_conditions, temp);
+
+  //cout << endl << endl << "Incision timestep the number of BL nodes is: " << flow.get_NBaseLevelNodes() << endl;
+
+  // We need to get the node indices from the channel
+  // string column_name = "elevation(m)";
+  //vector<float> bl_drop;
+  vector<int> ni = source_points_data.get_nodeindices_from_lat_long(flow);
+  vector<float> start_elev = source_points_data.data_column_to_float(column_name);  
+  vector<float> end_elev = start_elev;
+
+  //cout << "The outlet elevation is: "  << start_elev[0] << endl;
+  
+  string area_col_name = "area";
+  //cout << "If I have a baselevel code for reading area, the area column needs to be: " << area_col_name << endl;
+  vector<float> bl_area = source_points_data.data_column_to_float(area_col_name);
+
+  //cout.precision(9);
+  //cout << "Areas of first three upstream pixels are: " << endl << bl_area[1] << endl << bl_area[2] << endl << bl_area[3] << endl;
+
+  // A routine for bug checking. If you are satisfied it works set to false. 
+  bool check_first_two_nodes = false;
+  if (check_first_two_nodes)
+  {
+    int r,c,r_o,c_o;
+    int outlet_ni = ni[0];
+    flow.retrieve_current_row_and_col(outlet_ni, r_o, c_o);
+    float outlet_elev = zeta[r_o][c_o];
+
+    int upstream_ni = ni[1];
+    flow.retrieve_current_row_and_col(upstream_ni, r, c);
+    float upstream_elev = zeta[r][c];
+
+    cout << "From the raster! The r,c of outlet is: " << r_o << "," << c_o << endl;
+    cout << "The outlet is at " << outlet_elev << " m and the upstream node is at " << upstream_elev << " m." << endl;
+  }
+
+
+  int N_BL_nodes = int(ni.size());
+  int BL_fall_rate_nodes = int(bl_fall_rate.size());
+  if (N_BL_nodes != BL_fall_rate_nodes)
+  {
+    cout << "Hey! Something is wrong. The number of fall rate nodes (" << BL_fall_rate_nodes << ")" << endl; 
+    cout << "is not the same as the number of baselevel nodes (" << N_BL_nodes << endl;
+    cout << "I am exiting and you need to check your baselevel files" << endl;
+    exit(0);
+  }
+
+  vector <int> nodeList = flow.get_SVector();
+  int numNodes = nodeList.size();
+  int node, row, col, receiver, receiver_row, receiver_col;
+  float drainageArea, dx, streamPowerFactor;
+  float U;
+
+  // these save a bit of computational expense.
+  float root_2 = pow(2, 0.5);
+  float dx_root2 = root_2*DataResolution;
+  float DR2 = DataResolution*DataResolution;
+
+  // this is only for bug checking
+  if (quiet == false && name == "debug" && NRows <= 10 && NCols <= 10)
+  {
+    cout << "Drainage area: " << endl;
+    for (int i=0; i<NRows*NCols; ++i)
+    {
+      drainageArea = flow.retrieve_contributing_pixels_of_node(i) *  DR2;
+      cout << drainageArea << " ";
+      if (((i+1)%NCols) == 0)
+      cout << endl;
+    }
+  }
+
+  // We nest the main calculation routines in a logic statement that will
+  // recalculate everything at a smaller timestep if the model overexcavates
+  int timestep_iterator = 0;      // this checks how many times you have reduced the
+                                  // timestep
+  bool it_has_overexcavated;
+  //cout << "TUBBO entering the adaptive timestep loop" << endl;
+  do
+  {
+    // reset the overexcavation switch
+    it_has_overexcavated = false;
+
+    // reset zeta to the old elevation. This wastes a bit of time but we need it
+    // for the adaptive timestepping
+    zeta=RasterData.copy();
+
+    //bl_drop = timeStep*bl_fall_rate;
+    //cout << "Timestep is: " << timeStep << " and bl_drop is: " << bl_drop << endl;
+    //cout << "Elevation of node 10 is: " << start_elev[10] << endl;
+
+    // Make a map! Map map map. This speeds the searching
+    // Also gets the final state of the imposed baselevel nodes
+    // We need to to this within the timestepping loop so that
+    // the adaptive timestep can work
+    map<int,float> bl_map;
+    map<int,int> bl_to_points_map;      // this maps the node number to the index into the baselevel nodes
+    map<int,float>::iterator it;
+    map<int,int>::iterator it_bl_to_points;
+    //cout << "Setting the baselevel nodes based on the timestep" << endl;
+    for (int n = 0; n < int(ni.size()); n++)
+    {
+      // The following logic is for separating nodes where we use the baselevel fall 
+      // rate from nodes where we just take the area
+      if (bl_code[n] == 0)    // if the code is 0, we keep an elevation
+      {
+        bl_map[ ni[n] ] = start_elev[n] - timeStep*bl_fall_rate[n];
+        end_elev[n] = start_elev[n] - timeStep*bl_fall_rate[n];
+      }
+      else      // if not, we keep a reference to the index
+      {
+        bl_to_points_map[ ni[n] ] = n;
+
+        // some bug checking
+        //if (n == 1)
+        //{
+        //  cout << " n == 1, node is " << ni[n] << endl;
+        //}
+      }     
+    }
+
+    // Calculate new heights
+    for (int i=0; i<numNodes; ++i)
+    {
+      // get the information about node relationships from the flow info object
+      node = nodeList[i];
+
+      /*
+      // Check for the crazy node in ZNO
+      flow.retrieve_current_row_and_col(node, row, col);
+      flow.retrieve_receiver_information(node, receiver, receiver_row, receiver_col);
+      if (row == 617 && col == 761)
+      {
+        cout << "This is the crazy node." << endl;
+        if ( bl_map.find( node ) != bl_map.end()) 
+        {
+          cout << "It is in the BL list but shouldn't be." << endl;
+        }
+        else
+        {
+          cout << "Crazy node not in BL list" << endl;
+        }
+
+        if (node == receiver)
+        {
+          cout << "Crazy node thinks it is a baselevel node" << endl;
+        }
+
+        cout << "Crazy elevation is " << zeta[row][col] << endl;
+      }
+      */
+
+      // Skip this node if it is in the imposed baselevel (where bl_code = 0)
+      if ( bl_map.find( node ) != bl_map.end()) 
+      {
+        flow.retrieve_current_row_and_col(node, row, col);
+        zeta[row][col] = bl_map[node];
+      }
+      else      /// this node needs to be computed
+      {   
+        flow.retrieve_current_row_and_col(node, row, col);
+        flow.retrieve_receiver_information(node, receiver, receiver_row, receiver_col);
+
+        if ( bl_to_points_map.find( node ) != bl_to_points_map.end()) 
+        {
+
+          drainageArea = bl_area[ bl_to_points_map[node]  ];
+          
+          // A warning message
+          //if (node == receiver)
+          //{
+          //  cout << "The node in the bl list " << bl_to_points_map[node] << " is a bl node in flowinfo" << endl;
+          //}
+        }
+        else
+        {
+          drainageArea = flow.retrieve_contributing_pixels_of_node(node)*DR2;
+        }
+        
+        // get the distance between nodes. Depends on flow direction
+        switch (flow.retrieve_flow_length_code_of_node(node))
+        {
+          case 0:
+            dx = -99;
+            break;
+          case 1:
+            dx = DataResolution;
+            break;
+          case 2:
+            dx = dx_root2;
+            break;
+          default:
+            dx = -99;
+            break;
+        }
+
+        // some logic if n is close to 1. Saves a bit of computational expense.
+        if (abs(n - 1) < 0.0001)
+        {
+          if (dx == -99)
+            continue;
+
+          // compute new elevation if node is not a base level node
+          if (node != receiver)
+          {
+
+            // get the uplift rate
+            U = Urate_raster.get_data_element(row,col);
+
+            // get the stream power factor
+            streamPowerFactor = K_raster.get_data_element(row,col) * pow(drainageArea, m) * (timeStep / dx);
+
+            // calculate elevation
+            float zeta_old = zeta[row][col];
+            zeta[row][col] = (zeta[row][col]
+                            + zeta[receiver_row][receiver_col]*streamPowerFactor
+                            + timeStep*U) /
+                          (1 + streamPowerFactor);
+
+            // ====================== SOME BUG CHECK LOGIC =================
+            // logic for bug checking the bl_area nodes
+            bool check_area_bl_nodes = false;
+            if (check_area_bl_nodes)
+            {
+              if ( bl_to_points_map.find( node ) != bl_to_points_map.end()) 
+              {
+                if ( bl_to_points_map.find( receiver ) == bl_to_points_map.end()) 
+                {
+                  if (receiver == ni[0])
+                  {
+                    cout << "BL number " << bl_to_points_map[node] << " is draining to the outlet" << endl;
+                  } 
+                  else
+                  {
+                   cout << "Warning the receiver node of bl number " << bl_to_points_map[node] << " is not in the bl list and is not draining to the outlet." << endl;
+                   cout << "That means flow is being diverted from the imposed channel" << endl;
+                  }
+                }
+                else 
+                {
+                  if (bl_to_points_map[node] - bl_to_points_map[receiver] != 1)
+                  {
+                    cout << "Something weird here, the bl node is " << bl_to_points_map[node] << " and r: " << bl_to_points_map[receiver] << endl;
+                  }
+                }
+                
+                // This is an area baselevel node
+                int search_node = 1;
+                if (bl_to_points_map[node] == search_node)
+                {
+                  //it_bl_to_points = bl_to_points_map.find(4);
+                  cout << "This is the " << search_node << " channel pixel upstream of the outlet, its node is " << node << endl;
+                  cout << "Area: " << drainageArea << " and the stream power factor is: " << streamPowerFactor << endl;
+                  cout << "z_r: " <<  zeta[receiver_row][receiver_col] << " zold: " << zeta_old << " z_new: " << zeta[row][col] << endl;
+                  cout << "r.c of this node is " << row << "," << col << endl;
+                }
+              }   
+            } 
+            //================= END BUG CHECK LOGIC ======================                
+
+            // check for overexcavation
+            if(zeta[row][col] <= zeta[receiver_row][receiver_col]+dx*minimum_slope)
+            {
+              // See if the overexcavation is for a baselevel node
+              if (bl_map.find( receiver ) != bl_map.end()) 
+              {
+                cout << "HEY HEY JABBA I found overexcavation and it is because of a baselevel node!" << endl;
+              }
+
+              //cout << "HEY HEY JABBA I found overexcavation!" << endl;
+              it_has_overexcavated = true;
+
+              // If you are not using the adaptive timestep 
+              // Fix the pixel to the minimum slope
+              if (use_adaptive_timestep == false)
+              {
+                it_has_overexcavated = false;
+                zeta[row][col] = zeta[receiver_row][receiver_col]+dx*minimum_slope;
+              }
+
+              if (timestep_iterator> 100)
+              {
+                cout << "There is an overexcavation that has not  been fixed by a very small timestep." << endl;
+                cout << "I think there is a numerical instability and I am killing the computation." << endl;
+                cout << "This does not mean that you are a bad person." << endl;
+                cout << "zeta old is: " << zeta_old << endl;
+                cout << "zeta reciever is: " << zeta[receiver_row][receiver_col] << endl;
+                cout << "Streampower factor: " << streamPowerFactor << endl;
+                cout << "denominator is: " << (1 + streamPowerFactor) << endl;
+                cout << "uplift term is: " << timeStep*U << endl;
+                cout << "reciever term is: " << zeta[receiver_row][receiver_col]*streamPowerFactor << endl;
+
+                if (bl_map.find( receiver ) != bl_map.end()) 
+                {
+                  cout << "The reciever of this problem node is in the imposed channel." << endl;
+                }
+
+                exit(EXIT_FAILURE);
+              }
+            }
+          }
+        }
+        else    // this else loop is for when n is not close to one and you need an iterative solution
+        {
+          if (dx == -99)
+          {
+            continue;
+          }
+          float new_zeta = zeta[row][col];
+          //float old_iter_zeta = zeta[row][col];
+          float old_zeta = zeta[row][col];
+
+          // get the uplift rate
+          U = Urate_raster.get_data_element(row,col);
+
+          float epsilon;     // in newton's method, z_n+1 = z_n - f(z_n)/f'(z_n)
+                            // and here epsilon =   f(z_n)/f'(z_n)
+                              // f(z_n) = -z_n + z_old - dt*K*A^m*( (z_n-z_r)/dx )^n
+                            // We differentiate the above equation to get f'(z_n)
+                          // the resulting equation f(z_n)/f'(z_n) is seen below
+          float streamPowerFactor = K_raster.get_data_element(row,col) * pow(drainageArea, m) * timeStep;
+          float slope;
+
+          // iterate until you converge on a solution. Uses Newton's method.
+          int iter_count = 0;
+          do
+          {
+            slope = (new_zeta - zeta[receiver_row][receiver_col]) / dx;
+
+            if(slope < 0)
+            {
+              epsilon = 0;
+            }
+            else
+            {
+              // Get epsilon based on f(z_n)/f'(z_n)
+              epsilon = (new_zeta - old_zeta
+                      + streamPowerFactor * pow(slope, n) - timeStep*U) /
+                (1 + streamPowerFactor * (n/dx) * pow(slope, n-1));
+            }
+
+            new_zeta -= epsilon;
+
+            iter_count++;
+            if(iter_count > 100)
+            {
+              epsilon = 0.5e-6;
+            }
+
+          } while (abs(epsilon) > 1e-6);
+          zeta[row][col] = new_zeta;
+
+          // check for overexcavation
+          if(zeta[row][col] <= zeta[receiver_row][receiver_col])
+          {
+            it_has_overexcavated = true;
+
+            // If you are not using the adaptive timestep let it overexcavate
+            if (use_adaptive_timestep == false)
+            {
+              it_has_overexcavated = false;
+              zeta[row][col] = zeta[receiver_row][receiver_col]+dx*minimum_slope;
+            }
+
+            // kill the program if the number of overexcavation steps get too small
+            if (timestep_iterator> 100)
+            {
+              cout << "There is an overexcavation that has not  been fixed by a very small timestep." << endl;
+              cout << "I think there is a numerical instability and I am killing the computation." << endl;
+              cout << "I am so sorry for your simulation." << endl;
+              cout << "This does not mean that you are a bad person." << endl;
+              exit(EXIT_FAILURE);
+            }
+          }
+        }        // end logic for n not equal to one
+
+        if (it_has_overexcavated)
+        {
+          cout << "Whoops I had an overexcavation! " << endl;
+          cout << " The number of times this has happend this timestep is: " << timestep_iterator << endl;
+          timeStep = timeStep*0.25;
+          timestep_iterator++;
+          i = numNodes;
+        }
+      }         // end logic for the if it is in the baselevel node list    
+    }           // end logic for node loop
+
+  } while ( it_has_overexcavated);
+
+  // if the model didn't overexcavate at all, then increase the timestep.
+  //cout << "The timestep iterator is: " << timestep_iterator << endl;
+
+  // If you are not using the adaptive timestep let it overexcavate
+  if (use_adaptive_timestep == false)
+  {
+    let_timestep_increase = false;
+  }
+
+  if(let_timestep_increase)
+  {
+    if(timestep_iterator ==0)
+    {
+      timeStep = 2*timeStep;
+      if (timeStep > maxtimeStep)
+      {
+        timeStep = maxtimeStep;
+      }
+    }
+  }
+
+  // +++++++++++++++++++++++++++++ CHECKING ZNO
+  //cout << "ZNO penultamite is: " << zeta[627][1] << endl;
+
+
+  // we need to update the baselevel nodes
+  vector<float> bl_drop;
+  vector<float> bl_elevs;
+  //cout << "N BL Outlet" << N_BL_nodes << endl;
+  for(int n = 0; n< N_BL_nodes; n++)
+  {
+    int this_ni = ni[n];  
+    int this_row,this_col; 
+    flow.retrieve_current_row_and_col(this_ni, this_row, this_col);
+    bl_elevs.push_back(zeta[this_row][this_col]);
+
+    //if(n == 1)
+    //{
+    //  cout << "ZNO BL replace" << zeta[627][1] << endl;
+    //}
+
+    //cout << "Baselevel elev: ";
+    /*
+    if (bl_code[n] == 0) 
+    {
+      bl_drop.push_back( -bl_fall_rate[n]*timeStep);
+      cout << "dropping node: " << zeta[this_row][this_col] << endl;
+      bl_elevs.push_back(zeta[this_row][this_col]);
+    }
+    else
+    {
+      cout << "area node: " << zeta[this_row][this_col] << endl;
+      bl_drop.push_back(zeta_old[this_row][this_col]-zeta[this_row][this_col]);     
+    }
+    */
+    
+  }
+
+  // +++++++++++++++++++++++++++++ CHECKING ZNO
+  //cout << "ZNO penultamite (2) is: " << zeta[627][1] << endl; 
+
+  //source_points_data.data_column_add_float(column_name, bl_drop);
+  source_points_data.data_column_replace(column_name, bl_elevs);
   this->RasterData = zeta.copy();
 
 }
@@ -8212,25 +10244,12 @@ void LSDRasterModel::print_rasters_and_csv( int frame )
     cout << "Name of raster metadata file is: " <<  metadata_fname << endl;
           outfile.open(metadata_fname.c_str());
           outfile << "Frame_num,";
-    outfile << "Time,";
-    outfile << "K,";
-    outfile << "D,";
-    outfile << "Erosion,";
-    outfile << "Max_uplift";
+    outfile << "Time";
     outfile << endl;
   }
   outfile << frame << ",";
-  outfile << current_time << ",";
-  outfile << get_K() << ",";
-  outfile << get_D() << ",";
-  outfile << erosion << ",";
-  outfile << get_max_uplift() ; // The last comma was generating bug here
-  outfile << endl;
-  cout << "UPDATE_WARNING::I removed an extra comma from csv file here. It was creating a bug with pandas when reading csv (the python package, not the bamboo junkies). Let me know if it impacts your new outputs" << endl;
+  outfile << current_time << endl;
   map<string,string> GRS = get_GeoReferencingStrings();
-
-  //cout << "Printing, print elevation is " << print_elevation
-  //     << " and erosion is " << print_erosion << endl;
 
   stringstream ss;
   if (print_elevation)

@@ -2060,11 +2060,11 @@ void LSDRaster::get_row_and_col_of_a_point(float X_coordinate,float Y_coordinate
 
   //cout << "Getting row and col, " << row_point << " " << col_point << endl;
 
-  if(col_point > 0 && col_point < NCols-1)
+  if(col_point >= 0 && col_point <= NCols-1)
   {
     this_col = col_point;
   }
-  if(row_point > 0 && row_point < NRows -1)
+  if(row_point >= 0 && row_point <= NRows -1)
   {
     this_row = row_point;
   }
@@ -2088,11 +2088,11 @@ void LSDRaster::get_row_and_col_of_a_point(double X_coordinate,double Y_coordina
 
   //cout << "Getting row and col, " << row_point << " " << col_point << endl;
 
-  if(col_point > 0 && col_point < NCols-1)
+  if(col_point >= 0 && col_point <= NCols-1)
   {
     this_col = col_point;
   }
-  if(row_point > 0 && row_point < NRows -1)
+  if(row_point >= 0 && row_point <= NRows -1)
   {
     this_row = row_point;
   }
@@ -2101,6 +2101,72 @@ void LSDRaster::get_row_and_col_of_a_point(double X_coordinate,double Y_coordina
   col = this_col;
 }
 
+void LSDRaster::replace_pixels(string replace_filename)
+{
+  ifstream ifs;
+  ifs.open(replace_filename.c_str());
+
+  if( ifs.fail() )
+  {
+    cout << "\nFATAL ERROR: Trying to load csv data file, but the file" << replace_filename
+         << " doesn't exist;  LLSDRaster::replace_points" << endl;
+    exit(EXIT_FAILURE);
+  }
+  else
+  {
+    cout << "I have opened the csv file." << endl;
+  }
+
+  // get the headers from the first line
+  // we just ignore this. 
+  // initiate the strings to hold the file
+  string line_from_file;
+  vector<string> empty_string_vec;
+  vector<string> this_string_vec;
+  string temp_string;
+  getline(ifs, line_from_file);
+
+  // now loop through the rest of the lines, getting the data.
+  while( getline(ifs, line_from_file))
+  {
+    //cout << "Getting line, it is: " << line_from_file << endl;
+    // reset the string vec
+    this_string_vec = empty_string_vec;
+
+    // create a stringstream
+    stringstream ss(line_from_file);
+    ss.precision(9);
+
+    // create a stringstream
+    while( ss.good() )
+    {
+      string substr;
+      getline( ss, substr, ',' );
+
+      // remove the spaces
+      substr.erase(remove_if(substr.begin(), substr.end(), ::isspace), substr.end());
+
+      // remove control characters
+      substr.erase(remove_if(substr.begin(), substr.end(), ::iscntrl), substr.end());
+
+      // add the string to the string vec
+      this_string_vec.push_back( substr );
+    }
+
+    // now convert to pixel locations
+    float easting = atof(this_string_vec[0].c_str());
+    float northing = atof(this_string_vec[1].c_str());
+    float new_value = atof(this_string_vec[2].c_str());
+
+    if (check_if_point_is_in_raster(easting,northing))
+    {
+      int r,c;
+      get_row_and_col_of_a_point(easting,northing,r,c);
+      RasterData[r][c] = new_value;
+    }
+  }
+
+}
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // Snap to point with greatest value within a given window size
@@ -2307,6 +2373,57 @@ float LSDRaster::max_elevation( void )
   }
   return max_elevation;
 }
+
+float LSDRaster::min_elevation()
+{
+  float min_elevation = 9999999999999;
+  for (int i=0; i<NRows; ++i)
+  {
+    for (int j=0; j<NCols; ++j)
+    {
+      if (RasterData[i][j] != NoDataValue)
+      {
+        if (RasterData[i][j] < min_elevation)
+        {
+          min_elevation = RasterData[i][j];
+        }
+      }
+    }
+  }
+  return min_elevation;  
+}
+
+
+float LSDRaster::max_elevation( int& row, int& col)
+{
+  float max_elevation = 0.0;
+  bool found=false;
+  for (int i=0; i<NRows; ++i)
+  {
+    for (int j=0; j<NCols; ++j)
+    {
+      if (found==false)
+      {
+        if (RasterData[i][j] != NoDataValue)
+        {
+          max_elevation = RasterData[i][j];
+          row = i;
+          col = j;
+          found = true;
+        }
+      }
+      else if (RasterData[i][j] > max_elevation)
+      {
+        max_elevation = RasterData[i][j];
+        row = i;
+        col = j;
+      }
+    }
+  }
+  return max_elevation;
+}
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 
@@ -6625,6 +6742,43 @@ LSDRaster LSDRaster::mask_to_nodata_with_mask_raster(LSDIndexRaster& Mask_raster
 
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDRaster LSDRaster::isolate_to_smaller_raster(LSDRaster& Mask_raster)
+{
+  Array2D<float> new_data_raster;
+  new_data_raster = RasterData.copy();
+
+  // first check to see if the rasters are the same size
+  int IR_NRows = Mask_raster.get_NRows();
+  int IR_NCols = Mask_raster.get_NCols();
+  int IR_NDV   = Mask_raster.get_NoDataValue();
+
+  if(IR_NRows == NRows && IR_NCols == NCols)
+  {
+    for(int row = 0; row<NRows; row++)
+    {
+      for(int col = 0; col<NCols; col++)
+      {
+
+        if(Mask_raster.get_data_element(row,col) == IR_NDV)
+        {
+          //cout << "r: " << row << " c: " << col << " mask: " <<Mask_raster.get_data_element(row,col) << endl;
+          new_data_raster[row][col] = NoDataValue;
+        }
+      }
+    }
+  }
+  else
+  {
+    cout << "Trying to mask raster but the dimensions of the mask do not match"
+         << " the dimensions of the raster" << endl;
+  }
+
+  LSDRaster NDR(NRows,NCols,XMinimum,YMinimum,DataResolution,
+                             NoDataValue,new_data_raster,GeoReferencingStrings);
+  return NDR;
+
+}
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -10420,10 +10574,49 @@ vector<LSDRaster> LSDRaster::get_nearest_distance_and_value_masks()
 }
 
 
+// This returns two raster that are the nearest value and nearest distance to nodata nodes
+// This is similar to above but uses another raster and ignores any points where there is nodata
+// in the NoDataIgnore_raster
+vector<LSDRaster> LSDRaster::get_nearest_distance_and_value_masks(LSDRaster& NoDataIgnore_raster)
+{
+  Array2D<float> Distances(NRows, NCols, NoDataValue);
+  Array2D<float> Values(NRows, NCols, NoDataValue);
+
+  float distance,value;
+  for(int row = 0; row<NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      if (NoDataIgnore_raster.get_data_element(row,col) != NoDataValue)
+      {
+        if (RasterData[row][col] == NoDataValue)
+        {
+          find_nearest_data(row,col, distance, value);
+
+          Distances[row][col] = distance;
+          Values[row][col] = value;
+        }
+      }
+    }
+  }
+
+  LSDRaster DRaster(NRows,NCols, XMinimum, YMinimum, DataResolution,
+                            NoDataValue, Distances, GeoReferencingStrings);
+  LSDRaster VRaster(NRows,NCols, XMinimum, YMinimum, DataResolution,
+                            NoDataValue, Values, GeoReferencingStrings);
+
+  vector<LSDRaster> R_vec;
+  R_vec.push_back(DRaster);
+  R_vec.push_back(VRaster);
+
+  return R_vec;
+
+}
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-/// This takes a list of points. Then, for every pixel in the 
-///  raster it finds the point amongst that list that is closest to the given pixel. 
+/// This takes a list of points. Then, for every pixel in the
+///  raster it finds the point amongst that list that is closest to the given pixel.
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 vector< LSDRaster > LSDRaster::find_nearest_point_from_list_of_points(vector<float> Eastings, vector<float> Northings,
                                               vector<float> values, float swath_width)
@@ -10439,8 +10632,8 @@ vector< LSDRaster > LSDRaster::find_nearest_point_from_list_of_points(vector<flo
 
   int n_nodes = int(Eastings.size());
 
-  float this_min_distance, this_value, this_node, this_distance; 
-  float x_0,y_0,x_1,y_1; 
+  float this_min_distance, this_value, this_node, this_distance;
+  float x_0,y_0,x_1,y_1;
 
   // Now we loop through all pixels in the raster
   cout << "I am going to find the closest point in a list of points to every pixel in your raster." << endl;
@@ -10452,7 +10645,7 @@ vector< LSDRaster > LSDRaster::find_nearest_point_from_list_of_points(vector<flo
     {
       if(RasterData[row][col] != NoDataValue)
       {
-        
+
         // reset the minimum distance
         this_min_distance = 10000000000;
         this_value = NoDataValue;
@@ -10479,7 +10672,7 @@ vector< LSDRaster > LSDRaster::find_nearest_point_from_list_of_points(vector<flo
 
         //cout << "r: " << row << ", c: "<< col << " min dist: " << this_min_distance << endl;
 
-        // Finished looping through node, update the data 
+        // Finished looping through node, update the data
         // only record the nodes that are withing the swath width
         if (this_min_distance<0.5*swath_width)
         {
@@ -10494,7 +10687,7 @@ vector< LSDRaster > LSDRaster::find_nearest_point_from_list_of_points(vector<flo
   LSDRaster DistRaster(NRows,NCols, XMinimum, YMinimum, DataResolution,
                             NoDataValue, Distances, GeoReferencingStrings);
   LSDRaster ValuesRaster(NRows,NCols, XMinimum, YMinimum, DataResolution,
-                            NoDataValue, Values, GeoReferencingStrings);                            
+                            NoDataValue, Values, GeoReferencingStrings);
   LSDRaster NodesRaster(NRows,NCols, XMinimum, YMinimum, DataResolution,
                             NoDataValue, Nodes, GeoReferencingStrings);
 
@@ -10574,7 +10767,7 @@ void LSDRaster::make_swath(vector<float> Eastings, vector<float> Northings,
            ThirdQuartileY_output, MaximumY_output, StandardDeviationY_output, StandardErrorY_output,
            MADY_output, number_observations_output, NoDataValue);
 
-  
+
   ofstream bin_data_out(swath_data_name);
   bin_data_out << "distance,mean_elevation,minimum_z,first_quartile_z,median_z,third_quartile_z,max_z,n_samples"<< endl;
   int n_bins = (midpoints_output.size());
@@ -10582,15 +10775,12 @@ void LSDRaster::make_swath(vector<float> Eastings, vector<float> Northings,
   for(int i = 0; i<n_bins-1; i++)
   {
     bin_data_out << midpoints_output[i] << "," << MeanY_output[i] << "," << MinimumY_output[i] <<","
-                  << FirstQuartileY_output[i] << "," <<  MedianY_output[i] << "," << ThirdQuartileY_output[i] 
+                  << FirstQuartileY_output[i] << "," <<  MedianY_output[i] << "," << ThirdQuartileY_output[i]
                   << "," << MaximumY_output[i] << "," << number_observations_output[i] << endl;
   }
   bin_data_out.close();
 
 }
-
-
-
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This pads a smaller index raster to the same extent as a bigger raster by adding
@@ -11462,8 +11652,6 @@ LSDRaster LSDRaster::PeronaMalikFilter(int timesteps, float percentile_for_lambd
   cout << endl;
   return PM_FilteredTopo;
 }
-
-
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Method to turn a point shapefile into an LSDIndexRaster.
@@ -14168,6 +14356,8 @@ LSDIndexRaster LSDRaster::ConvertToBinary(int Value, int ndv){
   return binmask;
 }
 
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Method to merge data from two LSDRasters WITH SAME EXTENT together.  The data from the
 // raster specified as an argument will be added (will overwrite the original raster if there
@@ -14448,13 +14638,13 @@ string LSDRaster::ChannelLengthByOrder(LSDIndexRaster& StreamNetwork, Array2D<in
 /// Populate a raster with random noise drawn from a gaussian distribution of given mean and minimum values.
 /// SWDG 9/6/16
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-LSDRaster LSDRaster::PoupulateRasterGaussian(float minimum, float mean){
+LSDRaster LSDRaster::PopulateRasterGaussian(float minimum, float mean){
 
   bool allowNegative = false;
   Array2D<float> Gauss(NRows, NCols, NoDataValue);
 
-  for (int i = 1; i < NRows - 1; ++i){
-    for (int j = 1; j < NCols - 1; ++j){
+  for (int i = 0; i < NRows; ++i){
+    for (int j = 0; j < NCols; ++j){
 
       if (RasterData[i][j] != NoDataValue){
         Gauss[i][j] = getGaussianRandom(minimum, mean, allowNegative);
@@ -14470,15 +14660,18 @@ LSDRaster LSDRaster::PoupulateRasterGaussian(float minimum, float mean){
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 /// Populate a raster with a given value.
 /// SWDG 9/6/16
+/// updated SMM 07/05/2021 to get edges
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-LSDRaster LSDRaster::PoupulateRasterSingleValue(float value){
-
+LSDRaster LSDRaster::PopulateRasterSingleValue(float value)
+{
   Array2D<float> Single(NRows, NCols, NoDataValue);
 
-  for (int i = 1; i < NRows - 1; ++i){
-    for (int j = 1; j < NCols - 1; ++j){
-
-      if (RasterData[i][j] != NoDataValue){
+  for (int i = 0; i < NRows; ++i)
+  {
+    for (int j = 0; j < NCols; ++j)
+    {
+      if (RasterData[i][j] != NoDataValue)
+      {
         Single[i][j] = value;
       }
     }

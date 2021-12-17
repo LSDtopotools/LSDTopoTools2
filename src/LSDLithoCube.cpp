@@ -35,7 +35,58 @@ using namespace TNT;
 
 
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// operators
+// SMM, 2012
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+LSDLithoCube& LSDLithoCube::operator=(const LSDLithoCube& rhs)
+{
+  if (&rhs != this)
+  {
+    create(rhs.get_NRows(),rhs.get_NCols(),rhs.get_NLayers(),
+           rhs.get_XMinimum(),rhs.get_YMinimum(),rhs.get_ZMinimum(),          
+           rhs.get_DataResolution(),
+           rhs.get_XSpacing(),rhs.get_YSpacing(),rhs.get_ZSpacing(),
+           rhs.get_loaded_vo_file(), rhs.get_NoDataValue(), 
+           rhs.get_GeoReferencingStrings(),
+           rhs.get_LithoLayers(),
+           rhs.get_bottom_elevations(),
+           rhs.get_layer_thicknesses(),
+           rhs.get_StratiToK(),
+           rhs.get_StratiToSc() );
+  }
+  return *this;
+}
 
+// This is the create function that is used by the copy constructor
+void LSDLithoCube::create(int nrows, int ncols, int nlayers, float xmin, float ymin, float zmin,
+                          float cellsize, float xspace, float yspace, float zspace, 
+                          bool loaded, int ndv, map<string,string> temp_GRS,
+                          vector< Array2D<int> > ll, vector<float> be, vector<float> lt, 
+                          map<int,float> StK, map<int,float> StS)
+{
+  NRows = nrows;
+  NCols = ncols;
+  NLayers = nlayers, 
+  XMinimum = xmin;
+  YMinimum = ymin;
+  ZMinimum = zmin;
+  DataResolution = cellsize;
+  XSpacing = xspace;
+  YSpacing = yspace;
+  ZSpacing = zspace;
+  loaded_vo_file = loaded;
+  NoDataValue = ndv;
+  GeoReferencingStrings = temp_GRS;
+  LithoLayers = ll;
+  bottom_elevations = be;
+  layer_thicknesses = lt;
+  StratiToK = StK;
+  StratiToSc = StS;
+}
+
+
+// A minimal create function. 
 void LSDLithoCube::create()
 {
   NRows = 100;
@@ -516,11 +567,11 @@ void LSDLithoCube::get_row_and_col_of_a_point(float X_coordinate,float Y_coordin
 
   //cout << "Getting row and col, " << row_point << " " << col_point << endl;
 
-  if(col_point > 0 && col_point < NCols-1)
+  if(col_point >= 0 && col_point <= NCols-1)
   {
     this_col = col_point;
   }
-  if(row_point > 0 && row_point < NRows -1)
+  if(row_point >= 0 && row_point <= NRows -1)
   {
     this_row = row_point;
   }
@@ -585,6 +636,87 @@ int LSDLithoCube::get_layer_from_elevation(float elevation)
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
+// This gets the elevation from a layer number
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+float LSDLithoCube::get_elevation_from_layer(int layer_number)
+{
+  float this_elevation;
+
+  this_elevation = ZMinimum + (layer_number * ZSpacing) + 0.5 * ZSpacing;
+  cout << "Layer is: " << layer_number << " and elevation is: " << this_elevation << endl;
+
+  return this_elevation;
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This gets an elevation raster of the lithocube surface.
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDRaster LSDLithoCube::get_lithocube_surface_elevation(LSDIndexRaster& SurfaceLayerRaster)
+{
+  int SLR_NRows = SurfaceLayerRaster.get_NRows();
+  int SLR_NCols = SurfaceLayerRaster.get_NCols();
+  float SLR_NDV = SurfaceLayerRaster.get_NoDataValue();
+
+  Array2D<float> elevation(SLR_NRows,SLR_NCols,SLR_NDV);
+
+
+  // now loop through topmost layer raster, getting the information
+  for(int row = 0; row < SLR_NRows; row++)
+  {
+    for(int col = 0; col < SLR_NCols; col++)
+    {
+      elevation[row][col] = get_elevation_from_layer(SurfaceLayerRaster.get_data_element(row,col));    
+    }
+  }
+  cout << "I have assigned the elevations." << endl;
+  // now make the raster of the stratigraphic information
+  LSDRaster ThisSurfaceElevation(SLR_NRows, SLR_NCols, SurfaceLayerRaster.get_XMinimum(), SurfaceLayerRaster.get_YMinimum(), 
+                           SurfaceLayerRaster.get_DataResolution(), SLR_NDV, elevation, SurfaceLayerRaster.get_GeoReferencingStrings());
+
+  return ThisSurfaceElevation;
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This gets the topmost layer in the lithocube that represents stratigraphy 
+// (i.e. for each location, gets the layer number that represents the surface)
+// It has logic to "drill" down the lithocube so that it returns the 
+// topmost allowed values
+// the forbidden values are in the list called forbidden_codes
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDIndexRaster LSDLithoCube::get_lithocube_surface_layers(list<int> forbidden_codes)
+{
+  int starting_layer = NLayers-1;
+  Array2D<int> layer_number(NRows,NCols,NoDataValue);
+
+  cout << "Starting at layer " << starting_layer << endl;
+
+
+  // now loop through topmost layer raster, getting the information
+  for(int row = 0; row < NRows; row++)
+  {
+    for(int col = 0; col < NCols; col++)
+    {
+      layer_number[row][col] = get_layer_from_location(starting_layer, row, col, forbidden_codes);    
+    }
+  }
+  cout << "I have assigned the layer numbers." << endl;
+  // now make the raster of the stratigraphic information
+  LSDIndexRaster ThisSurfaceLayer(NRows, NCols, XMinimum, YMinimum, XSpacing, NoDataValue, layer_number, GeoReferencingStrings);
+
+
+  return ThisSurfaceLayer;
+
+
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
 // This gets a lithocode from a location
 // It has logic to "drill" down the lithocube so that it returns the 
 // topmost allowed values
@@ -619,6 +751,37 @@ int LSDLithoCube::get_lithocode_from_location(int LLayer, int LRow, int LCol, li
   }
     
   return this_lcode;
+
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This gets the layer number from a location
+// It has logic to "drill" down the lithocube so that it returns the 
+// topmost layer with allowed lithocode values
+// the forbidden values are in the list called forbidden_codes
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+int LSDLithoCube::get_layer_from_location(int LLayer, int LRow, int LCol, list<int> forbidden_codes)
+{
+
+  int this_lcode = LithoLayers[LLayer][LRow][LCol];
+  int this_layer = LLayer;
+
+ 
+  if (forbidden_codes.size() > 0)
+  {
+    cout << "This lithocode is: " << this_lcode << endl;
+    while (  (find(forbidden_codes.begin(),forbidden_codes.end(),this_lcode) != forbidden_codes.end()) && this_layer > 0)
+    {
+      cout << "Got a forbidden code! Let me dig a layer!" << endl;
+      this_layer--;
+      this_lcode = LithoLayers[this_layer][LRow][LCol];
+      cout << "New layer is: " << this_layer << " and new code is: " << this_lcode << endl;
+    } 
+  }
+    
+  return this_layer;
 
 }
 
@@ -699,7 +862,7 @@ LSDIndexRaster LSDLithoCube::get_lithology_codes_from_raster(LSDRaster& Elevatio
       }
     }
   }
-  cout << "I have assigned the lithocodes." << endl;
+  //cout << "I have assigned the lithocodes." << endl;
   // now make the raster of the stratigraphic information
   LSDIndexRaster ThisStrat(ER_NRows, ER_NCols, ElevationRaster.get_XMinimum(), ElevationRaster.get_YMinimum(), 
                            ElevationRaster.get_DataResolution(), LR_NDV, lithocode, ElevationRaster.get_GeoReferencingStrings());
@@ -1109,7 +1272,7 @@ void LSDLithoCube::XY_to_rowcol_careful(float X_coord, float Y_coord, int& row, 
     if(snap_to_closest_point_on_raster)
     {
       is_X_recasted = true;
-      std::cout << "WARNING::X coordinate is West to the X minimum by " << corrected_X << ", I am recasting to column 0" << std::endl;
+      //std::cout << "WARNING::X coordinate is West to the X minimum by " << corrected_X << ", I am recasting to column 0" << std::endl;
       col = 0;
     }
     else
@@ -1123,7 +1286,7 @@ void LSDLithoCube::XY_to_rowcol_careful(float X_coord, float Y_coord, int& row, 
     if(snap_to_closest_point_on_raster)
     {
       is_X_recasted = true;
-      std::cout << "WARNING::X coordinate is East to the X minimum by " << corrected_X - ((ncols+1) * cellsize) << ", I am recasting to column " << ncols - 1 << std::endl;
+      //std::cout << "WARNING::X coordinate is East to the X minimum by " << corrected_X - ((ncols+1) * cellsize) << ", I am recasting to column " << ncols - 1 << std::endl;
       col = ncols - 1;
     }
     else
@@ -1139,7 +1302,7 @@ void LSDLithoCube::XY_to_rowcol_careful(float X_coord, float Y_coord, int& row, 
     if(snap_to_closest_point_on_raster)
     {
       is_Y_recasted = true;
-      std::cout << "WARNING::Y coordinate is South to the Y minimum by " << - corrected_Y << ", I am recasting to row " << nrows - 1 << std::endl;
+      //std::cout << "WARNING::Y coordinate is South to the Y minimum by " << - corrected_Y << ", I am recasting to row " << nrows - 1 << std::endl;
       row = nrows - 1;
     }
     else
@@ -1153,7 +1316,7 @@ void LSDLithoCube::XY_to_rowcol_careful(float X_coord, float Y_coord, int& row, 
     if(snap_to_closest_point_on_raster)
     {
       is_Y_recasted = true;
-      std::cout << "WARNING::X coordinate is North to the Y maximum by " <<  (nrows+1) * cellsize - corrected_Y << ", I am recasting to row " << 0 << std::endl;
+      //std::cout << "WARNING::X coordinate is North to the Y maximum by " <<  (nrows+1) * cellsize - corrected_Y << ", I am recasting to row " << 0 << std::endl;
       row = 0;
     }
     else

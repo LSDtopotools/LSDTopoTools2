@@ -12,6 +12,7 @@
 #include "LSDIndexRaster.hpp"
 #include "LSDJunctionNetwork.hpp"
 #include "LSDStatsTools.hpp"
+#include "LSDSpatialCSVReader.hpp"
 using namespace std;
 using namespace TNT;
 
@@ -59,7 +60,7 @@ class LSDFloodplain
 	/// @param search_distance search distance for channel reach
 	/// @author FJC
 	/// @date 21/10/16
-void Get_Relief_of_Nearest_Channel(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, LSDRaster& ElevationRaster, LSDRaster& DistFromOutlet, int threshold_SO);
+	void Get_Relief_of_Nearest_Channel(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, LSDRaster& ElevationRaster, LSDRaster& DistFromOutlet, int threshold_SO);
 
 	/// @brief This function gets the information about all the floodplain pixels connected to the main stem channel from a junction
 	/// @details Takes a junction number and generates the main stem channel from this point. THe information about each floodplain or terrace pixel is then calculated relative to the main channel.
@@ -72,15 +73,74 @@ void Get_Relief_of_Nearest_Channel(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo&
 	/// @date 26/10/16
 	void get_distance_upstream_along_main_stem(int junction_number, LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, LSDRaster& DistFromOutlet);
 
-  /// @brief This function gets the valley centreline as a raster
+  /// @brief This function gets the information about all the floodplain pixels connected to the main stem channel from starting and ending junctions
+	/// @param junction_number junction number of interest
+	/// @param ChanNetwork LSDJunctionNetwork object
+	/// @param FlowInfo LSDFlow info object
+	/// @param DistFromOutlet LSDRaster of distances from the outlet
+	/// @param ElevationRaster LSDRaster of elevations
 	/// @author FJC
-	/// @date 30/01/21
-  LSDRaster get_valley_centreline(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, int threshold_SO, float window_radius, int neighbourhood_switch);
+	/// @date 31/01/21
+  void isolate_to_selected_channel(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo&FlowInfo, vector<int> nodes);
+
+  /// @brief This function gets the valley centreline as a raster
+  /// @author FJC
+  /// @date 30/01/21
+  //LSDRaster get_valley_centreline(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, vector<int> nodes, int threshold_SO, float window_radius, int neighbourhood_switch);
 
   /// @brief This function gets the information about the valley walls
 	/// @author FJC
 	/// @date 29/01/21
   vector<LSDRaster> get_valley_walls(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, LSDRaster& ElevationRaster, LSDRaster& DistFromOutlet, int threshold_SO);
+
+  /// @brief This function gets the continuous valley width along a csv file of nodes, either the channel or the centreline. 
+	/// @param channel_csv The csv file of channel nodes
+	/// @param FlowInfo LSDFlow info object
+	/// @param DistanceFromOutlet LSDRaster of distances from the outlet
+	/// @param channel_bearing_node__spacing The spacing between nodes upstream and downstream of the node of interest used to to calculate the flow bearing. A higher spacing will mean a more smoothed bearing calculation.
+	/// @param print_bearings Set to true if you want to print a geojson of the channel nodes with their flow bearings for checking
+	/// @param bearing_fname The name of the file to print the bearings
+	/// @param template_scale The search radius from the main channel to look for the valley banks. If you increase this it will increase the run time, but look for wider valleys.
+	/// @param outfilename The name of the file to print the channel widths
+	/// @param nodes_to_remove vector of nodes to remove
+	/// @author FJC
+	/// @date 31/01/21
+  vector<vector<float>> calculate_valley_widths(LSDSpatialCSVReader channel_csv, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet,
+                                                int channel_bearing_node__spacing, bool print_bearings, string bearing_fname, int template_scale, string outfilename, vector<int> nodes_to_remove);
+
+  void calculate_valley_widths_multiple_channels(vector<int> basin_junctions, LSDFlowInfo& FlowInfo, LSDJunctionNetwork& ChanNetwork, LSDRaster& DistanceFromOutlet, LSDRaster& DrainageArea, LSDRaster& Elevation,
+                                                int channel_bearing_node__spacing, bool print_bearings, string bearing_fname, int template_scale, string outfilename);
+
+
+ 	/// @brief This function looks through the channel csv file and gets a list of any nodes that are within a certain number of nodes upstream or downstream of a 
+ 	/// tributary junction greater or equal to the threshold stream order. It returns a vector of these nodes which will then be removed in the valley width code.
+ 	/// @param channel_csv The csv file of channel nodes
+ 	/// @param ChanNetwork the junction network object
+	/// @param FlowInfo LSDFlow info object
+	/// @param trib_search_radius The number of channel nodes upstream and downstream of a trib junction that will be removed
+	/// @param trib_stream_order The threshold stream order for trib junctions to be removed. widths will be removed if they are within the search radius of any tributaries greater or equal to this stream order.
+  vector<int> remove_tributary_nodes(LSDSpatialCSVReader& channel_csv, LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, int trib_search_radius, int trib_stream_order);
+
+
+
+ 	/// @brief This function fills holes in the floodplain before running the valley width technique to avoid small holes causing issues.
+	/// @author FJC
+	/// @param window_width The width to search for data for each nodata pixel. A pixel will be changed to data if it has data in all surrounding directions. 
+	/// @date 16/03/21
+  void fill_holes_in_floodplain(int window_width);
+
+
+  void fill_holes_in_floodplain_spiral(int window_width);
+
+  /// @brief This function gets the valley centreline flow path from a trough raster and a trough FlowInfo.
+  /// If it finds the end of a flow path, it first checks to see that none of the downslope neighbours are
+  /// in the channel network (if they are then it forces the flow path to continue)
+  /// @param start_ni starting node index of the centreline
+  /// @param FlowInfo LSDFlowInfo object corresponding to the trough
+  /// @param topo_raster raster of the original topography.
+  /// @author FJC
+  /// @date 17/06/21
+ /// vector<int> get_centreline_flow_path(int start_ni, LSDFlowInfo& FlowInfo, LSDRaster& topo_raster);
 
 	/// FUNCTIONS TO GENERATE RASTERS
 
@@ -96,11 +156,18 @@ void Get_Relief_of_Nearest_Channel(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo&
 	/// @date 24/11/16
 	LSDIndexRaster print_BinaryRaster();
 
-  /// @brief This function gets a raster of floodplain locations where the floodplain is no data and the surrounding landscape has a value of 1.
-	/// @return BinaryRaster binary raster
+  /// @brief This function gets a raster of floodplain locations where the floodplain is no data and the surrounding landscape has the elevation value of the topography.
+	/// @return TopographyRaster 
 	/// @author FJC
 	/// @date 29/01/21
+  LSDRaster get_NoData_FloodplainRaster(LSDRaster& TopographyRaster);
   LSDRaster get_NoData_FloodplainRaster();
+
+
+  /// @brief Function to buffer the nodata floodplain by a defined number of pixels. This is to ensure successful extraction of the centreline.
+  /// @author FJC 
+  /// @date 06/05/21
+  LSDRaster Buffer_NoData_FloodplainRaster(LSDRaster& NoData_FloodplainRaster, int n_pixels);
 
 	/// @brief This function prints the channel relief compared to the main stem to a raster
 	/// @return ChannelRelief LSDRaster of channel relief
@@ -187,6 +254,8 @@ void Get_Relief_of_Nearest_Channel(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo&
 	vector<float> UpstreamDist;
 	/// vector of channel relief for every pixel connected to the main stem
 	vector<float> ChannelRelief;
+  /// binary array of data on the main stem.
+  Array2D<int> BinaryMSArray;
 
   private:
 	void create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, float relief_threshold, float slope_threshold, int min_patch_size, int threshold_SO);

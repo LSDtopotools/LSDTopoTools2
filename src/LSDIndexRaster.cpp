@@ -1836,11 +1836,11 @@ void LSDIndexRaster::get_row_and_col_of_a_point(float X_coordinate,float Y_coord
 
   //cout << "Getting row and col, " << row_point << " " << col_point << endl;
 
-  if(col_point > 0 && col_point < NCols-1)
+  if(col_point >= 0 && col_point <= NCols-1)
   {
     this_col = col_point;
   }
-  if(row_point > 0 && row_point < NRows -1)
+  if(row_point >= 0 && row_point <= NRows -1)
   {
     this_row = row_point;
   }
@@ -3022,6 +3022,265 @@ LSDIndexRaster LSDIndexRaster::remove_checkerboard_pattern()
   //create new LSDIndexRaster with the filled patches
   LSDIndexRaster FilledRaster(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,FilledArray,GeoReferencingStrings);
   return FilledRaster;
+
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// More complex nodatafiller for binary raster (fills with 1s)
+// FJC 29/03/2021
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+LSDIndexRaster LSDIndexRaster::alternating_direction_nodata_fill_binary_raster(int window_width)
+{
+
+
+  // check argument
+  if(window_width <1)
+  {
+    cout << "You need a positive window width, defaulting to 1" << endl;
+    window_width = 1;
+  }
+
+  cout << "Sweeping nodata, window width is: " << window_width << endl;
+
+  // This function loops in alternating directions until there is no more nodata
+  int NNoData = 0;
+  //float this_window_sum;
+  int this_window_ndata;
+  int window_row, window_col;
+
+  // set up data to be
+  Array2D<int> this_sweep_data = RasterData.copy();;
+  Array2D<int> updated_raster;
+
+  // set the sweep number to 0
+  int nsweep = 0;
+
+  do
+  {
+    // reset the number of nodata points in this sweep to zero
+    NNoData = 0;
+
+    cout << "LINE 8268, Sweep number: " << nsweep << endl;
+    cout << "Line 8275, switch is: " << nsweep%4 << endl;
+
+    // copy over the updated raster
+    updated_raster = this_sweep_data.copy();
+
+    int begin_ndv = 0;
+    for(int row = 0; row<NRows; row++)
+    {
+      for(int col = 0; col <NCols; col++)
+      {
+        if( updated_raster[row][col] == 0)
+        {
+          begin_ndv++;
+        }
+      }
+    }
+    cout << "Line 8285, the updated raster has " << begin_ndv << " no data nodes " << endl;
+
+    // now run a sweep
+    switch(nsweep%4)
+    {
+      case(0):
+      {
+
+        // sweep 0
+        for (int row=0; row<NRows; ++row)
+        {
+          for(int col=0; col<NCols; ++col)
+          {
+            // if the node contains nodata, search the surrounding nodes
+            if(updated_raster[row][col] == 0)
+            {
+              NNoData++;
+              //this_window_sum = 0;
+              this_window_ndata = 0;
+
+              //cout << "Row: " << row << " col: " << col << endl;
+              for(int r = -window_width; r<=window_width; r++)
+              {
+                for(int c = -window_width; c<=window_width; c++)
+                {
+                  window_row = r+row;
+                  window_col = c+col;
+
+
+                  if(window_row > 0 && window_row < NRows-1
+                     && window_col > 0 && window_col < NCols-1)
+                  {
+                    //cout << "wr: " << window_row << " wc: " << window_col << " data: " << updated_raster[window_row][window_col] << endl;
+                    if(updated_raster[window_row][window_col] != NoDataValue)
+                    {
+                      //this_window_sum += updated_raster[window_row][window_col];
+                      this_window_ndata += 1;
+                    }
+                  }
+                }
+              }
+
+              // now get the average
+              if(this_window_ndata>0)
+              {
+                //cout << "Found a nodata replacement" << endl;
+                //local_average = this_window_sum/float(this_window_ndata );
+                this_sweep_data[row][col] = 1;
+              }
+            }
+          }
+        }
+        break;
+      }
+      case(1):
+      {
+        // sweep 1
+        for (int col=0; col<NCols; ++col)
+        {
+          for(int row=0; row<NRows; ++row)
+          {
+            // if the node contains nodata, search the surrounding nodes
+            if(updated_raster[row][col] == 0)
+            {
+              NNoData++;
+              //this_window_sum = 0;
+              this_window_ndata = 0;
+              for(int r = -window_width; r<=window_width; r++)
+              {
+                for(int c = -window_width; c<=window_width; c++)
+                {
+                  window_row = r+row;
+                  window_col = c+col;
+
+                  if(window_row > 0 && window_row < NRows-1 && window_col > 0 && window_col < NCols-1)
+                  {
+                    if(updated_raster[window_row][window_col] != NoDataValue)
+                    {
+                      //this_window_sum += updated_raster[window_row][window_col];
+                      this_window_ndata += 1;
+                    }
+                  }
+                }
+              }
+
+              // now get the average
+              if(this_window_ndata>0)
+              {
+                //local_average = this_window_sum/float(this_window_ndata );
+                this_sweep_data[row][col] = 1;
+              }
+            }
+          }
+        }
+        break;
+      }
+      case(2):
+      {
+        // sweep 2
+        for (int row=0; row<NRows; ++row)
+        {
+          for(int col=NCols-1; col>0; --col)
+          {
+            // if the node contains nodata, search the surrounding nodes
+            if(updated_raster[row][col] == 0)
+            {
+              NNoData++;
+              //this_window_sum = 0;
+              this_window_ndata = 0;
+              for(int r = -window_width; r<=window_width; r++)
+              {
+                for(int c = -window_width; c<=window_width; c++)
+                {
+                  window_row = r+row;
+                  window_col = c+col;
+
+                  if(window_row > 0 && window_row < NRows-1 && window_col > 0 && window_col < NCols-1)
+                  {
+                    if(updated_raster[window_row][window_col] != NoDataValue)
+                    {
+                      //this_window_sum += updated_raster[window_row][window_col];
+                      this_window_ndata += 1;
+                    }
+                  }
+                }
+              }
+
+              // now get the average
+              if(this_window_ndata>0)
+              {
+                //local_average = this_window_sum/float(this_window_ndata );
+                this_sweep_data[row][col] = 1;
+              }
+            }
+          }
+        }
+        break;
+      }
+      case(3):
+      {
+        // sweep 3
+        for (int col=0; col<NCols; ++col)
+        {
+          for(int row=NRows-1; row>0; --row)
+          {
+            // if the node contains nodata, search the surrounding nodes
+            if(updated_raster[row][col] == 0)
+            {
+              NNoData++;
+              //this_window_sum = 0;
+              this_window_ndata = 0;
+              for(int r = -window_width; r<=window_width; r++)
+              {
+                for(int c = -window_width; c<=window_width; c++)
+                {
+                  window_row = r+row;
+                  window_col = c+col;
+
+                  if(window_row > 0 && window_row < NRows-1 && window_col > 0 && window_col < NCols-1)
+                  {
+                    if(updated_raster[window_row][window_col] != NoDataValue)
+                    {
+                      //this_window_sum += updated_raster[window_row][window_col];
+                      this_window_ndata += 1;
+                    }
+                  }
+                }
+              }
+
+              // now get the average
+              if(this_window_ndata>0)
+              {
+                //local_average = this_window_sum/float(this_window_ndata );
+                this_sweep_data[row][col] = 1;
+              }
+            }
+          }
+        }
+      }
+      break;
+    }
+
+    int test_ndv = 0;
+    for(int row = 0; row<NRows; row++)
+    {
+      for(int col = 0; col <NCols; col++)
+      {
+        if( this_sweep_data[row][col] == 0)
+        {
+          test_ndv++;
+        }
+      }
+    }
+
+    cout << "Line 8452, testing ndv = " << test_ndv<< endl;
+    cout << "Line 8445, number of nodata nodes: " << NNoData << endl;
+    // increment the sweep number
+    nsweep++;
+
+  } while(NNoData > 0);
+
+  LSDIndexRaster Hole_filled_Raster(NRows,NCols,XMinimum,YMinimum,DataResolution,
+                         int(NoDataValue),this_sweep_data,GeoReferencingStrings);
+  return Hole_filled_Raster;
 
 }
 

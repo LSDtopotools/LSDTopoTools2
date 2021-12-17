@@ -501,6 +501,12 @@ class LSDRaster
   void get_row_and_col_of_a_point(float X_coordinate,float Y_coordinate,int& row, int& col);
   void get_row_and_col_of_a_point(double X_coordinate,double Y_coordinate,int& row, int& col);
 
+  /// @brief This reads a csv with x,y,value and finds the pixels at those locations and replaces the value
+  /// @detail the csv has columns X,Y,new_value
+  /// @param replace_filename the name of the csv file (with full path and csv extension)
+  /// @author SMM
+  /// @date 06/10/2021
+  void replace_pixels(string replace_filename);
 
   void snap_to_row_col_with_greatest_value_in_window(int input_row, int input_col, int&out_row, int& out_col, int n_pixels);
 
@@ -634,11 +640,11 @@ class LSDRaster
   void find_nearest_data(int this_row,int this_col, float& distance, float& value);
 
 
-  /// @brief This takes a list of points. Then, for every pixel in the 
-  ///  raster it finds the point amongst that list that is closest to the given pixel. 
+  /// @brief This takes a list of points. Then, for every pixel in the
+  ///  raster it finds the point amongst that list that is closest to the given pixel.
   /// @param Eastings a vector of easting locations
   /// @param Northings a vector of northing locations
-  /// @param values The value of the list of points to map onto the raster. 
+  /// @param values The value of the list of points to map onto the raster.
   ///  This functions is most commonly used for swath mapping so the value is usually a distance
   /// @param swath_width the width of the swath in metres
   /// @return A vector or rasters. The first is the closest distance to each pixel in the list
@@ -649,10 +655,10 @@ class LSDRaster
   vector< LSDRaster > find_nearest_point_from_list_of_points(vector<float> Eastings, vector<float> Northings,
                                               vector<float> values, float swath_width);
 
-  /// @brief This takes a list of points and makes a swath profile around them. 
+  /// @brief This takes a list of points and makes a swath profile around them.
   /// @param Eastings a vector of easting locations
   /// @param Northings a vector of northing locations
-  /// @param values The value of the list of points to map onto the raster. 
+  /// @param values The value of the list of points to map onto the raster.
   ///  This functions is most commonly used for swath mapping so the value is usually a distance
   /// @param swath_width the width of the swath in metres
   /// @param bin_width the distance between bins in the (i.e., the distance between points)
@@ -667,13 +673,21 @@ class LSDRaster
                                               vector<float> values, float swath_width, float bin_width,
                                               string swath_data_prefix, bool print_swath_rasters);
 
-
   /// @brief Finds all nodata nodes and gets rasters of the nearest points value and
   ///  its distance
   /// @return a vector of two rasters, the first is the distance and the second is the value
   /// @author SMM
   /// @date 26/01/2021
   vector<LSDRaster> get_nearest_distance_and_value_masks();
+
+  /// @brief Finds all nodata nodes and gets rasters of the nearest points value and
+  ///  its distance
+  /// @param NoDataIgnore_raster a raster where the NaData values in that raster
+  ///  are ignored by the nearest to value data raster
+  /// @return a vector of two rasters, the first is the distance and the second is the value
+  /// @author SMM
+  /// @date 05/03/2021
+  vector<LSDRaster> get_nearest_distance_and_value_masks(LSDRaster& NoDataIgnore_raster);
 
   /// @brief Pad one smaller raster to the same extent as a bigger raster by adding
   /// no data around the edges
@@ -707,6 +721,22 @@ class LSDRaster
   /// @author JAJ (entered into trunk SMM)
   /// @date 01/02/2014
   float max_elevation(void);
+
+
+  /// @brief Calculates minimum elevation of a raster
+  /// @return Minimum elevation
+  /// @author SMM
+  /// @date 08/10/2021
+  float min_elevation();
+
+
+  /// @brief Calculates max elevation of a raster
+  /// @param row overwritten row of the maximum elevation
+  /// @param col overwritten col of the maximum elevation
+  /// @return The spatially distributed relief
+  /// @author SMM
+  /// @date 12/03/2021
+  float max_elevation(int& row, int& col);
 
   /// @brief Calculates mean relief of a raster, it defaults to a circular kernal
   /// @return The spatially distributed relief
@@ -1457,6 +1487,11 @@ class LSDRaster
   /// @author SMM
   /// @date 4/11/2014
   LSDRaster mask_to_nodata_with_mask_raster(LSDIndexRaster& Mask_raster, int mask_value);
+
+  /// @brief This function masks a raster to only include points with data in the second raster
+  /// @author FJC
+  /// @date 09/03/21
+  LSDRaster isolate_to_smaller_raster(LSDRaster& Mask_raster);
 
   ///@brief This function fills pits/sinks in a DEM by incrementing elevations for cells with
   ///no downslope neighbour. The process is repeated adnausium until no cells require
@@ -2430,13 +2465,13 @@ class LSDRaster
   /// @param mean Mean value of the distribution to draw values from.
   /// @author SWDG
   /// @date 9/6/16
-  LSDRaster PoupulateRasterGaussian(float minimum, float mean);
+  LSDRaster PopulateRasterGaussian(float minimum, float mean);
 
   /// @brief Populate a raster with a single value.
   /// @param value Value to populate all non nodata cells with.
-  /// @author SWDG
-  /// @date 9/6/16
-  LSDRaster PoupulateRasterSingleValue(float value);
+  /// @author SWDG SMM
+  /// @date 9/6/16 update 07/05/2021 to get edges
+  LSDRaster PopulateRasterSingleValue(float value);
 
   /// @brief Write CHT and hilltop gradient data to a *.csv file, coded by UTM coordinates as well as lat/long.
   ///

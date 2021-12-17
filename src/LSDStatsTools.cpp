@@ -6118,7 +6118,7 @@ float angle_between_vectors(float x1, float y1, float x2, float y2)
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 float clockwise_angle_between_vector_and_north(float x1, float y1, float x2, float y2)
 {
-  float pi = 3.14159265;
+  //float pi = 3.14159265;
   float angle;
   float vector_x = x2-x1;
   float vector_y = y2-y1;
@@ -6143,7 +6143,7 @@ float clockwise_angle_between_vector_and_north(float x1, float y1, float x2, flo
   // counter clockwise, subtract from 2*pi (360 degrees)
   if (angle < 0)
   {
-    angle = (2*pi)+angle;
+    angle = (2*M_PI)+angle;
   }
 
   return angle;
@@ -6314,8 +6314,20 @@ vector<float> get_directional_vector_coords_from_dataset(vector<float> x_data, v
 
 // Some utility functions
 // This creates a template array for a line of a given bearing
+// The bearing is in degrees
 Array2D<int> make_template_for_vector_bearing(float bearing, int scale)
 {
+  // Open the data file. 
+  // This is for debugging. 
+  bool print_file_for_debug = false;
+  ofstream out_file;
+
+  if(print_file_for_debug)
+  {
+    out_file.open("data_out.csv");
+  }
+
+
   int dim = 2*scale+1;
   Array2D<int> bearing_template(dim,dim,0);
 
@@ -6336,311 +6348,419 @@ Array2D<int> make_template_for_vector_bearing(float bearing, int scale)
   float tan_of_bearing = tan(rads);
   float cos_of_bearing = cos(rads);
 
+  vector<float> empty_f_vec;
   vector<float> east_vec;
   vector<float> north_vec;
 
+  vector<int> empty_i_vec;
   vector<int> a_vec;
   vector<int> b_vec;
 
-  // Do each side of the bearing
-  // This code comes from the flow routing routines by stuart
-  
-  
-  // This is for the first bearing
-  xo = 0;
-  yo = 0;
-
-  east_vec.push_back(0);
-  north_vec.push_back(0);
-
-  a_vec.push_back(a);
-  b_vec.push_back(b);
-  
-  //test direction, calculate outlet coordinates and update indicies
-  // easterly
-  if (degs >= 45 && degs < 135)
+  // We do the four edge cases first
+  // Remember that the y coordinate increases with decreasing 
+  // row number 
+  int shifted_i;
+  if(degs == 45)
   {
-    cout << "\neasterly" << endl;
-    xo = 1, yo = (1+tan_of_bearing)*0.5;
-    xi = 0, yi = yo;
-    dir = 1;
-    east_vec.push_back(0.5);
-    north_vec.push_back(yo - 0.5);
-    ++b;
-    if (yi == 0) yi = 0.00001;
-    else if (yi == 1) yi = 1 - 0.00001;
+    shifted_i = scale;   
+    bearing_template[shifted_i][shifted_i] = 1;
+    for(int i = 0; i<= scale; i++)
+    {
+      bearing_template[-i+scale][i+scale] = 1;
+      bearing_template[i+scale][-i+scale] = 2;
+    }  
   }
-  //southerly
-  else if (degs >= 135 && degs < 225)
+  else if (degs==135)
   {
-    cout << "\nsoutherly" << endl;
-    xo = (1-(1/tan_of_bearing))*0.5, yo = 0;
-    xi = xo, yi = 1;
-    dir = 2;
-    east_vec.push_back(xo - 0.5);
-    north_vec.push_back(-0.5);
-    ++a;
-    if (xi == 0) xi = 0.00001;
-    else if (xi == 1) xi = 1 - 0.00001;
+    shifted_i = scale;   
+    bearing_template[shifted_i][shifted_i] = 1;
+    for(int i = 0; i<= scale; i++)
+    {
+      shifted_i = i+scale;
+      bearing_template[i+scale][i+scale] = 1;
+      bearing_template[-i+scale][-i+scale] = 2;
+    }  
   }
-  // westerly
-  else if (degs >= 225 && degs < 315)
+  else if (degs==225)
   {
-    cout << "\nwesterly" << endl;
-    xo = 0, yo = (1-tan_of_bearing)*0.5;
-    xi = 1,  yi = yo;
-    dir = 3;
-    east_vec.push_back(-0.5);
-    north_vec.push_back((yo - 0.5));
-    --b;
-    if (yi == 0) yi = 0.00001;
-    else if (yi == 1) yi = 1 - 0.00001;
+    shifted_i = scale;   
+    bearing_template[shifted_i][shifted_i] = 1;
+    for(int i = 0; i<= scale; i++)
+    {
+      shifted_i = i+scale;
+      bearing_template[i+scale][-i+scale] = 1;
+      bearing_template[-i+scale][i+scale] = 2;
+    }  
   }
-  //northerly
-  else if (degs >= 315 || degs < 45)
+  else if (degs==315)
   {
-    cout << "\nnortherly" << endl;
-    xo = (1+(1/tan_of_bearing))*0.5, yo = 1;
-    xi = xo, yi = 0;
-    dir = 4;
-    east_vec.push_back(xo - 0.5);
-    north_vec.push_back(0.5);
-    --a;
-    if (xi == 0) xi = 0.00001;
-    else if (xi == 1) xi = 1 - 0.00001;
-  }  
-  a_vec.push_back(a);
-  b_vec.push_back(b);
-
-
-  // now loop through the next
-  //continue trace until you get to the edge
-  while (a > -scale-1 && a < scale && b > -scale-1 && b < scale)
-  {   //added boudary checking to catch cells which flow off the  edge of the DEM tile.
-
-    degs_new = degs;
-
-    //DO NORMAL FLOW PATH
-    //set xo, yo to 0 and 1 in turn and test for true outlet (xi || yi == 0 || 1)
-    temp_yo1 = yi + (1-xi)*tan_of_bearing;     // xo = 1
-    temp_xo1 = xi + (1-yi)*(1/tan_of_bearing);   // yo = 1
-    temp_yo2 = yi - xi*tan_of_bearing;      // xo = 0
-    temp_xo2 = xi - yi*(1/tan_of_bearing);    // yo = 0
-
-    // can't outlet at same point as inlet
-    if (dir == 1) temp_yo2 = -1;
-    else if (dir == 2) temp_xo1 = -1;
-    else if (dir == 3) temp_yo1 = -1;
-    else if (dir == 4) temp_xo2 = -1;
-
-    if (temp_yo1 <= 1 && temp_yo1 > 0)
+    shifted_i = scale;   
+    bearing_template[shifted_i][shifted_i] = 1;
+    for(int i = 0; i<= scale; i++)
     {
-      xo = 1, yo = temp_yo1;
-      xi = 0, yi = yo,
-      dir = 1;
-      east_vec.push_back(float(b) + 0.5);
-      north_vec.push_back(float(-a) + (yo - 0.5));
-      ++b;
-      if (xi== 0 && yi == 0) yi = 0.00001;
-      else if (xi== 0 && yi == 1) yi = 1 - 0.00001;
-    }
-    else if (temp_xo2 <= 1 && temp_xo2 > 0)
-    {
-      xo = temp_xo2, yo = 0;
-      xi = xo, yi = 1,
-      dir = 2;
-      east_vec.push_back(float(b) + (xo - 0.5));
-      north_vec.push_back(float(-a) - 0.5);
-      ++a;
-      if (xi== 0 && yi == 1) xi = 0.00001;
-      else if (xi== 1 && yi == 1) xi = 1 - 0.00001;
-    }
-    else if (temp_yo2 <= 1 && temp_yo2 > 0)
-    {
-      xo = 0, yo = temp_yo2;
-      xi = 1, yi = yo,
-      dir = 3;
-      east_vec.push_back(float(b) -0.5);
-      north_vec.push_back(float(-a) + (yo - 0.5));
-      --b;
-      if (xi== 1 && yi == 0) yi = 0.00001;
-      else if (xi== 1 && yi == 1) yi = 1 - 0.00001;
-    }
-    else if (temp_xo1 <= 1 && temp_xo1 > 0)
-    {
-      xo = temp_xo1, yo = 1;
-      xi = xo, yi = 0,
-      dir = 4;
-      east_vec.push_back(float(b) + (xo - 0.5));
-      north_vec.push_back(float(-a) + 0.5);
-      --a;
-      if (xi == 0 && yi == 0) xi = 0.00001;
-      else if (xi== 1 && yi == 0) xi = 1 - 0.00001;
-    }
+      shifted_i = i+scale;
+      bearing_template[-i+scale][-i+scale] = 1;
+      bearing_template[i+scale][i+scale] = 2;
+    }  
+  }
+  else
+  {
+    // Do each side of the bearing
+    // This code comes from the flow routing routines by stuart
+    // This is for the first bearing
+    xo = 0;
+    yo = 0;
+
+    east_vec.push_back(0);
+    north_vec.push_back(0);
+
     a_vec.push_back(a);
     b_vec.push_back(b);
-  }
-
-
-
-  xo = 0;
-  yo = 0;
-  a = 0;
-  b = 0;
-  degs = degs+180;
-  if(degs > 360)
-  {
-    degs = degs-360;
-  }
-  rads = BearingToRad(degs);
-  tan_of_bearing = tan(rads);
-  cos_of_bearing = cos(rads);  
-  // Now the reverse direction
-  //test direction, calculate outlet coordinates and update indicies
-  // easterly
-  if (degs >= 45 && degs < 135)
-  {
-    cout << "\neasterly" << endl;
-    xo = 1, yo = (1+tan_of_bearing)*0.5;
-    xi = 0, yi = yo;
-    dir = 1;
-    east_vec.push_back(0.5);
-    north_vec.push_back(yo - 0.5);
-    ++b;
-    if (yi == 0) yi = 0.00001;
-    else if (yi == 1) yi = 1 - 0.00001;
-  }
-  //southerly
-  else if (degs >= 135 && degs < 225)
-  {
-    cout << "\nsoutherly" << endl;
-    xo = (1-(1/tan_of_bearing))*0.5, yo = 0;
-    xi = xo, yi = 1;
-    dir = 2;
-    east_vec.push_back(xo - 0.5);
-    north_vec.push_back(-0.5);
-    ++a;
-    if (xi == 0) xi = 0.00001;
-    else if (xi == 1) xi = 1 - 0.00001;
-  }
-  // westerly
-  else if (degs >= 225 && degs < 315)
-  {
-    cout << "\nwesterly" << endl;
-    xo = 0, yo = (1-tan_of_bearing)*0.5;
-    xi = 1,  yi = yo;
-    dir = 3;
-    east_vec.push_back(-0.5);
-    north_vec.push_back((yo - 0.5));
-    --b;
-    if (yi == 0) yi = 0.00001;
-    else if (yi == 1) yi = 1 - 0.00001;
-  }
-  //northerly
-  else if (degs >= 315 || degs < 45)
-  {
-    cout << "\nnortherly" << endl;
-    xo = (1+(1/tan_of_bearing))*0.5, yo = 1;
-    xi = xo, yi = 0;
-    dir = 4;
-    east_vec.push_back(xo - 0.5);
-    north_vec.push_back(0.5);
-    --a;
-    if (xi == 0) xi = 0.00001;
-    else if (xi == 1) xi = 1 - 0.00001;
-  }  
-  a_vec.push_back(a);
-  b_vec.push_back(b);
-
-  // now loop through the next
-  //continue trace until you get to the edge
-  while (a > -scale-1 && a < scale && b > -scale-1 && b < scale)
-  {   //added boudary checking to catch cells which flow off the  edge of the DEM tile.
-
-    degs_new = degs;
-
-    //DO NORMAL FLOW PATH
-    //set xo, yo to 0 and 1 in turn and test for true outlet (xi || yi == 0 || 1)
-    temp_yo1 = yi + (1-xi)*tan_of_bearing;     // xo = 1
-    temp_xo1 = xi + (1-yi)*(1/tan_of_bearing);   // yo = 1
-    temp_yo2 = yi - xi*tan_of_bearing;      // xo = 0
-    temp_xo2 = xi - yi*(1/tan_of_bearing);    // yo = 0
-
-    // can't outlet at same point as inlet
-    if (dir == 1) temp_yo2 = -1;
-    else if (dir == 2) temp_xo1 = -1;
-    else if (dir == 3) temp_yo1 = -1;
-    else if (dir == 4) temp_xo2 = -1;
-
-    if (temp_yo1 <= 1 && temp_yo1 > 0)
+    
+    //test direction, calculate outlet coordinates and update indicies
+    // easterly
+    if (degs >= 45 && degs < 135)
     {
-      xo = 1, yo = temp_yo1;
-      xi = 0, yi = yo,
+      //cout << "\neasterly" << endl;
+      xo = 1, yo = (1+tan_of_bearing)*0.5;
+      xi = 0, yi = yo;
       dir = 1;
-      east_vec.push_back(float(b) + 0.5);
-      north_vec.push_back(float(-a) + (yo - 0.5));
+      east_vec.push_back(0.5);
+      north_vec.push_back(yo - 0.5);
       ++b;
-      if (xi== 0 && yi == 0) yi = 0.00001;
-      else if (xi== 0 && yi == 1) yi = 1 - 0.00001;
+      if (yi == 0) yi = 0.00001;
+      else if (yi == 1) yi = 1 - 0.00001;
     }
-    else if (temp_xo2 <= 1 && temp_xo2 > 0)
+    //southerly
+    else if (degs >= 135 && degs < 225)
     {
-      xo = temp_xo2, yo = 0;
-      xi = xo, yi = 1,
+      //cout << "\nsoutherly" << endl;
+      xo = (1-(1/tan_of_bearing))*0.5, yo = 0;
+      xi = xo, yi = 1;
       dir = 2;
-      east_vec.push_back(float(b) + (xo - 0.5));
-      north_vec.push_back(float(-a) - 0.5);
+      east_vec.push_back(xo - 0.5);
+      north_vec.push_back(-0.5);
       ++a;
-      if (xi== 0 && yi == 1) xi = 0.00001;
-      else if (xi== 1 && yi == 1) xi = 1 - 0.00001;
+      if (xi == 0) xi = 0.00001;
+      else if (xi == 1) xi = 1 - 0.00001;
     }
-    else if (temp_yo2 <= 1 && temp_yo2 > 0)
+    // westerly
+    else if (degs >= 225 && degs < 315)
     {
-      xo = 0, yo = temp_yo2;
-      xi = 1, yi = yo,
+      //cout << "\nwesterly" << endl;
+      xo = 0, yo = (1-tan_of_bearing)*0.5;
+      xi = 1,  yi = yo;
       dir = 3;
-      east_vec.push_back(float(b) -0.5);
-      north_vec.push_back(float(-a) + (yo - 0.5));
+      east_vec.push_back(-0.5);
+      north_vec.push_back((yo - 0.5));
+      //cout << "LSDStatstools Line 6456" << endl;
       --b;
-      if (xi== 1 && yi == 0) yi = 0.00001;
-      else if (xi== 1 && yi == 1) yi = 1 - 0.00001;
+      if (yi == 0) yi = 0.00001;
+      else if (yi == 1) yi = 1 - 0.00001;
     }
-    else if (temp_xo1 <= 1 && temp_xo1 > 0)
+    //northerly
+    else if (degs >= 315 || degs < 45)
     {
-      xo = temp_xo1, yo = 1;
-      xi = xo, yi = 0,
+      //cout << "\nnortherly" << endl;
+      xo = (1+(1/tan_of_bearing))*0.5, yo = 1;
+      xi = xo, yi = 0;
       dir = 4;
-      east_vec.push_back(float(b) + (xo - 0.5));
-      north_vec.push_back(float(-a) + 0.5);
+      east_vec.push_back(xo - 0.5);
+      north_vec.push_back(0.5);
       --a;
-      if (xi == 0 && yi == 0) xi = 0.00001;
-      else if (xi== 1 && yi == 0) xi = 1 - 0.00001;
-    }
+      if (xi == 0) xi = 0.00001;
+      else if (xi == 1) xi = 1 - 0.00001;
+    }  
     a_vec.push_back(a);
     b_vec.push_back(b);
-  }
 
-  // now tag the raster
-  int n_cells = int( a_vec.size());
-  for(int i = 0; i<n_cells; i++)
-  {
-    r = a_vec[i]+scale;
-    c = b_vec[i]+scale;
 
-    if (r >= 0 && r < 2*scale+1 && c >= 0 && c < 2*scale+1)
-    {
-      bearing_template[r][c] = 1;
+    // now loop through the next
+    //continue trace until you get to the edge
+    while (a > -scale-1 && a < scale && b > -scale-1 && b < scale)
+    {   //added boudary checking to catch cells which flow off the  edge of the DEM tile.
+
+      degs_new = degs;
+
+      //DO NORMAL FLOW PATH
+      //set xo, yo to 0 and 1 in turn and test for true outlet (xi || yi == 0 || 1)
+      temp_yo1 = yi + (1-xi)*tan_of_bearing;     // xo = 1
+      temp_xo1 = xi + (1-yi)*(1/tan_of_bearing);   // yo = 1
+      temp_yo2 = yi - xi*tan_of_bearing;      // xo = 0
+      temp_xo2 = xi - yi*(1/tan_of_bearing);    // yo = 0
+
+      //cout << "temp yo1 " << temp_yo1 << " temp xo1 " << temp_xo1 << " temp_yo2 " << temp_yo2 << " temp_xo2 " << temp_xo2 << " dir " << dir << endl;
+
+      // can't outlet at same point as inlet
+      if (dir == 1) temp_yo2 = -1;
+      else if (dir == 2) temp_xo1 = -1;
+      else if (dir == 3) temp_yo1 = -1;
+      else if (dir == 4) temp_xo2 = -1;
+
+      if (temp_yo1 <= 1 && temp_yo1 > 0)
+      {
+        xo = 1, yo = temp_yo1;
+        xi = 0, yi = yo,
+        dir = 1;
+        east_vec.push_back(float(b) + 0.5);
+        north_vec.push_back(float(-a) + (yo - 0.5));
+        ++b;
+        //cout << "b " << b << endl;
+        if (xi== 0 && yi == 0) yi = 0.00001;
+        else if (xi== 0 && yi == 1) yi = 1 - 0.00001;
+      }
+      else if (temp_xo2 <= 1 && temp_xo2 > 0)
+      {
+        xo = temp_xo2, yo = 0;
+        xi = xo, yi = 1,
+        dir = 2;
+        east_vec.push_back(float(b) + (xo - 0.5));
+        north_vec.push_back(float(-a) - 0.5);
+        ++a;
+        if (xi== 0 && yi == 1) xi = 0.00001;
+        else if (xi== 1 && yi == 1) xi = 1 - 0.00001;
+      }
+      else if (temp_yo2 <= 1 && temp_yo2 > 0)
+      {
+        xo = 0, yo = temp_yo2;
+        xi = 1, yi = yo,
+        dir = 3;
+        east_vec.push_back(float(b) -0.5);
+        north_vec.push_back(float(-a) + (yo - 0.5));
+        --b;
+        if (xi== 1 && yi == 0) yi = 0.00001;
+        else if (xi== 1 && yi == 1) yi = 1 - 0.00001;
+      }
+      else if (temp_xo1 <= 1 && temp_xo1 > 0)
+      {
+        xo = temp_xo1, yo = 1;
+        xi = xo, yi = 0,
+        dir = 4;
+        east_vec.push_back(float(b) + (xo - 0.5));
+        north_vec.push_back(float(-a) + 0.5);
+        --a;
+        if (xi == 0 && yi == 0) xi = 0.00001;
+        else if (xi== 1 && yi == 0) xi = 1 - 0.00001;
+      }
+      else { a = scale ; }   // FJC - added 28/07/21 to stop infinite loop bug where a and b do not change. Does this work?
+      //cout << "a " << a << " b " << b << endl; 
+      a_vec.push_back(a);
+      b_vec.push_back(b);
     }
-  }
 
-  ofstream out_file;
-  out_file.open("data_out.csv");
-  for(int i = 0; i<n_cells; i++)
-  {
-    cout << "a: " << a_vec[i] << " b: " << b_vec[i] << " x: " << east_vec[i] << " y: " << north_vec[i] << endl;
-    out_file <<  a_vec[i] << "," << b_vec[i] << "," << east_vec[i] << "," << north_vec[i] << endl;
-  }
-  out_file.close();
+    // now tag the raster
+    int n_cells = int( a_vec.size());
+    for(int i = 0; i<n_cells; i++)
+    {
+      r = a_vec[i]+scale;
+      c = b_vec[i]+scale;
+
+      if (r >= 0 && r < 2*scale+1 && c >= 0 && c < 2*scale+1)
+      {
+        bearing_template[r][c] = 1;
+      }
+    }
+
+    if(print_file_for_debug)
+    {
+      for(int i = 0; i<n_cells; i++)
+      {
+        cout << "a: " << a_vec[i] << " b: " << b_vec[i] << " x: " << east_vec[i] << " y: " << north_vec[i] << endl;
+        out_file <<  a_vec[i] << "," << b_vec[i] << "," << east_vec[i] << "," << north_vec[i] << endl;
+      }
+    }
+
+    // now for the second bearing (i.e., the bearing 180 degrees from the first)
+    // reset the tracking vectors
+    a_vec = empty_i_vec;
+    b_vec = empty_i_vec;
+    east_vec = empty_f_vec;
+    north_vec = empty_f_vec;
+
+    xo = 0;
+    yo = 0;
+    a = 0;
+    b = 0;
+    degs = degs+180;
+    if(degs > 360)
+    {
+      degs = degs-360;
+    }
+    rads = BearingToRad(degs);
+    tan_of_bearing = tan(rads);
+    cos_of_bearing = cos(rads);  
+    // Now the reverse direction
+    //test direction, calculate outlet coordinates and update indicies
+    // easterly
+    if (degs >= 45 && degs < 135)
+    {
+      //cout << "\neasterly" << endl;
+      xo = 1, yo = (1+tan_of_bearing)*0.5;
+      xi = 0, yi = yo;
+      dir = 1;
+      east_vec.push_back(0.5);
+      north_vec.push_back(yo - 0.5);
+      ++b;
+      if (yi == 0) yi = 0.00001;
+      else if (yi == 1) yi = 1 - 0.00001;
+    }
+    //southerly
+    else if (degs >= 135 && degs < 225)
+    {
+      //cout << "\nsoutherly" << endl;
+      xo = (1-(1/tan_of_bearing))*0.5, yo = 0;
+      xi = xo, yi = 1;
+      dir = 2;
+      east_vec.push_back(xo - 0.5);
+      north_vec.push_back(-0.5);
+      ++a;
+      if (xi == 0) xi = 0.00001;
+      else if (xi == 1) xi = 1 - 0.00001;
+    }
+    // westerly
+    else if (degs >= 225 && degs < 315)
+    {
+      //cout << "\nwesterly" << endl;
+      xo = 0, yo = (1-tan_of_bearing)*0.5;
+      xi = 1,  yi = yo;
+      dir = 3;
+      east_vec.push_back(-0.5);
+      north_vec.push_back((yo - 0.5));
+      --b;
+      if (yi == 0) yi = 0.00001;
+      else if (yi == 1) yi = 1 - 0.00001;
+    }
+    //northerly
+    else if (degs >= 315 || degs < 45)
+    {
+      //cout << "\nnortherly" << endl;
+      xo = (1+(1/tan_of_bearing))*0.5, yo = 1;
+      xi = xo, yi = 0;
+      dir = 4;
+      east_vec.push_back(xo - 0.5);
+      north_vec.push_back(0.5);
+      --a;
+      if (xi == 0) xi = 0.00001;
+      else if (xi == 1) xi = 1 - 0.00001;
+    }  
+    a_vec.push_back(a);
+    b_vec.push_back(b);
+
+    //cout << "Got the first step" << endl;
+
+    // now loop through the next
+    //continue trace until you get to the edge
+    while (a > -scale-1 && a < scale && b > -scale-1 && b < scale)
+    {   //added boundary checking to catch cells which flow off the  edge of the DEM tile.
+
+      degs_new = degs;
+
+      //cout << "x: " << xi << " y: " << yi << endl;
+
+      //DO NORMAL FLOW PATH
+      //set xo, yo to 0 and 1 in turn and test for true outlet (xi || yi == 0 || 1)
+      temp_yo1 = yi + (1-xi)*tan_of_bearing;     // xo = 1
+      temp_xo1 = xi + (1-yi)*(1/tan_of_bearing);   // yo = 1
+      temp_yo2 = yi - xi*tan_of_bearing;      // xo = 0
+      temp_xo2 = xi - yi*(1/tan_of_bearing);    // yo = 0
+
+      // can't have outlet at same point as inlet
+      if (dir == 1) temp_yo2 = -1;
+      else if (dir == 2) temp_xo1 = -1;
+      else if (dir == 3) temp_yo1 = -1;
+      else if (dir == 4) temp_xo2 = -1;
+
+      //cout << "o1: " << temp_xo1 << "," << temp_yo1 << " o2: " << temp_xo2 << "," << temp_yo2 << endl;
+
+      if (temp_yo1 <= 1 && temp_yo1 > 0)
+      {
+        //cout << "case 1" << endl;
+        xo = 1, yo = temp_yo1;
+        xi = 0, yi = yo,
+        dir = 1;
+        east_vec.push_back(float(b) + 0.5);
+        north_vec.push_back(float(-a) + (yo - 0.5));
+        ++b;
+        if (xi== 0 && yi == 0) yi = 0.00001;
+        else if (xi== 0 && yi == 1) yi = 1 - 0.00001;
+      }
+      else if (temp_xo2 <= 1 && temp_xo2 > 0)
+      {
+        //cout << "case 2" << endl;
+        xo = temp_xo2, yo = 0;
+        xi = xo, yi = 1,
+        dir = 2;
+        east_vec.push_back(float(b) + (xo - 0.5));
+        north_vec.push_back(float(-a) - 0.5);
+        ++a;
+        if (xi== 0 && yi == 1) xi = 0.00001;
+        else if (xi== 1 && yi == 1) xi = 1 - 0.00001;
+      }
+      else if (temp_yo2 <= 1 && temp_yo2 > 0)
+      {
+        //cout << "case 3" << endl;
+        xo = 0, yo = temp_yo2;
+        xi = 1, yi = yo,
+        dir = 3;
+        east_vec.push_back(float(b) -0.5);
+        north_vec.push_back(float(-a) + (yo - 0.5));
+        --b;
+        if (xi== 1 && yi == 0) yi = 0.00001;
+        else if (xi== 1 && yi == 1) yi = 1 - 0.00001;
+      }
+      else if (temp_xo1 <= 1 && temp_xo1 > 0)
+      {
+        //cout << "case 4" << endl;
+        xo = temp_xo1, yo = 1;
+        xi = xo, yi = 0,
+        dir = 4;
+        east_vec.push_back(float(b) + (xo - 0.5));
+        north_vec.push_back(float(-a) + 0.5);
+        --a;
+        if (xi == 0 && yi == 0) xi = 0.00001;
+        else if (xi== 1 && yi == 0) xi = 1 - 0.00001;
+      }
+      a_vec.push_back(a);
+      b_vec.push_back(b);
+    }
+
+    // now tag the raster
+    n_cells = int( a_vec.size());
+    for(int i = 0; i<n_cells; i++)
+    {
+      r = a_vec[i]+scale;
+      c = b_vec[i]+scale;
+
+      if (r >= 0 && r < 2*scale+1 && c >= 0 && c < 2*scale+1)
+      {
+        bearing_template[r][c] = 2;
+      }
+    }
+
+    if(print_file_for_debug)
+    {
+      for(int i = 0; i<n_cells; i++)
+      {
+        cout << "a: " << a_vec[i] << " b: " << b_vec[i] << " x: " << east_vec[i] << " y: " << north_vec[i] << endl;
+        out_file <<  a_vec[i] << "," << b_vec[i] << "," << east_vec[i] << "," << north_vec[i] << endl;
+      }
+      out_file.close();
+    }
+
+  }   // end flow routing
+
+
+
+  //for(int r = 0; r<2*scale+1; r++)
+  //{
+  //  for(int c = 0; c<2*scale+1; c++)
+  //  {
+  //    cout << r << "," << c << ": " << bearing_template[r][c] << endl;
+  //  }
+  //}
+
+  //cout << bearing_template << endl;
+
   return bearing_template;
 
 

@@ -13,13 +13,7 @@
 #include "LSDJunctionNetwork.hpp"
 #include "LSDStatsTools.hpp"
 #include "LSDFloodplain.hpp"
-#include "LSDSwathProfile.hpp"
 
-// PCL
-#include <pcl/point_types.h>
-#include <pcl/point_cloud.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl/octree/octree.h>
 
 using namespace std;
 using namespace TNT;
@@ -86,7 +80,7 @@ void Get_Relief_of_Nearest_Channel(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo&
   /// @param Swath swath object
 	/// @author FJC
 	/// @date 21/11/17
-  void print_TerraceWidths_to_csv(string csv_filename, LSDSwath& Swath);
+  //void print_TerraceWidths_to_csv(string csv_filename, LSDSwath& Swath);
 
   /// @brief This function gets the nearest channel node on the baseline to each terrace pixel
   /// @param Swath LSDSwath object
@@ -94,7 +88,7 @@ void Get_Relief_of_Nearest_Channel(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo&
   /// @param FlowInfo LSDFlowInfo object
   /// @author FJC
   /// @date 30/11/17
-  Array2D<int> get_ChannelNodeArray(LSDSwath& Swath, Array2D<float> BaselineDistance, LSDFlowInfo& FlowInfo);
+//  Array2D<int> get_ChannelNodeArray(LSDSwath& Swath, Array2D<float> BaselineDistance, LSDFlowInfo& FlowInfo);
 
 	/// FUNCTIONS TO GENERATE RASTERS
 
@@ -184,7 +178,7 @@ void Get_Relief_of_Nearest_Channel(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo&
   /// @param Swath LSDSwathProfile object
 	/// @author FJC
 	/// @date 28/09/17
-  void print_TerraceInfo_to_csv(string csv_filename, LSDRaster& ElevationRaster, LSDRaster& ChannelRelief,  LSDFlowInfo& FlowInfo, LSDSwath& Swath);
+//  void print_TerraceInfo_to_csv(string csv_filename, LSDRaster& ElevationRaster, LSDRaster& ChannelRelief,  LSDFlowInfo& FlowInfo, LSDSwath& Swath);
 
   protected:
 

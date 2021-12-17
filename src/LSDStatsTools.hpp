@@ -551,7 +551,9 @@ double deg(double radians);
 // Get the angle between two vectors
 float angle_between_vectors(float x1, float y1, float x2, float y2);
 
-// Get the clockwise angle between two vectors
+// Get the clockwise angle a vector and north
+// this gets the bearing
+// returns the value in radians
 float clockwise_angle_between_vector_and_north(float x1, float y1, float x2, float y2);
 
 // get clockwise angle between two vectors specifying the origin

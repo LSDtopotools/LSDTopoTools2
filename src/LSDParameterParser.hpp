@@ -139,6 +139,15 @@ class LSDParameterParser
                       map<string,int> default_map_i, map<string,bool> default_map_b,
                       map<string,string> default_map_s, map<string,double> default_map_d);
 
+    /// @brief This processes the help information
+    /// @param help_map the map of string vectors containing help information. 
+    /// @param the file prefix of the help file
+    /// @param the version the help file refers to 
+    /// @param the appropriate citation for the code
+    /// @author SMM
+    /// @date 21/07/2021 
+    void print_help(map< string, vector<string> > help_map, string file_prefix, string version, string citation);
+
 
     /// @brief This function takes a default map and converts it into the parameters
     ///  by comparing the keys to the parsed parameter file

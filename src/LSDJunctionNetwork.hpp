@@ -1514,6 +1514,53 @@ vector<int> GetChannelHeadsChiMethodFromValleys(vector<int> ValleyNodes,
   /// @date 21/10/2013
   int get_nodeindex_of_nearest_channel_for_specified_coordinates(float X_coordinate,float Y_coordinate, int threshold_stream_order, int search_radius_nodes,LSDFlowInfo& FlowInfo);
 
+  /// @brief Function to get the nodeindex of the nearest channel node for a given nodeindex
+  /// @param starting_nodeindex does what it says on the tin
+  /// @param threshold_stream_order The minimum stream order that will be considers a 'channel' by the algorithm
+  /// @param FlowInfo LSDFlowInfo object.
+  /// @return Returns the NodeIndex of the nearest channel node.
+  /// @author SMM
+  /// @date 02/07/2021
+  int get_nodeindex_of_nearest_channel(int starting_nodeindex, int threshold_stream_order, LSDFlowInfo& FlowInfo);
+
+  /// @brief Function to get the distance to the nearest channel
+  /// @param starting_nodeindex does what it says on the tin
+  /// @param threshold_stream_order The minimum stream order that will be considers a 'channel' by the algorithm
+  /// @param FlowInfo LSDFlowInfo object.
+  /// @param FlowDist the distance from outlet raster
+  /// @return Returns the distance to the nearest channel node following a flow path
+  /// @author SMM
+  /// @date 02/07/2021
+  float get_distance_to_nearest_channel(int starting_nodeindex, int threshold_stream_order, LSDFlowInfo& FlowInfo, LSDRaster& FlowDist);
+
+  /// @brief Function to get the distance to the nearest channel
+  /// @param threshold_stream_order The minimum stream order that will be considers a 'channel' by the algorithm
+  /// @param FlowInfo LSDFlowInfo object.
+  /// @param FlowDist the flow distance raster
+  /// @return Returns the distance of all pixels to the nearest channel node as a raster
+  /// @author SMM
+  /// @date 02/07/2021
+  LSDRaster get_distance_to_nearest_channel_raster(int threshold_stream_order, LSDFlowInfo& FlowInfo, LSDRaster& FlowDist);
+
+  /// @brief Function to get the releif to the nearest channel
+  /// @param starting_nodeindex does what it says on the tin
+  /// @param threshold_stream_order The minimum stream order that will be considers a 'channel' by the algorithm
+  /// @param FlowInfo LSDFlowInfo object.
+  /// @param Elevation the elevation raster
+  /// @return Returns the relief of this pixel to the nearest channel node following a flow path
+  /// @author SMM
+  /// @date 02/07/2021
+  float get_relief_to_nearest_channel(int starting_nodeindex, int threshold_stream_order, LSDFlowInfo& FlowInfo, LSDRaster& Elevation);
+
+  /// @brief Function to get the distance to the nearest channel
+  /// @param threshold_stream_order The minimum stream order that will be considers a 'channel' by the algorithm
+  /// @param FlowInfo LSDFlowInfo object.
+  /// @param Elevation the elevation raster
+  /// @return Returns the relief of this pixel to the nearest channel node as a raster
+  /// @author SMM
+  /// @date 02/07/2021
+  LSDRaster get_relief_to_nearest_channel_raster(int threshold_stream_order, LSDFlowInfo& FlowInfo, LSDRaster& Elevation);
+
   /// @brief Function to snap input coordinates to the nearest channel node from latitude and longitude
   /// @param latitude
   /// @param longitude

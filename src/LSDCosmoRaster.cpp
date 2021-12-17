@@ -1277,7 +1277,7 @@ float LSDCosmoRaster::calculate_eff_erate_from_conc(float Nuclide_conc,
   double eff_e_new = double(eff_erate_guess); // the erosion rate upon which we iterate
   double eff_e_change;                // the change in erosion rate between iterations
   int threshold_steps = 15;           // the maximum number of iterations before it just takes the best guess
-  double tolerance = 1e-7;           // tolerance for a change in the erosion rate
+  double tolerance = 1e-7;            // tolerance for a change in the erosion rate
                                       // between Newton-Raphson iterations
   double eff_e_displace = 1e-4;       // A small displacment in the erosion rate used
                                       // to calculate the derivative
@@ -1307,6 +1307,16 @@ float LSDCosmoRaster::calculate_eff_erate_from_conc(float Nuclide_conc,
   LSDRaster cosmo_conc_raster;
   float closest_guess = eff_erate_guess;
   float closest_N_difference = 10e10;
+
+  // these are for skipping out to bisection method
+  float closest_pos_N_difference = 10e10;
+  float closest_neg_N_difference = -10e10;
+  float closest_pos_N_diff_erate = eff_erate_guess;
+  float closest_neg_N_diff_erate = eff_erate_guess;
+
+  // for bisection;
+  float midpoint_e, last_midpoint_e;
+
   int N_steps = 0;
   do
   {
@@ -1363,6 +1373,24 @@ float LSDCosmoRaster::calculate_eff_erate_from_conc(float Nuclide_conc,
       closest_guess = eff_e_new;  
     }
 
+    // need to get the closest guess both positive and negative for the bisection loop
+    if (f_x < 0)
+    {
+      if ( f_x > closest_neg_N_difference)
+      {
+        closest_neg_N_difference = f_x;
+        closest_neg_N_diff_erate = eff_e_new;
+      }
+    }
+    if (f_x > 0)
+    {
+       if ( f_x < closest_pos_N_difference)
+      {
+        closest_pos_N_difference = f_x;
+        closest_pos_N_diff_erate = eff_e_new;
+      }     
+    }
+
     cout << "Conc diff is: " << N_this_step - N_displace << endl;
     cout << "Diff from target conc is: " << f_x << endl;
     //cout << "f_x displace is: " << f_x_displace << endl;
@@ -1391,11 +1419,67 @@ float LSDCosmoRaster::calculate_eff_erate_from_conc(float Nuclide_conc,
       eff_e_change = 0;
     }
 
-    // This is an escape hatch that takes the best guess if there is no convergence. 
+    // This is an escape hatch that converts to bisection method if there is no convergence. 
     if(N_steps > threshold_steps)
     {
-      eff_e_change = 0;
-      eff_e_new = closest_guess;
+      //eff_e_change = 0;
+      //eff_e_new = closest_guess;
+
+      cout << "Failed to converge using Newton. Now using bisection method." << endl;
+      cout << "This might take a while." << endl;
+
+      midpoint_e = 0.5*(closest_neg_N_diff_erate-closest_pos_N_diff_erate)+closest_pos_N_diff_erate;
+      last_midpoint_e = midpoint_e;
+
+      do
+      {
+        cout << "erate brackets: " << closest_neg_N_diff_erate << " , " << closest_pos_N_diff_erate << endl;
+        cout << "N brackets and actual N: " << closest_neg_N_difference << ", " << closest_pos_N_difference << ", " <<N_this_step << endl;
+
+
+        MakeItYeah.set_to_constant_value(float(midpoint_e));
+        eff_erosion_raster =  MakeItYeah.return_as_raster();
+        cosmo_conc_raster = calculate_CRN_concentration_raster(Nuclide, Muon_scaling, 
+                                          eff_erosion_raster,Production_raster, 
+                                          TopoShield, SelfShield,SnowShield,
+                                          FlowInfo,outlet_node,  
+                                          is_production_uncertainty_plus_on,
+                                          is_production_uncertainty_minus_on);
+        N_this_step = calculate_accumulated_CRN_concentration(cosmo_conc_raster, 
+                                              eff_erosion_raster, 
+                                              FlowInfo, outlet_node); 
+
+        f_x =  N_this_step-Nuclide_conc;        
+
+        // need to get the closest guess both positive and negative for the bisection loop
+        if (f_x < 0)
+        {
+          if ( f_x > closest_neg_N_difference)
+          {
+            closest_neg_N_difference = f_x;
+            closest_neg_N_diff_erate = midpoint_e;
+          }
+        }
+        if (f_x > 0)
+        {
+          if ( f_x < closest_pos_N_difference)
+          {
+            closest_pos_N_difference = f_x;
+            closest_pos_N_diff_erate = midpoint_e;
+          }     
+        }
+
+        midpoint_e = 0.5*(closest_neg_N_diff_erate-closest_pos_N_diff_erate)+closest_pos_N_diff_erate;
+        eff_e_change  = last_midpoint_e-midpoint_e;
+        eff_e_new = midpoint_e;
+        last_midpoint_e = midpoint_e;
+
+        cout << "Bisection f_x: " << f_x << " atoms/g and midpoint e is: " << midpoint_e << endl;
+
+      } while (fabs(eff_e_change) > tolerance);
+      
+
+
 
     }
 
