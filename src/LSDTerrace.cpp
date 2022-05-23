@@ -452,7 +452,6 @@ LSDIndexRaster LSDTerrace::get_combined_terraces_and_floodplains_raster(LSDFlood
 	}
 
 	LSDIndexRaster TerraceFloodplainRaster(NRows,NCols, XMinimum, YMinimum, DataResolution, NoDataValue, TerraceFloodplain_Array, GeoReferencingStrings);
-	return TerraceFloodplainRaster;
 }
 
 
