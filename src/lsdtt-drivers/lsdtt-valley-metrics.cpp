@@ -70,7 +70,8 @@ int main (int nNumberofArgs,char *argv[])
   //start the clock
   clock_t begin = clock();
 
-  string version_number = "0.6";
+  string version_number = "0.7d";
+
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -160,7 +161,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["search_radius_nodes"] = {  "int","8","A parameter for snapping to the nearest channel. It will search for the largest channel (by stream order) within the pixel window.","You will want smaller pixel numbers if you have a dense channel network."};
  
   int_default_map["threshold_stream_order_for_snapping"] = 2;
-  help_map["threshold_stream_order_for_snapping"] = {  "int","2","If you are snapping to a channel, it will ignore channel with lower stream order than this number.","Set this to a higher number to avoid snapping to small channels."};
+  help_map["threshold_stream_order_for_snapping"] = {  "int","2","If you are snapping to a channel this routine will ignore channel with lower stream order than this number.","Set this to a higher number to avoid snapping to small channels."};
   
 
   // valley centreline
@@ -171,7 +172,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["centreline_loops"] = {  "int","5","The centreline routine iteratively digs and fills the trough and this sets the number of iterations.","We find 5 is about right but if the results are looking bad then try increasing this number. Warning: that might make things worse."};
  
   float_default_map["trough_scaling_factor"] = 0.1;
-  help_map["trough_scaling_factor"] = {  "float","0.1","The centreline routine digs a trough (to route flow through the centre of the valley) with a depth that is this factor times the distance from the edge. Increase this number for a deeper trough.","A deeper trough has more sucess at routing flow but you get backwater effects at the bottom of the valley. Play with this number to get the best result."};
+  help_map["trough_scaling_factor"] = {  "float","0.1","The centreline routine digs a trough (to route flow through the centre of the valley) with a depth that is this factor times the distance from the edge. Increase this number for a deeper trough.","A deeper trough has more success at routing flow but you get backwater effects at the bottom of the valley. Play with this number to get the best result."};
   
   float_default_map["minimum_bank_elevation_window_radius"] = 20;
   help_map["minimum_bank_elevation_window_radius"] = {  "float","20","The valley routine will dig a trough where the starting elevation at the side is determined by the lowest bank elevation within this radius.","For best results this needs to be about the width of the valley."};
@@ -213,12 +214,12 @@ int main (int nNumberofArgs,char *argv[])
   help_map["surface_fitting_radius"] = {  "float","30","Our surface fitting routines fit a polynomial over the points with in a radius defined by surface_fitting_radius and then differentiate this surface to get the surface metrics like gradient and curvature","If not bigger than the pixel_size*sqrt(2) then will increase to that number."};
 
   float_default_map["QQ_threshold"] = 0.005;
-  help_map["QQ_threshold"] = {  "float","0.005","Once the QQ plot is fitted, this determines the level below which a floodplain is identified. Higher numbers give you more floodplain or terrace pixels.","See Clubb et al ESURF 2017."};
+  help_map["QQ_threshold"] = {  "float","0.005","Once the QQ plot is fitted this value determines the level below which a floodplain is identified. Higher numbers give you more floodplain or terrace pixels.","See Clubb et al ESURF 2017."};
 
 
   // choice for absolute thresholds
   bool_default_map["use_absolute_thresholds"] = false;
-  help_map["use_absolute_thresholds"] = {  "bool","false","This overrides the quantile-qunatile approach and just sets anything below the relief and slope thresholds as a floodplain.","This is not recommended but might work in very high relief landscapes."};
+  help_map["use_absolute_thresholds"] = {  "bool","false","This overrides the quantile-quantile approach and just sets anything below the relief and slope thresholds as a floodplain.","This is not recommended but might work in very high relief landscapes."};
  
   int_default_map["relief_threshold"] = 50;
   help_map["relief_threshold"] = {  "int","50","When use_absolute_thresholds is true this is the threshold below which you get a floodplain","The slope threshold must also be lower to trigger a floodplain"};
@@ -330,7 +331,7 @@ int main (int nNumberofArgs,char *argv[])
   {
     cout << "I am going to print the help and exit." << endl;
     cout << "You can find the help in the file:" << endl;
-    cout << "./lsdtt-basic-metrics-README.csv" << endl;
+    cout << "./lsdtt-valley-metrics-README.csv" << endl;
     string help_prefix = "lsdtt-valley-metrics-README";
     LSDPP.print_help(help_map, help_prefix, version_number, citation);
     exit(0);
@@ -1264,6 +1265,11 @@ int main (int nNumberofArgs,char *argv[])
     LSDIndexRaster ConnectedComponents = Terraces.print_ConnectedComponents_to_Raster();
     string CC_ext = "_terraces";
     ConnectedComponents.write_raster((OUT_DIR+OUT_ID+CC_ext), DEM_extension);
+
+    // print the terrace relief raster
+    LSDRaster TerraceRelief = Terraces.print_ChannelRelief_to_Raster();
+    string R_ext = "_terrace_relief";
+    TerraceRelief.write_raster((OUT_DIR+OUT_ID+CC_ext), DEM_extension);
 
     //cout << "\t Testing connected components" << endl;
     //vector <vector <float> > CC_vector = TestSwath.get_connected_components_along_swath(ConnectedComponents, RasterTemplate, this_int_map["NormaliseToBaseline"]);
