@@ -1145,6 +1145,67 @@ void LSDCRNParameters::set_Braucher_parameters()
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// 10Be production is based on a combination of data from Braucher et al 2011
+// and Borchers et al 2016 as transcribed by Mirjam Schaller
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDCRNParameters::set_BraucherBorchers_parameters()
+{
+  //S_t = 1;
+
+  // from Vermeesh 2007
+  // 10Be from Chmeleff/Korschinek 10Be decay constant;
+  lambda_10Be = 500e-9;    // in yr-1
+  lambda_26Al = 980e-9;    // in yr-1
+  lambda_14C = 121e-6;     // in yr-1
+  lambda_36Cl = 230e-8;    // in yr-1          
+
+  // from the Braucher and Borchers papers
+  // data compiled by Mirjam Schaller in personal communication
+  //
+  // All but 10Be are calibrated to the Stone scaling
+  // Also linked to the nishizumii standards
+  P0_10Be = 4.061;          // in a/g/yr
+  P0_26Al = 28.851;         // in a/g/yr
+  P0_14C = 15.21;          // in a/g/yr
+  P0_36Cl = 58.95;         // in a/g/yr
+  P0_21Ne = 18.23;         // in a/g/yr
+  P0_3He = 121.59;         // in a/g/yr
+
+  // in g/cm^2
+  Gamma[0] = 160;
+  Gamma[1] = 1500;
+  Gamma[2] = 1500;
+  Gamma[3] = 4320;
+
+  // dimensionless
+  F_10Be[0] = 0.9874;
+  F_10Be[1] = 0.0030;
+  F_10Be[2] = 0.0;
+  F_10Be[3] = 0.0096;
+
+  // dimensionless
+  F_26Al[0] = 0.9681;
+  F_26Al[1] = 0.0291;
+  F_26Al[2] = 0.000;
+  F_26Al[3] = 0.0028;
+
+  // dimensionless
+  F_14C[0] = 0.83;
+  F_14C[1] = 0.15;
+  F_14C[2] = 0.0;
+  F_14C[3] = 0.02;
+
+  // dimensionless
+  F_36Cl[0] = 0.9456;
+  F_36Cl[1] = 0.0324;
+  F_36Cl[2] = 0.00;
+  F_36Cl[3] = 0.022;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // 10Be is set to a new production curve provided by Shasta Marrero
 // All others: sets the parameters to those used by Braucher et al 2009
 // as implemented in cosmocalc v2.0
@@ -1592,7 +1653,7 @@ void LSDCRNParameters::set_neutron_scaling(double scaling, double topo_shield,
 // and latitude scaling and produces scaling factors
 // for each production mechamism.
 // the scaling follows the approach of vermeesch 2008
-// it uses a 'virstual' shielding depth to calcualte
+// it uses a 'virtual' shielding depth to calcualte
 // the updated scaling factors
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDCRNParameters::scale_F_values(double single_scaling)
@@ -1877,7 +1938,7 @@ void LSDCRNParameters::scale_F_values(double single_scaling, vector<bool> nuclid
   }
 
   // set up the parameters for the newton-raphson iteration
-  double initial_guess = 0;         // an initial test depth
+  double initial_guess = 0;     // an initial test depth
   double new_x;                 // the new test depth
   double displace_x = 1e-6;     // how far you diplace the test depth
   double displace_scaling;      // the scaling after displacement
@@ -2138,8 +2199,6 @@ void LSDCRNParameters::scale_F_values(double single_scaling, vector<bool> nuclid
     F_14C[2] = exp(-new_x/Gamma[2])*F_14C[2];
     F_14C[3] = exp(-new_x/Gamma[3])*F_14C[3];  
   }
-
-
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -2687,6 +2746,10 @@ void LSDCRNParameters::print_parameters_to_file(string fname, string muon_scalin
   {
     set_Granger_parameters();
   }
+  else if (muon_scaling == "BraucherBorchers")
+  {
+    set_BraucherBorchers_parameters();
+  }
   else
   {
     muon_scaling = "Braucher_as_default";
@@ -2776,11 +2839,13 @@ void LSDCRNParameters::Print_10Beproduction_csv(string filename, string path_to_
   vector<double> P_mu_schaller;
   vector<double> P_mu_granger;
   vector<double> P_mu_braucher;
+  vector<double> P_mu_BraucherBorchers;
   vector<double> P_mu_newCRONUS;
   
   vector<double> P_total_schaller;
   vector<double> P_total_granger;
   vector<double> P_total_braucher;
+  vector<double> P_total_BraucherBorchers;
   vector<double> P_total_newCRONUS;
   
   // get the production vectors from the CRONUS scheme
@@ -2824,16 +2889,24 @@ void LSDCRNParameters::Print_10Beproduction_csv(string filename, string path_to_
                              F_10Be[3]*exp(-z/Gamma[3])));
     P_total_newCRONUS.push_back( P0_10Be*(F_10Be[0]*exp(-z/Gamma[0])+F_10Be[1]*exp(-z/Gamma[1]) + 
                              F_10Be[2]*exp(-z/Gamma[2]) + F_10Be[3]*exp(-z/Gamma[3])));
+
+    set_BraucherBorchers_parameters();
+    scale_F_values(this_P, nuclides_for_scaling);
+    P_mu_BraucherBorchers.push_back( P0_10Be*(F_10Be[1]*exp(-z/Gamma[1]) + F_10Be[2]*exp(-z/Gamma[2]) +
+                             F_10Be[3]*exp(-z/Gamma[3])));
+    P_total_BraucherBorchers.push_back( P0_10Be*(F_10Be[0]*exp(-z/Gamma[0])+F_10Be[1]*exp(-z/Gamma[1]) + 
+                             F_10Be[2]*exp(-z/Gamma[2]) + F_10Be[3]*exp(-z/Gamma[3])));
   }
   
   for(int i = 0; i<n_z; i++)
   {
     prod_file_out  << z_mu[i] << "," << P_mu_z_10Be[i] << "," << P_mu_schaller[i] << ","
                    << P_mu_granger[i] << ","  << P_mu_braucher[i] << "," 
-                   << P_mu_newCRONUS[i] << "," << P_total_z_10Be[i] << "," 
+                   << P_mu_newCRONUS[i] << "," << P_mu_BraucherBorchers[i] << "," 
+                   << P_total_z_10Be[i] << "," 
                    << P_total_schaller[i] << ","
                    << P_total_granger[i] << ","  << P_total_braucher[i] << "," 
-                   << P_total_newCRONUS[i] << endl;
+                   << P_total_newCRONUS[i] << "," << P_total_BraucherBorchers[i] << endl;
   }
   
   prod_file_out.close();

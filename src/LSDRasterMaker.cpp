@@ -79,7 +79,7 @@ void LSDRasterMaker::create(int NRows, int NCols)
 // this creates a LSDRasterModel raster from another LSDRaster
 void LSDRasterMaker::create(LSDRaster& An_LSDRaster)
 {
-  cout << "Lets get some info!" << endl;
+  //cout << "Lets get some info!" << endl;
   NRows = An_LSDRaster.get_NRows();
   NCols = An_LSDRaster.get_NCols();
   XMinimum = An_LSDRaster.get_XMinimum();

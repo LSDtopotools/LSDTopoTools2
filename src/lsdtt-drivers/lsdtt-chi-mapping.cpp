@@ -70,7 +70,7 @@
 int main (int nNumberofArgs,char *argv[])
 {
 
-  string version_number = "0.6";
+  string version_number = "0.7d";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -168,7 +168,7 @@ int main (int nNumberofArgs,char *argv[])
   //=================================================================================
   // Basic DEM preprocessing
   float_default_map["minimum_elevation"] = 0.0;
-  help_map["minimum_elevation"] = { "float","0.0","All elevation values below this become nodata if remove_seas is true.","Ususally 0."};
+  help_map["minimum_elevation"] = { "float","0.0","All elevation values below this become nodata if remove_seas is true.","Usually 0."};
 
   float_default_map["maximum_elevation"] = 30000;
   help_map["maximum_elevation"] = {  "float","0.0","All elevation values above this become nodata if remove_seas is true.","Pick a big number."};
@@ -199,10 +199,10 @@ int main (int nNumberofArgs,char *argv[])
   help_map["threshold_contributing_pixels"] = {  "int","1000","The number of contributing pixels needed to start a channel using the threshold method.","This is in pixels not drainage area. More options are in the lsdtt-channel-extraction tool."};
 
   int_default_map["minimum_basin_size_pixels"] = 5000;
-  help_map["minimum_basin_size_pixels"] = {  "int","5000","For basin finding algorithm, the minimum size of a selected basin.","Will reject basins along edge."};
+  help_map["minimum_basin_size_pixels"] = {  "int","5000","For basin finding algorithm this value is the minimum size of a selected basin.","Will reject basins along edge."};
   
   int_default_map["maximum_basin_size_pixels"] = 500000;
-  help_map["maximum_basin_size_pixels"] = {  "int","500000","For basin finding algorithm, the maximum size of a selected basin.","Will reject basins along edge."};
+  help_map["maximum_basin_size_pixels"] = {  "int","500000","For basin finding algorithm this value is the maximum size of a selected basin.","Will reject basins along edge."};
   
   bool_default_map["only_take_largest_basin"] = false;
   help_map["only_take_largest_basin"] = {  "bool","false","This only retains the largest complete basin in the raster.","Will reject basins along edge."};
@@ -211,7 +211,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["BaselevelJunctions_file"] = {  "string","NULL","The name of a csv file with basin outlets for selecting basins using junction numbers.","An old method. You should use get_basins_from_outlets: true and basin_outlet_csv instead."};
   
   bool_default_map["extend_channel_to_node_before_receiver_junction"] = true;
-  help_map["extend_channel_to_node_before_receiver_junction"] = {  "bool","true","For various basin extractions the basin snaps to the nearest junction. If this is true then the outlet of the basin is one pixel upstream of the reciever junction of the snapped channel.","If false it will pick the donor junction of the channel rather than one pixel above the reciever."};
+  help_map["extend_channel_to_node_before_receiver_junction"] = {  "bool","true","For various basin extractions the basin snaps to the nearest junction. If this is true then the outlet of the basin is one pixel upstream of the receiver junction of the snapped channel.","If false it will pick the donor junction of the channel rather than one pixel above the receiver."};
 
   bool_default_map["get_basins_from_outlets"] = false;
   help_map["get_basins_from_outlets"] = {  "bool","false","Switches on the outlet based basin finding.","See BaselevelJunctions_file for format of outlets csv."};
@@ -240,7 +240,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["find_complete_basins_in_window"] = {  "bool","true","Deletes basins that have pixels at the edge.","S-A analysis and chi analysis wont work if you have a truncated basin."};
   
   bool_default_map["find_largest_complete_basins"] = false;
-  help_map["find_largest_complete_basins"] = {  "bool","false","Deletes basins that have pixels at the edge and nested basins.","This gets superceded by newer basin extraction."};
+  help_map["find_largest_complete_basins"] = {  "bool","false","Deletes basins that have pixels at the edge and nested basins.","This gets superseded by newer basin extraction."};
   
   bool_default_map["force_all_basins"] = false;
   help_map["force_all_basins"] = {  "bool","false","This overrides deletion of nested basins.","Breaks lots of analyses so frequently is ignored."};
@@ -292,7 +292,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["force_n_iteration_knickpoint_analysis"] = {  "int","20","Sets the number of iterations value for the knickpoint analysis. This can be different from the k_sn segmentation n_iterations","See parameter n_iterations for details. Parameter described in Mudd et al 2014 JGR-ES"};
 
   float_default_map["force_A0_knickpoint_analysis"] = 1;
-  help_map["force_A0_knickpoint_analysis"] = {  "float","1","Set the A0 for the knickpoint analysis. This can be different from the k_sn segmentation A_0","Allows you to test the sentitivity of results to A_0"};
+  help_map["force_A0_knickpoint_analysis"] = {  "float","1","Set the A0 for the knickpoint analysis. This can be different from the k_sn segmentation A_0","Allows you to test the sensitivity of results to A_0"};
 
   float_default_map["MZS_threshold"] = 0.5;
   help_map["MZS_threshold"] = {  "float","0.5","A parameter for knickpoint extraction","See Gailleton et al 2019 ESURF to see how results are sensitive to this parameter"};
@@ -321,10 +321,10 @@ int main (int nNumberofArgs,char *argv[])
   help_map["A_0"] = {  "float","1.0","The A_0 parameter for chi computation. See https://doi.org/10.1002/esp.3302","Usually set to 1 so that the slope in chi-elevation space is the same as k_sn"};
    
   float_default_map["m_over_n"] = 0.5;
-  help_map["m_over_n"] = {  "float","0.5","The concavity index for chi calculations. Ususally denoted as the greek symbol theta.","Default is 0.5 but possibly 0.45 is better as Kwang and Parker suggest 0.5 leads to unrealistic behaviour in landscape evolution models."};
+  help_map["m_over_n"] = {  "float","0.5","The concavity index for chi calculations. Usually denoted as the Greek symbol theta.","Default is 0.5 but possibly 0.45 is better as Kwang and Parker suggest 0.5 leads to unrealistic behaviour in landscape evolution models."};
 
   int_default_map["threshold_pixels_for_chi"] = 0;
-  help_map["threshold_pixels_for_chi"] = {  "int","0","Minimum number of controbuting pixels for calculating chi.","You can reduce the size of the chi csv files by setting a high number."};
+  help_map["threshold_pixels_for_chi"] = {  "int","0","Minimum number of contributing pixels for calculating chi.","You can reduce the size of the chi csv files by setting a high number."};
 
   // This burns a raster value to any csv output of chi data
   // Useful for appending geology data to chi profiles 
@@ -365,21 +365,21 @@ int main (int nNumberofArgs,char *argv[])
   // these loop through m/n spitting out profies and calculating goodness of fit
   // If you want to visualise the data you need to switch both of these to true
   bool_default_map["calculate_MLE_collinearity"] = false;
-  help_map["calculate_MLE_collinearity"] = {  "bool","false","For concavity analysis. Caluculates MLE for each basin and theta for visualisation. You can just use estimate_best_fit_movern_no_bootstrap now","Used in concavity analysis."};
+  help_map["calculate_MLE_collinearity"] = {  "bool","false","For concavity analysis. Calculates MLE for each basin and theta for visualisation. You can just use estimate_best_fit_movern_no_bootstrap now","Used in concavity analysis."};
 
   float_default_map["collinearity_MLE_sigma"] = 1000;
   help_map["collinearity_MLE_sigma"] = {  "float","1000","Setting for controlling the degree of uncertainty in the MLE collinearity test. We now prefer the disorder method","See mudd et al 2018 ESURF for details."};
 
   bool_default_map["print_profiles_fxn_movern_csv"] = false;
-  help_map["print_profiles_fxn_movern_csv"] = {  "bool","false","For concavity analysis, prints all the profiles. You get *a lot* of files. ","Used in concavity analysis. For visualising profile"};
+  help_map["print_profiles_fxn_movern_csv"] = {  "bool","false","For concavity analysis this prints all the profiles. You get *a lot* of files. ","Used in concavity analysis. For visualising profile"};
 
 
   // these are routines to calculate the movern ratio using points
   bool_default_map["calculate_MLE_collinearity_with_points"] = false;
-  help_map["calculate_MLE_collinearity_with_points"] = {  "bool","false","For concavity analysis. You can now just use estimate_best_fit_movern. We tend not to use this now since we favour the disorder approach","Used in concavity analysis. See Mueed et al 2018 esurf."};
+  help_map["calculate_MLE_collinearity_with_points"] = {  "bool","false","For concavity analysis. You can now just use estimate_best_fit_movern. We tend not to use this now since we favour the disorder approach","Used in concavity analysis. See Mudd et al 2018 esurf."};
 
   bool_default_map["calculate_MLE_collinearity_with_points_MC"] = false;
-  help_map["calculate_MLE_collinearity_with_points_MC"] = {  "bool","false","For concavity analysis. This uses some random selection of poais and is computationally expensive. You can now just use estimate_best_fit_movern. We tend not to use this now since we favour the disorder approach","Used in concavity analysis. See Mueed et al 2018 esurf."};
+  help_map["calculate_MLE_collinearity_with_points_MC"] = {  "bool","false","For concavity analysis. This uses random selection of points and is computationally expensive. You can now just use estimate_best_fit_movern. We tend not to use this now since we favour the disorder approach","Used in concavity analysis. See Mudd et al 2018 esurf."};
 
   int_default_map["MC_point_fractions"] = 5;
   help_map["MC_point_fractions"] = {  "int","5","Sets the frequency of sampling points in the calculate_MLE_collinearity_with_points_MC. But disorder works better. So you will probably not use this.","See mudd et al 2018 ESURF for details."};
@@ -417,10 +417,10 @@ int main (int nNumberofArgs,char *argv[])
   // this switch turns on all the appropriate runs for estimating
   // the best fit m/n
   bool_default_map["estimate_best_fit_movern"] = false;
-  help_map["estimate_best_fit_movern"] = {  "bool","false","This is the key switch for concavity analysis and controls other switches. For a concavity analysis you really only have to set this one or estimate_best_fit_movern_no_bootstrap to true. This one has all the methods, the other limits to disorder","See Mudd et al 2018 ESURF. Controls other switches"};
+  help_map["estimate_best_fit_movern"] = {  "bool","false","This is the key switch for concavity analysis and controls other switches. For a concavity analysis you really only have to set this one or estimate_best_fit_movern_no_bootstrap to true. This one has all the available methods whereas the other limits to disorder","See Mudd et al 2018 ESURF https://doi.org/10.5194/esurf-6-505-2018. Controls other switches"};
   
   bool_default_map["estimate_best_fit_movern_no_bootstrap"] = false;
-  help_map["estimate_best_fit_movern_no_bootstrap"] = {  "bool","false","This is the key switch for concavity analysis and controls other switches. For a concavity analysis you really only have to set this one or estimate_best_fit_movern to true. This one removes the bootstrap method. Bootstrap method is very computationally intensive and less reliable than disorder metric","See Mudd et al 2018 ESURF. Controls other switches"};
+  help_map["estimate_best_fit_movern_no_bootstrap"] = {  "bool","false","This is the key switch for concavity analysis and controls other switches. For a concavity analysis you really only have to set this one or estimate_best_fit_movern to true. This one removes the bootstrap method. Bootstrap method is very computationally intensive and less reliable than disorder metric","See Mudd et al 2018 ESURF https://doi.org/10.5194/esurf-6-505-2018. Controls other switches"};
   
   // S-A analysis parameters
   float_default_map["SA_vertical_interval"] = 20;
@@ -450,7 +450,7 @@ int main (int nNumberofArgs,char *argv[])
 
   // parameters for various chi calculations as well as slope-area
   int_default_map["n_iterations"] = 20;
-  help_map["n_iterations"] = {  "int","20","Number of interations of random sampling of chi-elevation space to make segments. Used to constrain segmentation uncertainty.","See Mudd et al 2014 JGR-ES for details.."};
+  help_map["n_iterations"] = {  "int","20","Number of iterations of random sampling of chi-elevation space to make segments. Used to constrain segmentation uncertainty.","See Mudd et al 2014 JGR-ES for details.."};
 
   int_default_map["minimum_segment_length"] = 10;
   help_map["minimum_segment_length"] = {  "int","10","The minimum number of pixels in a segment. If too short computation is very expensive.","See Mudd et al 2014 JGR-ES for details. Sensitivity testing suggest values between 8 and 14 are appropriate."};
@@ -489,7 +489,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["print_chi_data_maps"] = {  "bool","false","If true prints the chi network to csv.","csv file has chidatamaps in the filename. Has the locations of the channel pixels with their chi coordinates and other information."};
 
   bool_default_map["print_simple_chi_map_with_basins_to_csv"] = false;
-  help_map["print_simple_chi_map_with_basins_to_csv"] = {  "bool","false","If true prints the chi network to csv bith basin numbers.","Less data in this file than print_chi_data_maps. Use if you just want the chi coordinate and want to save file space."};
+  help_map["print_simple_chi_map_with_basins_to_csv"] = {  "bool","false","If true prints the chi network to csv with basin numbers.","Less data in this file than print_chi_data_maps. Use if you just want the chi coordinate and want to save file space."};
 
 
   // these are routines that run segmentation
@@ -518,13 +518,13 @@ int main (int nNumberofArgs,char *argv[])
 
   // These enable calculation of chi based on discharge
   bool_default_map["use_precipitation_raster_for_chi"] = false;
-  help_map["use_precipitation_raster_for_chi"] = {  "bool","false","Reads a precipitation raster and calucates chi on the basis of accumulated precipitation.","You need to point the code to the precipitation raster with precipitation_fname."};
+  help_map["use_precipitation_raster_for_chi"] = {  "bool","false","Reads a precipitation raster and calculates chi on the basis of accumulated precipitation.","You need to point the code to the precipitation raster with precipitation_fname."};
 
   bool_default_map["print_discharge_raster"] = false;
-  help_map["print_discharge_raster"] = {  "bool","false","If you ingest precipiation this prints discharge to a raster.","You need to point the code to the precipitation raster with precipitation_fname."};
+  help_map["print_discharge_raster"] = {  "bool","false","If you ingest precipitation this prints discharge to a raster.","You need to point the code to the precipitation raster with precipitation_fname."};
 
   bool_default_map["print_chi_no_discharge"] = false;  
-  help_map["print_chi_no_discharge"] = {  "bool","false","If you ingest precipiation this prints chi without discharge so you can compare to the chi with discharge.","Only used in conjunction with the discharge-based chi calculation."};
+  help_map["print_chi_no_discharge"] = {  "bool","false","If you ingest precipitation this prints chi without discharge so you can compare to the chi with discharge.","Only used in conjunction with the discharge-based chi calculation."};
                                                         
   string_default_map["precipitation_fname"] = "NULL";
   help_map["precipitation_fname"] = {  "string","NULL","Raster prefix of the precipitation raster you will use to accumulate into discharge. Do not include extension","This is used when use_precipitation_raster_for_chi is true."};
@@ -589,7 +589,7 @@ int main (int nNumberofArgs,char *argv[])
   {
     cout << "I am going to print the help and exit." << endl;
     cout << "You can find the help in the file:" << endl;
-    cout << "./lsdtt-basic-metrics-README.csv" << endl;
+    cout << "./lsdtt-chi-mapping-README.csv" << endl;
     string help_prefix = "lsdtt-chi-mapping-README";
     LSDPP.print_help(help_map, help_prefix, version_number, citation);
     exit(0);
@@ -1522,7 +1522,7 @@ int main (int nNumberofArgs,char *argv[])
       cout << endl << endl << "=====================================================" << endl;
       cout << "I am now getting the channels for the chi tool." << endl;
       cout << "  These channels extend below the junction to the channel that stops" << endl;
-      cout << "  just before the reciever junction. This option is used to remain" << endl;
+      cout << "  just before the receiver junction. This option is used to remain" << endl;
       cout << "  consitent with basin ordering, since a 2nd order basin will begin" << endl;
       cout << "  at the channel one node upslope of the most upstream 3rd order junction." << endl;
       cout << "  If you simply want the channel starting from the selcted junction, " << endl;
@@ -1541,7 +1541,7 @@ int main (int nNumberofArgs,char *argv[])
       cout << "I am now getting the channels for the chi tool." << endl;
       cout << "  These channels will start from the baselevel junctions selected. " << endl;
       cout << "  If you want them to extend to below the junction to the channel that stops" << endl;
-      cout << "  just before the reciever junction, then set the option:" << endl;
+      cout << "  just before the receiver junction, then set the option:" << endl;
       cout << "    extend_channel_to_node_before_receiver_junction" << endl;
       cout << "  to true." << endl;
       cout << "=====================================================" << endl << endl;

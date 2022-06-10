@@ -2498,6 +2498,81 @@ float LSDRaster::difference_rasters(LSDRaster& compare_raster)
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// Gets the number of pixels that are different between two rasters
+// used for numerical modelling
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+int LSDRaster::find_n_different_pixels(LSDRaster& compare_raster)
+{
+  int n = 0;
+  float raster_val1, raster_val2;
+
+  float average_difference;
+  // first, compare the raster dimensions
+  if(does_raster_have_same_dimensions(compare_raster))
+  {
+    for (int i=0; i<NRows; ++i)
+    {
+      for (int j=0; j<NCols; ++j)
+      {
+        raster_val1 = RasterData[i][j];
+        raster_val2 = compare_raster.get_data_element(i, j);
+        if (raster_val1 != NoDataValue && raster_val2 != NoDataValue)
+        {
+          if (raster_val1 != raster_val2)
+          {
+            n++;
+          }
+        }
+      }
+    }
+  }
+
+  return n;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// Gets the number of pixels that are different between two rasters
+// used for numerical modelling
+// Same as above but you give it a threshold of change
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+int LSDRaster::find_n_different_pixels(LSDRaster& compare_raster, float threshold)
+{
+  int n = 0;
+  float raster_val1, raster_val2;
+
+  float average_difference;
+  // first, compare the raster dimensions
+  if(does_raster_have_same_dimensions(compare_raster))
+  {
+    for (int i=0; i<NRows; ++i)
+    {
+      for (int j=0; j<NCols; ++j)
+      {
+        raster_val1 = RasterData[i][j];
+        raster_val2 = compare_raster.get_data_element(i, j);
+        if (raster_val1 != NoDataValue && raster_val2 != NoDataValue)
+        {
+          if ( fabs(raster_val1 - raster_val2) > threshold )
+          {
+            n++;
+          }
+        }
+      }
+    }
+  }
+
+  return n;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This mulitplies each pixel in a raster by a multiplier
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -6645,6 +6720,76 @@ LSDRaster  LSDRaster::mask_to_nodata_using_threshold_using_other_raster(float th
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// Same as above but also removes any pixels in the raster to be masked
+// by nodata values in the mask raster
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDRaster  LSDRaster::mask_to_nodata_using_threshold_using_other_raster_expunge_nodata_in_mask(float threshold,bool belowthresholdisnodata, 
+                                                                        LSDRaster& MaskingRaster)
+{
+
+  Array2D<float> NewArray;
+  NewArray = RasterData.copy();
+
+  // first check to see if the rasters are the same size
+  int IR_NRows = MaskingRaster.get_NRows();
+  int IR_NCols = MaskingRaster.get_NCols();
+
+  float this_mask_value;
+
+  if(IR_NRows == NRows && IR_NCols == NCols)
+  {
+    for(int row = 0; row<NRows; row++)
+    {
+      for(int col = 0; col<NCols; col++)
+      {
+
+        // only do anything if the value at the raster point is not nodata
+        if(NewArray[row][col] != NoDataValue)
+        {
+          this_mask_value = MaskingRaster.get_data_element(row,col);
+          if(this_mask_value != NoDataValue)
+          {
+            // logic for testing below nodata
+            if(belowthresholdisnodata)
+            {
+              if(this_mask_value <= threshold)
+              {
+                NewArray[row][col] = NoDataValue;
+              }
+            }
+            else  // this logic is for if you are changing to nodata if above threshold
+            {
+              if(this_mask_value >= threshold)
+              {
+                NewArray[row][col] = NoDataValue;
+              }
+            }
+          }
+          else
+          {
+            NewArray[row][col] = NoDataValue;
+          }
+        }
+      }
+    }
+  }
+  else
+  {
+    cout << "Trying to mask raster but the dimensions of the mask do not match"
+         << " the dimensions of the raster" << endl;
+  }
+
+  LSDRaster NDR(NRows,NCols,XMinimum,YMinimum,DataResolution,
+                             NoDataValue,NewArray,GeoReferencingStrings);
+  return NDR;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
 // This masks to nodata below a threshold value
@@ -10334,6 +10479,27 @@ LSDRaster LSDRaster::RasterTrimmerSpiral()
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// This replaces the first and last rows and columns with nodata. 
+// Is a raster preprocessing step for draiange extraction
+// where you need to eliminate nodes influenced by the edge
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDRaster::replace_edges_with_nodata()
+{
+  for (int col = 0; col<NCols; col++)
+  {
+    RasterData[0][col] = NoDataValue;
+    RasterData[NRows-1][col] = NoDataValue;
+  }
+  for (int row = 0; row<NRows; row++)
+  {
+    RasterData[row][0] = NoDataValue;
+    RasterData[row][NCols-1] = NoDataValue;
+  }  
+}
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //
 // Trims the raster array by one pixel around the edge. This was primarily written
 // for the LSDCatchmentModel which has a padding of zeros around most of the surface
@@ -10450,7 +10616,7 @@ void LSDRaster::find_nearest_data(int this_row,int this_col, float& distance, fl
 
   bool havent_found_nearest = true;
   int row,col;
-  int data_row,data_col;
+  //int data_row,data_col;
   while(offset_counter <= max_offset_counter && havent_found_nearest)
   {
     //cout << "The offset counter is " << offset_counter << endl;
@@ -10697,8 +10863,114 @@ vector< LSDRaster > LSDRaster::find_nearest_point_from_list_of_points(vector<flo
   return_rasters.push_back(NodesRaster);
 
   return return_rasters;
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+/// This takes a list of points. Then, for every pixel in the
+///  raster it finds the point amongst that list that is closest to the given pixel.
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector< LSDRaster > LSDRaster::find_nearest_point_from_list_of_points_with_relief(vector<float> Eastings, vector<float> Northings,
+                                              vector<float> values, float swath_width)
+{
+  Array2D<float> Distances(NRows, NCols, NoDataValue);
+  Array2D<float> Values(NRows, NCols, NoDataValue);
+  Array2D<float> Nodes(NRows, NCols, NoDataValue);
+  Array2D<float> Relief(NRows, NCols, NoDataValue);
+
+  // Get the easting and northing vectors from the raster
+  vector<float> raster_eastings;
+  vector<float> raster_northings;
+  get_easting_and_northing_vectors(raster_eastings, raster_northings);
+
+  int n_nodes = int(Eastings.size());
+
+  float this_min_distance, this_value, this_node, this_distance, this_relief;
+  float x_0,y_0,x_1,y_1;
+
+  int max_pixel_distance = int( (sqrt(2)*swath_width*0.5/DataResolution)+0.5);
+
+  // Now we loop through all pixels in the raster
+  cout << "I am going to find the closest point in a list of points to every pixel in your raster." << endl;
+  int point_row,point_col;
+  for(int row = 0; row<NRows; row++)
+  {
+    if(row%10 == 0)
+    {
+      cout << flush << "\tProcessing row " << row << " of " << NRows <<"\r";
+    }
+    for (int col = 0; col<NCols; col++)
+    {
+      if(RasterData[row][col] != NoDataValue)
+      {
+        // reset the minimum distance
+        this_min_distance = 10000000000;
+        this_value = NoDataValue;
+        this_node = NoDataValue;
+
+        // now loop through all the points getting the minimum point
+        x_0 = raster_eastings[col];
+        y_0 = raster_northings[row];
+
+        for(int i = 0; i< n_nodes; i++)
+        {
+          x_1 = Eastings[i];
+          y_1 = Northings[i];
+
+          get_row_and_col_of_a_point(x_1,y_1,point_row,point_col);
+
+          if ( fabs(point_row-row) < max_pixel_distance && fabs(point_col-col) < max_pixel_distance )
+          {
+
+            this_distance = distance_between_two_points(x_0,y_0,x_1,y_1);
+
+            if (this_distance < this_min_distance)
+            {
+              this_min_distance = this_distance;
+              this_value = values[i];
+              this_node = float(i);
+              this_relief = RasterData[row][col] - RasterData[point_row][point_col];
+            }
+          }
+        }
+
+        //cout << "r: " << row << ", c: "<< col << " min dist: " << this_min_distance << endl;
+
+        // Finished looping through node, update the data
+        // only record the nodes that are withing the swath width
+        if (this_min_distance<0.5*swath_width)
+        {
+          Distances[row][col] = this_min_distance;
+          Values[row][col] = this_value;
+          Nodes[row][col] = this_node;
+          Relief[row][col] = this_relief;
+
+        }
+      }
+    }
+  }
+  cout << endl << "Done with nearest node computation" << endl;
+
+  LSDRaster DistRaster(NRows,NCols, XMinimum, YMinimum, DataResolution,
+                            NoDataValue, Distances, GeoReferencingStrings);
+  LSDRaster ValuesRaster(NRows,NCols, XMinimum, YMinimum, DataResolution,
+                            NoDataValue, Values, GeoReferencingStrings);
+  LSDRaster NodesRaster(NRows,NCols, XMinimum, YMinimum, DataResolution,
+                            NoDataValue, Nodes, GeoReferencingStrings);
+  LSDRaster ReliefRaster(NRows,NCols, XMinimum, YMinimum, DataResolution,
+                            NoDataValue, Relief, GeoReferencingStrings);
+
+
+  vector<LSDRaster> return_rasters;
+  return_rasters.push_back(DistRaster);
+  return_rasters.push_back(ValuesRaster);
+  return_rasters.push_back(NodesRaster);
+  return_rasters.push_back(ReliefRaster);
+
+  return return_rasters;
 
 }
+
 
 
 void LSDRaster::make_swath(vector<float> Eastings, vector<float> Northings,
@@ -12040,8 +12312,9 @@ LSDRaster LSDRaster::neighbourhood_statistics_local_min_max_location(Array2D<flo
 
   float extreme;
   float value;
-  int k_row,k_col,extreme_row,extreme_col;
-
+  int k_row,k_col;
+  int extreme_row = 0;
+  int extreme_col = 0;
 
   vector<float> data;
   for(int i=0;i<NRows;++i)
@@ -14878,10 +15151,10 @@ LSDRaster LSDRaster::convert_from_centimetres_to_metres()
 //-----------------------------------------------------------------------------//
 LSDRaster LSDRaster::Breaching_Lindsay2016()
 {
-  cout << "I am going to carve/breach your depressions in order to force flow paths." << endl;
-  cout << "I am using an algorithm from Lindsay et al., 2016 DOI:https://doi.org/10.1002/hyp.10648" << endl;
-  cout << "Implementation adapted from RichDEM: https://github.com/r-barnes/richdem" << endl;
-  cout << "Not widely tested yet, It may break..." << endl;
+  //cout << "I am going to carve/breach your depressions in order to force flow paths." << endl;
+  //cout << "I am using an algorithm from Lindsay et al., 2016 DOI:https://doi.org/10.1002/hyp.10648" << endl;
+  //cout << "Implementation adapted from RichDEM: https://github.com/r-barnes/richdem" << endl;
+  //cout << "Not widely tested yet, It may break..." << endl;
 
   const uint32_t NO_BACK_LINK = std::numeric_limits<uint32_t>::max();
 

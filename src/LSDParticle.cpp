@@ -593,6 +593,15 @@ void LSDCRNParticle::update_cosmo_conc_const(double C_10Be, double C_26Al, doubl
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+//...##.....####...#####...######...........####....####...##..##...####..
+//..###....##..##..##..##..##..............##..##..##..##..###.##..##..##.
+//...##....######..#####...####............##......##..##..##.###..##.....
+//...##....##..##..##..##..##..............##..##..##..##..##..##..##..##.
+//.######...####...#####...######...........####....####...##..##...####..
+//
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // this function updates the concentration of CRNs in a particle
 // the model assumes that during the timestep the change in the
@@ -698,21 +707,11 @@ void LSDCRNParticle::update_10Be_SSfull(double erosion_rate, LSDCRNParameters& C
   
   double spall_tot = 0; 
   double muon_tot = 0;
-  
+
+  // calculate the steady production based on steady state analytical solution
+  // this for starting point at infinite depth and infinite time   
   for (int i = 0; i<4; i++)
   {
-    //cout << "ThickSF: " <<  CRNp.F_10Be[i]*(1-exp(-effective_dLoc/CRNp.Gamma[i]))*
-    //                        (CRNp.Gamma[i]/effective_dLoc) << endl;
-    //cout << "A: " <<  (CRNp.lambda_10Be+erosion_rate/CRNp.Gamma[i]) << endl;
-  
-    //sum_term1+= (CRNp.F_10Be[i]*exp(-effective_dLoc/CRNp.Gamma[i])*CRNp.Gamma[i])/
-    //           (erosion_rate+CRNp.Gamma[i]*CRNp.lambda_10Be);
-    //sum_term1+= (CRNp.F_10Be[i]*(1-exp(-effective_dLoc/CRNp.Gamma[i]))*
-    //            (CRNp.Gamma[i]/effective_dLoc))/
-    //            (CRNp.lambda_10Be+erosion_rate/CRNp.Gamma[i]);
-    //cout << "Thick/A:" << (CRNp.F_10Be[i]*(1-exp(-effective_dLoc/CRNp.Gamma[i]))*
-    //            (CRNp.Gamma[i]/effective_dLoc))/
-    //            (CRNp.lambda_10Be+erosion_rate/CRNp.Gamma[i]) << endl;
     this_term = (exp(-effective_dLoc/CRNp.Gamma[i])*CRNp.F_10Be[i]*CRNp.Gamma[i])/
                  (erosion_rate+CRNp.Gamma[i]*CRNp.lambda_10Be);
     sum_term1 += this_term;
@@ -726,24 +725,60 @@ void LSDCRNParticle::update_10Be_SSfull(double erosion_rate, LSDCRNParameters& C
     }
   }
 
-  //cout << "effective_dLoc: " << effective_dLoc  << endl;
-  //cout << "erosion rate: " << erosion_rate << endl;
-  
-
-  //cout << "and sum term is: " << sum_term1 << " " << sum_term2 << endl;
-  //double Pref =  CRNp.S_t*CRNp.P0_10Be;
-  //cout << "Pref is: " << Pref << endl;
-  //cout << "Scaling is: " << CRNp.S_t << " P0 is: " << CRNp.P0_10Be 
-  //     << " and Pref is: " << CRNp.S_t*CRNp.P0_10Be << endl;
   Conc_10Be = CRNp.S_t*CRNp.P0_10Be*sum_term1;
   spall_tot = CRNp.S_t*CRNp.P0_10Be*spall_tot;
   muon_tot =  CRNp.S_t*CRNp.P0_10Be*muon_tot;
-  //cout << "Line 717, Conc 10Be is: " << Conc_10Be << " from spallation: " << spall_tot
-  //     << " and muons: " << muon_tot << endl;
-  
-  //cout << "and ending 10Be conc is: " << Conc_10Be <<endl;
+
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This is for a step change in the erosion rate
+// assuming previously there was a steady state
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDCRNParticle::update_10Be_step_change(double erosion_old, 
+                                             double erosion_new, 
+                                             double time_since_change, 
+                                             LSDCRNParameters& CRNp)
+{
+  dLoc = 0;
+  effective_dLoc = 0;
+  
+  double this_term;
+  double sum_term1 = 0;
+  double sum_term2 = 0;
+  //double prefactor_term, exp_term;
+
+  // First get the original steady state 
+  for (int i = 0; i<4; i++)
+  {
+    this_term = (exp(-(time_since_change*erosion_new)/CRNp.Gamma[i])*CRNp.F_10Be[i]*CRNp.Gamma[i])/
+                 (erosion_old+CRNp.Gamma[i]*CRNp.lambda_10Be);
+    sum_term1 += this_term;
+  }
+
+  for (int i = 0; i<4; i++)
+  {
+    //prefactor_term = CRNp.Gamma[i]*CRNp.F_10Be[i]/(erosion_new+CRNp.Gamma[i]*CRNp.lambda_10Be);
+    //exp_term = exp(  -(time_since_change*(erosion_new+CRNp.Gamma[i]*CRNp.lambda_10Be))/CRNp.Gamma[i]  );
+    this_term = (  (1-  exp(  -(time_since_change*(erosion_new+CRNp.Gamma[i]*CRNp.lambda_10Be))/CRNp.Gamma[i]  ) )
+                   *CRNp.F_10Be[i]*CRNp.Gamma[i] )/
+                 (erosion_new+CRNp.Gamma[i]*CRNp.lambda_10Be);
+    sum_term2 += this_term;
+    //cout << "i: " << i << " prefactor: " << prefactor_term << " exp_term: " << exp_term << endl;
+  }
+
+  double erosion_old_SS_conc = CRNp.S_t*CRNp.P0_10Be*sum_term1*exp(-time_since_change*CRNp.lambda_10Be);
+  double erosion_new_conc = CRNp.S_t*CRNp.P0_10Be*sum_term2;
+
+  // Now the next component
+  //cout << "sum_term from old steady state is: " << erosion_old_SS_conc << endl;
+  //cout << "sum_term from new steady state is: " << erosion_new_conc << endl;
+
+  Conc_10Be = erosion_old_SS_conc+erosion_new_conc;
+}
+
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // A depth integrated version of the steady state equation. 
@@ -807,22 +842,12 @@ void LSDCRNParticle::update_10Be_SSfull_depth_integrated(double erosion_rate,
     // get the concentration
     Conc_10Be = (1/(bottom_eff_depth-top_eff_depth))*CRNp.S_t*CRNp.P0_10Be*sum_term1;
     spall_tot = (1/(bottom_eff_depth-top_eff_depth))*CRNp.S_t*CRNp.P0_10Be*spall_tot;
-    muon_tot =  (1/(bottom_eff_depth-top_eff_depth))*CRNp.S_t*CRNp.P0_10Be*muon_tot;
-
-    
-    
+    muon_tot =  (1/(bottom_eff_depth-top_eff_depth))*CRNp.S_t*CRNp.P0_10Be*muon_tot;   
   }
 
   // print some stuff to screen for bug checking  
   vector<bool> cosmo_flags(4,false);
   cosmo_flags[0] = true;
-
-  //cout << "\n\n\nLSDParticle line 797, getting cosmo for erosion rate: " << erosion_rate <<endl;
-  //cout << "Top depth: " << top_eff_depth << " bottom depth: " << bottom_eff_depth << endl;
-  //cout << "The parameter values are: " << endl;
-  //CRNp.print_parameters_to_screen(cosmo_flags);
-  //cout << "Conc 10Be: " << Conc_10Be << endl << endl << endl;
-
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -864,10 +889,14 @@ vector<double> LSDCRNParticle::apparent_erosion_10Be_COSMOCALC(double rho, LSDCR
   {
     CRNp.set_newCRONUS_parameters();
   }
+  else if (Muon_scaling == "BraucherBorchers" )
+  {
+    CRNp.set_BraucherBorchers_parameters();
+  }
   else
   {
     cout << "You didn't set the muon scaling." << endl
-         << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+         << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
          << "You chose: " << Muon_scaling << endl
          << "Defaulting to Braucher et al (2009) scaling" << endl;
     CRNp.set_Braucher_parameters();     
@@ -968,6 +997,17 @@ double LSDCRNParticle::apparent_erosion_10Be_neutron_only(double rho, LSDCRNPara
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+//..####.....##.....####...##...............####....####...##..##...####..
+//.....##...##.....##..##..##..............##..##..##..##..###.##..##..##.
+//..####...#####...######..##..............##......##..##..##.###..##.....
+//.##......##..##..##..##..##..............##..##..##..##..##..##..##..##.
+//.######...####...##..##..######...........####....####...##..##...####..
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDCRNParticle::update_26Al_conc(double dt,double erosion_rate, LSDCRNParameters& CRNp)
 {
   double Al_exp = exp(-dt*CRNp.lambda_26Al);
@@ -1058,10 +1098,14 @@ vector<double> LSDCRNParticle::apparent_erosion_26Al_COSMOCALC(double rho, LSDCR
   {
     CRNp.set_newCRONUS_parameters();
   }
+  else if (Muon_scaling == "BraucherBorchers" )
+  {
+    CRNp.set_BraucherBorchers_parameters();
+  }
   else
   {
     cout << "You didn't set the muon scaling." << endl
-         << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+         << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
          << "You chose: " << Muon_scaling << endl
          << "Defaulting to Braucher et al (2009) scaling" << endl;
     CRNp.set_Braucher_parameters();     
@@ -1174,6 +1218,50 @@ void LSDCRNParticle::update_26Al_SSfull(double erosion_rate, LSDCRNParameters& C
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This is for a step change in the erosion rate
+// assuming previously there was a steady state
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDCRNParticle::update_26Al_step_change(double erosion_old, 
+                                             double erosion_new, 
+                                             double time_since_change, 
+                                             LSDCRNParameters& CRNp)
+{
+  dLoc = 0;
+  effective_dLoc = 0;
+  
+  double this_term;
+  double sum_term1 = 0;
+  double sum_term2 = 0;
+
+  // First get the original steady state 
+  for (int i = 0; i<4; i++)
+  {
+    this_term = (exp(-(time_since_change*erosion_new)/CRNp.Gamma[i])*CRNp.F_26Al[i]*CRNp.Gamma[i])/
+                 (erosion_old+CRNp.Gamma[i]*CRNp.lambda_26Al);
+    sum_term1 += this_term;
+  }
+
+  for (int i = 0; i<4; i++)
+  {
+    this_term = (  (1-  exp(  -(time_since_change*(erosion_new+CRNp.Gamma[i]*CRNp.lambda_26Al))/CRNp.Gamma[i]  ) )
+                   *CRNp.F_26Al[i]*CRNp.Gamma[i] )/
+                 (erosion_new+CRNp.Gamma[i]*CRNp.lambda_10Be);
+    sum_term2 += this_term;
+  }
+
+  double erosion_old_SS_conc = CRNp.S_t*CRNp.P0_26Al*sum_term1*exp(-time_since_change*CRNp.lambda_26Al);
+  double erosion_new_conc = CRNp.S_t*CRNp.P0_26Al*sum_term2;
+
+  // Now the next component
+  //cout << "sum_term from old steady state is: " << erosion_old_SS_conc << endl;
+  //cout << "sum_term from new steady state is: " << erosion_new_conc << endl;
+
+  Conc_26Al = erosion_old_SS_conc+erosion_new_conc;
+}
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // A depth integrated version of the steady state equation. 
 // This is really only appropriate for basinwide calculations because 
@@ -1239,7 +1327,14 @@ void LSDCRNParticle::update_26Al_SSfull_depth_integrated(double erosion_rate,
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 
-
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+//...##........##...####............####....####...##..##...####..
+//..###....##..##..##..##..........##..##..##..##..###.##..##..##.
+//...##....######..##..............##......##..##..##.###..##.....
+//...##........##..##..##..........##..##..##..##..##..##..##..##.
+//.######......##...####............####....####...##..##...####..
+//
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDCRNParticle::update_14C_conc(double dt,double erosion_rate, LSDCRNParameters& CRNp)
 {
@@ -1277,6 +1372,157 @@ void LSDCRNParticle::update_14C_conc_neutron_only(double dt,double erosion_rate,
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 
+
+
+
+// The erosion rate should be in g/cm^2/yr
+void LSDCRNParticle::update_14C_SSfull(double erosion_rate, LSDCRNParameters& CRNp)
+{
+  double this_term;
+  double sum_term1 = 0;
+  //double sum_term2 = 0;
+  
+  double spall_tot = 0; 
+  double muon_tot = 0;
+
+  // calculate the steady production based on steady state analytical solution
+  // this for starting point at infinite depth and infinite time   
+  for (int i = 0; i<4; i++)
+  {
+    this_term = (exp(-effective_dLoc/CRNp.Gamma[i])*CRNp.F_14C[i]*CRNp.Gamma[i])/
+                 (erosion_rate+CRNp.Gamma[i]*CRNp.lambda_14C);
+    sum_term1 += this_term;
+    if(i == 0)
+    {
+      spall_tot+=this_term;
+    }             
+    else
+    {
+      muon_tot+=this_term;
+    }
+  }
+
+  Conc_14C = CRNp.S_t*CRNp.P0_14C*sum_term1;
+  spall_tot = CRNp.S_t*CRNp.P0_14C*spall_tot;
+  muon_tot =  CRNp.S_t*CRNp.P0_14C*muon_tot;
+
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This is for a step change in the erosion rate
+// assuming previously there was a steady state
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDCRNParticle::update_14C_step_change(double erosion_old, 
+                                             double erosion_new, 
+                                             double time_since_change, 
+                                             LSDCRNParameters& CRNp)
+{
+  dLoc = 0;
+  effective_dLoc = 0;
+  
+  double this_term;
+  double sum_term1 = 0;
+  double sum_term2 = 0;
+  double prefactor_term, exp_term;
+
+  // First get the original steady state 
+  for (int i = 0; i<4; i++)
+  {
+    this_term = (exp(-(time_since_change*erosion_new)/CRNp.Gamma[i])*CRNp.F_14C[i]*CRNp.Gamma[i])/
+                 (erosion_old+CRNp.Gamma[i]*CRNp.lambda_14C);
+    sum_term1 += this_term;
+  }
+
+  for (int i = 0; i<4; i++)
+  {
+    this_term = (  (1-  exp(  -(time_since_change*(erosion_new+CRNp.Gamma[i]*CRNp.lambda_14C))/CRNp.Gamma[i]  ) )
+                   *CRNp.F_14C[i]*CRNp.Gamma[i] )/
+                 (erosion_new+CRNp.Gamma[i]*CRNp.lambda_14C);
+
+    //cout << "i: " << i << " pf term:" << prefactor_term << " exp_term:" << exp_term << endl;
+    sum_term2 += this_term;
+  }
+
+  double erosion_old_SS_conc = CRNp.S_t*CRNp.P0_14C*sum_term1*exp(-time_since_change*CRNp.lambda_14C);
+  double erosion_new_conc = CRNp.S_t*CRNp.P0_14C*sum_term2;
+
+  Conc_14C = erosion_old_SS_conc+erosion_new_conc;
+}
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// A depth integrated version of the steady state equation. 
+// This is really only appropriate for basinwide calculations because 
+// it doens't really represent the CRN concentration of an individual particle
+// The arguments also override the effective depth of the particle
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDCRNParticle::update_14C_SSfull_depth_integrated(double erosion_rate, 
+                                  LSDCRNParameters& CRNp,
+                                  double top_eff_depth, double bottom_eff_depth)
+{
+
+  //cout << "LINE 748, doing full depth integration" << endl;
+
+  // first, check if the inputs are working properly
+  if (top_eff_depth > bottom_eff_depth)
+  {
+    cout << "LSDParticle line 753, your effective depths for integration are reversed" << endl;
+    cout << "Reversing the two depths. Check your inputs!" << endl;
+    double temp_eff_depth = bottom_eff_depth;
+    bottom_eff_depth = top_eff_depth;
+    top_eff_depth = temp_eff_depth;
+  }
+
+  // If the top effective depth and the bottom effective depth are the same, then run the standard
+  // concentration for particles eroding from the top of this pixel
+  if (top_eff_depth == bottom_eff_depth)
+  {
+    effective_dLoc = top_eff_depth;
+    update_14C_SSfull(erosion_rate, CRNp);
+  }
+  else  // If they arent the same, this calculates the depth average concentrations of particles between the top and bottom effective depths.  
+  {
+    double this_term;
+    double sum_term1 = 0;
+  
+    double spall_tot = 0; 
+    double muon_tot = 0;
+    
+    for (int i = 0; i<4; i++)
+    { 
+      // get the individual terms
+      this_term = ( ( exp(-top_eff_depth/CRNp.Gamma[i])
+                     -exp(-bottom_eff_depth/CRNp.Gamma[i]) )*
+                    CRNp.F_14C[i]*CRNp.Gamma[i]*CRNp.Gamma[i])/
+                   (erosion_rate+CRNp.Gamma[i]*CRNp.lambda_14C);
+      sum_term1 += this_term;
+      
+      // add the terms to track muon and spalling production
+      if(i == 0)
+      {
+        spall_tot+=this_term;
+      }             
+      else
+      {
+        muon_tot+=this_term;
+      }
+      
+    }
+    
+    // get the concentration
+    Conc_14C = (1/(bottom_eff_depth-top_eff_depth))*CRNp.S_t*CRNp.P0_14C*sum_term1;
+    spall_tot = (1/(bottom_eff_depth-top_eff_depth))*CRNp.S_t*CRNp.P0_14C*spall_tot;
+    muon_tot =  (1/(bottom_eff_depth-top_eff_depth))*CRNp.S_t*CRNp.P0_14C*muon_tot;   
+  }
+
+  // print some stuff to screen for bug checking  
+  vector<bool> cosmo_flags(4,false);
+  cosmo_flags[0] = true;
+}
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This gets the apparent erosion rate. 
 // if rho is in kg/m^3 this returns erosion in m/yr
@@ -1298,19 +1544,130 @@ double LSDCRNParticle::apparent_erosion_14C_neutron_only(double rho, LSDCRNParam
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 
-// The erosion rate should be in g/cm^2/yr
-void LSDCRNParticle::update_14C_SSfull(double erosion_rate, LSDCRNParameters& CRNp)
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function uses newton iteration to get an apparent erosion rate
+// for full muons. 
+// It is intended to mimic the cosmocalc erosion rate finder
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<double> LSDCRNParticle::apparent_erosion_14C_COSMOCALC(double rho, LSDCRNParameters& CRNp,
+                                    double scaling_factor, string Muon_scaling,
+                                    double top_eff_depth, double bottom_eff_depth)
 {
-  double sum_term = 0;
-  for (int i = 0; i<4; i++)
+  double Target_conc = Conc_14C;
+  
+  // get the initial guess
+  effective_dLoc = top_eff_depth;
+  double erate_guess = apparent_erosion_14C_neutron_only(rho, CRNp);
+  double eff_erate_guess = convert_m_to_gpercm2(erate_guess,rho);
+  
+  //cout << "Concentration: " << Conc_26Al << " rho: " << rho << " neutron erate " 
+  //     << erate_guess << "m/yr, effective: " << eff_erate_guess << " g/cm^2/yr" << endl;
+
+  // set the scaling
+  // reset scaling parameters. This is necessary since the F values are
+  // reset for local scaling
+  if (Muon_scaling == "Schaller" )
   {
-    sum_term+= (CRNp.F_14C[i]*exp(-effective_dLoc/CRNp.Gamma[i])*CRNp.Gamma[i])/
-               (erosion_rate+CRNp.Gamma[i]*CRNp.lambda_14C);
+    CRNp.set_Schaller_parameters();
   }
+  else if (Muon_scaling == "Braucher" )
+  {
+    CRNp.set_Braucher_parameters();
+  }
+  else if (Muon_scaling == "Granger" )
+  {
+    CRNp.set_Granger_parameters();
+  }
+  else if (Muon_scaling == "newCRONUS" )
+  {
+    CRNp.set_newCRONUS_parameters();
+  }
+  else if (Muon_scaling == "BraucherBorchers" )
+  {
+    CRNp.set_BraucherBorchers_parameters();
+  }
+  else
+  {
+    cout << "You didn't set the muon scaling." << endl
+         << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
+         << "You chose: " << Muon_scaling << endl
+         << "Defaulting to Braucher et al (2009) scaling" << endl;
+    CRNp.set_Braucher_parameters();     
+  }
+  
+  // scale the F values
+  vector<bool> nuclide_scaling_switches(4,false);
+  nuclide_scaling_switches[3] = true;       // this scales for 26Al
+  CRNp.scale_F_values(scaling_factor,nuclide_scaling_switches);
+  
+  // now do Newton Iteration to find the correct erosion rate
+  // convert to  g/cm^2/yr
+  eff_erate_guess = 0.1*erate_guess*rho;
+  
+  // now using this as the initial guess, use Newton-Raphson to zero in on the
+  // correct erosion rate
+  double eff_e_new = eff_erate_guess; // the erosion rate upon which we iterate
+  double eff_e_change;                // the change in erosion rate between iterations
+  double tolerance = 1e-10;           // tolerance for a change in the erosion rate
+                                      // between Newton-Raphson iterations
+  double eff_e_displace = 1e-6;       // A small displacment in the erosion rate used
+                                      // to calculate the derivative
+  double N_this_step;                 // the concentration of the nuclide reported this step
+  double N_displace;                  // the concentration at the displaced erosion rate
+  double N_derivative;                // dN/de derivative for Newton-Raphson
+  double f_x;                         // the function being tested by newton raphson
+  double f_x_displace;                // the displaced function (for calculating the derivative)
+  
+  do
+  {
+    update_14C_SSfull_depth_integrated(eff_e_new, CRNp,
+                                           top_eff_depth,  bottom_eff_depth);
+    N_this_step = Conc_14C;
+    
+    update_14C_SSfull_depth_integrated(eff_e_new+eff_e_displace, CRNp,
+                                           top_eff_depth,  bottom_eff_depth); 
+    N_displace = Conc_14C;
+    
+    f_x =  N_this_step-Target_conc;
+    f_x_displace =  N_displace-Target_conc;
+    
+    N_derivative = (f_x_displace-f_x)/eff_e_displace;
+      
+    if(N_derivative != 0)
+    {
+      
+      eff_e_new = eff_e_new-f_x/N_derivative;
+      
+      // check to see if the difference in erosion rates meet a tolerance
+      eff_e_change = f_x/N_derivative;
+      //cout << "Change is: " << eff_e_change << " and erosion rate is: " << eff_e_new << endl;
+    }
+    else
+    {
+      eff_e_change = 0;
+    }
+  
+  } while(fabs(eff_e_change) > tolerance);
+  
+  vector<double> erosion_rate_vec;
+  erosion_rate_vec.push_back(eff_e_new);
+  erosion_rate_vec.push_back(eff_e_new*10/rho);
+  
+  Conc_14C = Target_conc;
+  return erosion_rate_vec;
 
-  Conc_14C = CRNp.S_t*CRNp.P0_14C*sum_term;
-}
+}                                    
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//.######....##.....####...##.....
+//....##....##.....##..##..##.....
+//...###...#####...##......##.....
+//.....##..##..##..##..##..##.....
+//.#####....####....####...######.
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDCRNParticle::update_36Cl_conc(double dt,double erosion_rate, LSDCRNParameters& CRNp)
 {
   double Cl_exp = exp(-dt*CRNp.lambda_36Cl);
@@ -1592,6 +1949,16 @@ void LSDCRNParticle::update_fallout10Be_simple_density_2exp(double dt, double M_
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+//.##..##..#####...#####....####...######..######..........#####...######..#####...######..##..##.
+//.##..##..##..##..##..##..##..##....##....##..............##..##..##......##..##....##....##..##.
+//.##..##..#####...##..##..######....##....####............##..##..####....#####.....##....######.
+//.##..##..##......##..##..##..##....##....##..............##..##..##......##........##....##..##.
+//..####...##......#####...##..##....##....######..........#####...######..##........##....##..##.
+//
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // this function resets the depth and effective depth
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -1708,8 +2075,14 @@ double LSDCRNParticle::intOfBeta(double x, double Rc)
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-
-
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+//..####....####....####...##......######..##..##...####..
+//.##......##..##..##..##..##........##....###.##..##.....
+//..####...##......######..##........##....##.###..##.###.
+//.....##..##..##..##..##..##........##....##..##..##..##.
+//..####....####...##..##..######..######..##..##...####..
+//
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // The deselits 2006 sclaing
 // Modified from Greg Balco's code:
@@ -2203,6 +2576,15 @@ double LSDCRNParticle::thickness_scaling_factor(LSDCRNParameters& LSDCRNP, bool 
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+//..####...#####....####...##..##..##..##...####...........######..##...##..##..##..##.......####...######..######.
+//.##..##..##..##..##..##..###.##..##..##..##..............##......###.###..##..##..##......##..##....##....##.....
+//.##......#####...##..##..##.###..##..##...####...........####....##.#.##..##..##..##......######....##....####...
+//.##..##..##..##..##..##..##..##..##..##......##..........##......##...##..##..##..##......##..##....##....##.....
+//..####...##..##...####...##..##...####....####...........######..##...##...####...######..##..##....##....######.
+//
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This function is the initial guess of erosion rate
 // that repicates the initial guesss component of the CRONUS 
@@ -2763,8 +3145,13 @@ void LSDCRNParticle::CRONUS_calculate_N_forward(double effective_erosion_rate,
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-
-
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//.######..#####...#####....####...#####............####...##..##...####...##......##..##...####...######...####..
+//.##......##..##..##..##..##..##..##..##..........##..##..###.##..##..##..##.......####...##........##....##.....
+//.####....#####...#####...##..##..#####...........######..##.###..######..##........##.....####.....##.....####..
+//.##......##..##..##..##..##..##..##..##..........##..##..##..##..##..##..##........##........##....##........##.
+//.######..##..##..##..##...####...##..##..........##..##..##..##..##..##..######....##.....####...######...####..
+//
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // this function does the error propagation from the CRONUS calculator
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-

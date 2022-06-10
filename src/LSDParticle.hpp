@@ -371,6 +371,10 @@ class LSDCRNParticle: public LSDParticle
   /// @param the new 26Al conc in atoms per gram
   void setConc_26Al(double new_26AlConc) { Conc_26Al = new_26AlConc; }
 
+  /// @brief this sets 14C conc
+  /// @param the new 14C conc in atoms per gram
+  void setConc_14C(double new_14CConc) { Conc_14C = new_14CConc; }
+
   /// @brief Retrieves the concentration of 10Be
   /// @return concentration of 10Be
   double getConc_10Be() const      { return Conc_10Be; }
@@ -630,9 +634,22 @@ class LSDCRNParticle: public LSDParticle
   ///  section being depth-integrated
   /// @author SMM
   /// @date 20/02/2015
-void update_10Be_SSfull_depth_integrated(double erosion_rate, LSDCRNParameters& CRNp,
+  void update_10Be_SSfull_depth_integrated(double erosion_rate, LSDCRNParameters& CRNp,
                                   double top_eff_depth, double bottom_eff_depth);
 
+  /// @brief A trainsient concentration of 10Be based on a step change in the erosion rate
+  /// @details This function solves for the updated concentration assuming
+  /// particles eroded from the surface (in g/cm^2/yr). It is an analytical
+  /// solution
+  /// @param erosion_old the old (steady state) erosion rate in g/cm^2/yr   POSITIVE FOR EROSION
+  /// @param erosion_old the new erosion rate in g/cm^2/yr   POSITIVE FOR EROSION  
+  /// @param time_since_change the time in years since the change happened. 
+  /// @param CRNp a CRN parameters object that stores the coefficients
+  /// to approximate production from the different production mechanisms
+  /// @author SMM
+  /// @date 25/05/2022
+  void update_10Be_step_change(double erosion_old, double erosion_new, 
+                               double time_since_change, LSDCRNParameters& CRNp);
 
   /// @brief Bring the 26Al concentration to steady state based
   /// on a constant erosion rate using full muogenic production.  
@@ -666,6 +683,20 @@ void update_10Be_SSfull_depth_integrated(double erosion_rate, LSDCRNParameters& 
                                   double top_eff_depth, double bottom_eff_depth);
 
 
+  /// @brief A trainsient concentration of 26Al based on a step change in the erosion rate
+  /// @details This function solves for the updated concentration assuming
+  /// particles eroded from the surface (in g/cm^2/yr). It is an analytical
+  /// solution
+  /// @param erosion_old the old (steady state) erosion rate in g/cm^2/yr   POSITIVE FOR EROSION
+  /// @param erosion_old the new erosion rate in g/cm^2/yr   POSITIVE FOR EROSION  
+  /// @param time_since_change the time in years since the change happened. 
+  /// @param CRNp a CRN parameters object that stores the coefficients
+  /// to approximate production from the different production mechanisms
+  /// @author SMM
+  /// @date 25/05/2022
+  void update_26Al_step_change(double erosion_old, double erosion_new, 
+                               double time_since_change, LSDCRNParameters& CRNp);
+
   /// @brief Bring the 14C concentration to steady state based
   /// on a constant erosion rate using full muogenic production.  
   /// @details This function solves for the updated concentration assuming
@@ -677,6 +708,40 @@ void update_10Be_SSfull_depth_integrated(double erosion_rate, LSDCRNParameters& 
   /// @author SMM
   /// @date 01/01/2010
   void update_14C_SSfull(double erosion, LSDCRNParameters& CRNp);
+
+  /// @brief Bring the 14C concentration to steady state based
+  ///  on a constant erosion rate using full muogenic production. This version
+  ///  is for a DEPTH INTEGRATED concentration and as such should only be used
+  ///  for basinwide calculations 
+  /// @details This function solves for the updated concentration assuming
+  /// a constant erosion rate (in g/cm^2/yr). It is an analytical
+  /// steady state solution
+  /// @param erosion the erosion rate in g/cm^2/yr   POSITIVE FOR EROSION
+  /// @param CRNp a CRN parameters object that stores the coefficients
+  /// to approximate production from the different production mechanisms
+  /// @param top_eff_depth the effective depth g/cm^2 at the top of the
+  ///  section being depth-integrated
+  /// @param bottom_eff_depth the effective depth g/cm^2 at the bottom of the
+  ///  section being depth-integrated
+  /// @author SMM
+  /// @date 24/05/2022
+  void update_14C_SSfull_depth_integrated(double erosion_rate, 
+                                  LSDCRNParameters& CRNp,
+                                  double top_eff_depth, double bottom_eff_depth);
+
+  /// @brief A trainsient concentration of 14C based on a step change in the erosion rate
+  /// @details This function solves for the updated concentration assuming
+  /// particles eroded from the surface (in g/cm^2/yr). It is an analytical
+  /// solution
+  /// @param erosion_old the old (steady state) erosion rate in g/cm^2/yr   POSITIVE FOR EROSION
+  /// @param erosion_old the new erosion rate in g/cm^2/yr   POSITIVE FOR EROSION  
+  /// @param time_since_change the time in years since the change happened. 
+  /// @param CRNp a CRN parameters object that stores the coefficients
+  /// to approximate production from the different production mechanisms
+  /// @author SMM
+  /// @date 25/05/2022
+  void update_14C_step_change(double erosion_old, double erosion_new, 
+                              double time_since_change, LSDCRNParameters& CRNp);
 
   /// @brief Bring the 36Cl concentration to steady state based
   /// on a constant erosion rate using full muogenic production.  
@@ -807,6 +872,24 @@ void update_10Be_SSfull_depth_integrated(double erosion_rate, LSDCRNParameters& 
   /// @author SMM
   /// @date 01/01/2010 
   double apparent_erosion_14C_neutron_only(double rho, LSDCRNParameters& CRNp);
+
+  /// @brief This returns the 'apparent' erosion rate that one would calcualte
+  /// based on an assumed density above the sampling depth and for full muon 
+  /// production based on COSMOCALC scaling
+  /// @param rho the density in kg/m^3 above the 'sampling' point
+  /// @param CRNp a CRN parameters object that stores the coefficients
+  /// @param muon_string a string containting the muon scaling
+  ///  can be Schaller, Granger or Braucher. Default is Braucher
+  /// @param top_eff_depth the effective depth g/cm^2 at the top of the
+  ///  section being depth-integrated
+  /// @param bottom_eff_depth the effective depth g/cm^2 at the bottom of the
+  ///  section being depth-integrated
+  /// @return the apparent erosion rate in g/cm^2/yr and m/yr
+  /// @author SMM
+  /// @date 25/05/2022 
+  vector<double> apparent_erosion_14C_COSMOCALC(double rho, LSDCRNParameters& CRNp,
+                                    double scaling_factor, string Muon_scaling,
+                                    double top_eff_depth, double bottom_eff_depth);
 
   /// @brief This returns the 'apparent' erosion rate that one would calcualte
   /// based on an assumed density abouve the sampling depth and if the

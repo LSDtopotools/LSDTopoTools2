@@ -80,11 +80,34 @@ using namespace TNT;
 // empty create function
 void LSDSpatialCSVReader::create()
 {
-  cout << "Size data map: " << data_map.size() << endl;
-  map<string, vector<string> > empty_map;
-  cout << "Size empty map: " << empty_map.size() << endl;
-  data_map = empty_map;
+  NRows = -9999;
+  NCols = -9999;
+  XMinimum = -9999;
+  YMinimum = -9999;
+  DataResolution = -9999;
+  NoDataValue = -9999;
+
+  ///A map of strings for holding georeferencing information
+  map<string,string> EmptyString;
+  GeoReferencingStrings = EmptyString;
 }
+
+//==============================================================================
+// Basic create function
+//==============================================================================
+void LSDSpatialCSVReader::create(LSDRasterInfo& ThisRasterInfo)
+{
+  //cout << "I am creating a csv object from a raster info object and a csv name." << endl;
+  NRows = ThisRasterInfo.get_NRows();
+  NCols = ThisRasterInfo.get_NCols();
+  XMinimum = ThisRasterInfo.get_XMinimum();
+  YMinimum = ThisRasterInfo.get_YMinimum();
+  DataResolution = ThisRasterInfo.get_DataResolution();
+  NoDataValue = ThisRasterInfo.get_NoDataValue();
+  GeoReferencingStrings = ThisRasterInfo.get_GeoReferencingStrings();
+
+}
+
 
 //==============================================================================
 // Basic create function
@@ -122,7 +145,7 @@ void LSDSpatialCSVReader::create(string csv_fname)
 //==============================================================================
 void LSDSpatialCSVReader::create(LSDRasterInfo& ThisRasterInfo, string csv_fname)
 {
-  cout << "I am creating a csv object from a raster info object and a csv name." << endl;
+  //cout << "I am creating a csv object from a raster info object and a csv name." << endl;
   NRows = ThisRasterInfo.get_NRows();
   NCols = ThisRasterInfo.get_NCols();
   XMinimum = ThisRasterInfo.get_XMinimum();
@@ -148,7 +171,7 @@ void LSDSpatialCSVReader::create(LSDRasterInfo& ThisRasterInfo, string csv_fname
 //==============================================================================
 void LSDSpatialCSVReader::create(LSDRaster& ThisRaster, string csv_fname)
 {
-  cout << "I am creating a csv object from a raster info object and a csv name." << endl;
+  //cout << "I am creating a csv object from a raster info object and a csv name." << endl;
   NRows = ThisRaster.get_NRows();
   NCols = ThisRaster.get_NCols();
   XMinimum = ThisRaster.get_XMinimum();
@@ -165,8 +188,8 @@ void LSDSpatialCSVReader::create(LSDRaster& ThisRaster, string csv_fname)
 // A create function for getting all the elements to copy or duplicate a csv object
 void LSDSpatialCSVReader::create(int nrows, int ncols, float xmin, float ymin,
            float cellsize, float ndv, map<string,string> temp_GRS,
-           vector<double>& this_latitude, vector<double>& this_longitude,
-           vector<bool>& this_is_point_in_raster, map<string, vector<string> >& this_data_map)
+           vector<double> this_latitude, vector<double> this_longitude,
+           vector<bool> this_is_point_in_raster, map<string, vector<string> > this_data_map)
 {
 
 
@@ -184,7 +207,22 @@ void LSDSpatialCSVReader::create(int nrows, int ncols, float xmin, float ymin,
   longitude = this_longitude;
   is_point_in_raster = this_is_point_in_raster;
   data_map = this_data_map;
-  }
+}
+
+// the assignment operator
+LSDSpatialCSVReader& LSDSpatialCSVReader::operator=(const LSDSpatialCSVReader& rhs)
+ {
+  if (&rhs != this)
+   {
+    create(rhs.get_NRows(),rhs.get_NCols(),rhs.get_XMinimum(),rhs.get_YMinimum(),
+           rhs.get_DataResolution(), rhs.get_NoDataValue(), 
+           rhs.get_GeoReferencingStrings(),
+           rhs.get_latitude(),rhs.get_longitude(),
+           rhs.get_is_point_in_raster(),
+           rhs.get_data_map() );
+   }
+  return *this;
+ }
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -202,10 +240,10 @@ void LSDSpatialCSVReader::load_csv_data(string filename)
          << " doesn't exist;  LSDSpatialCSVReader::load_csv_data" << endl;
     exit(EXIT_FAILURE);
   }
-  else
-  {
-    cout << "I have opened the csv file." << endl;
-  }
+  //else
+  //{
+  //  cout << "I have opened the csv file." << endl;
+  //}
 
   // Initiate the data map
   map<string, int > temp_vec_vec_key;
@@ -1051,6 +1089,7 @@ void LSDSpatialCSVReader::burn_raster_data_to_csv(LSDRaster& ThisRaster,string c
   float this_value;
 
   vector<string> new_column_data;
+  cout << "yoyoyoyoyoyo burning to the column " << column_name << endl;
 
   // The csv file needs to have lat-long data
   if (check_if_latitude_and_longitude_exist() == false)
@@ -1073,7 +1112,7 @@ void LSDSpatialCSVReader::burn_raster_data_to_csv(LSDRaster& ThisRaster,string c
       this_UTMN = UTMN[i];
 
       this_value = ThisRaster.get_value_of_point(this_UTME, this_UTMN);
-      //cout << "Node is: " << i << " and value is: " << this_value << endl;
+      cout << "Node is: " << i << " and value is: " << this_value << endl;
       s << this_value;
       new_column_data.push_back(s.str());
     }

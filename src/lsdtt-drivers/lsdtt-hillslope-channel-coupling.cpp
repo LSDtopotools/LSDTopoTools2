@@ -79,7 +79,7 @@
 int main (int nNumberofArgs,char *argv[])
 {
 
-  string version_number = "0.6";
+  string version_number = "0.7d";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -176,7 +176,7 @@ int main (int nNumberofArgs,char *argv[])
   //=================================================================================
   // Basic DEM preprocessing
   float_default_map["minimum_elevation"] = 0.0;
-  help_map["minimum_elevation"] = { "float","0.0","All elevation values below this become nodata if remove_seas is true.","Ususally 0."};
+  help_map["minimum_elevation"] = { "float","0.0","All elevation values below this become nodata if remove_seas is true.","Usually 0."};
 
   float_default_map["maximum_elevation"] = 30000;
   help_map["maximum_elevation"] = {  "float","0.0","All elevation values above this become nodata if remove_seas is true.","Pick a big number."};
@@ -199,16 +199,16 @@ int main (int nNumberofArgs,char *argv[])
 
   // Channel extraction
   bool_default_map["print_wiener_channels"] = false;
-  help_map["print_wiener_channels"] = {  "bool","false","Prints the channel network determined by the the wiener method which is a mashup of passalacqua and pelletier methods first reported by grieve et al 2016.","Output is a csv file."};
+  help_map["print_wiener_channels"] = {  "bool","false","Prints the channel network determined by the Wiener method which is a mashup of Passalacqua and Pelletier methods first reported by grieve et al 2016.","Output is a csv file."};
 
   float_default_map["pruning_drainage_area"] = 1000;
-  help_map["pruning_drainage_area"] = {  "float","1000","In both driech and wiener channels with less than this drainage area are removed during the pruning process.","In m^2."};
+  help_map["pruning_drainage_area"] = {  "float","1000","In both driech and Wiener channels with less than this drainage area are removed during the pruning process.","In m^2."};
 
   int_default_map["threshold_contributing_pixels"] = 1000;
   help_map["threshold_contributing_pixels"] = {  "int","1000","The number of contributing pixels needed to start a channel using the threshold method.","This is in pixels not drainage area. More options are in the lsdtt-channel-extraction tool."};
 
   int_default_map["connected_components_threshold"] = 100;
-  help_map["connected_components_threshold"] = {  "int","100","Number of connected pixels to classify as a channel.","Used in pelletier and wiener methods."};
+  help_map["connected_components_threshold"] = {  "int","100","Number of connected pixels to classify as a channel.","Used in Pelletier and Wiener methods."};
 
 
    //Defining hilltops
@@ -245,7 +245,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["MaskHilltopstoBasins"] = {  "bool","false","Removes hilltops not around study basins in legacy hilltop flow routing.","Legacy code only. This defaults to true for new version."};
  
   int_default_map["min_stream_order_to_extract_basins"] = 0;
-  help_map["min_stream_order_to_extract_basins"] = {  "int","0","Minium basin order in legacy hilltop flow routing.","Legacy code only."};
+  help_map["min_stream_order_to_extract_basins"] = {  "int","0","Minimum basin order in legacy hilltop flow routing.","Legacy code only."};
  
 	int_default_map["max_stream_order_to_extract_basins"] = 100;
   help_map["max_stream_order_to_extract_basins"] = {  "int","100","Maximum basin order in legacy hilltop flow routing.","Legacy code only."};
@@ -267,7 +267,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["search_radius_nodes"] = {  "int","8","A parameter for snapping to the nearest channel. It will search for the largest channel (by stream order) within the pixel window.","You will want smaller pixel numbers if you have a dense channel network."};
  
   int_default_map["threshold_stream_order_for_snapping"] = 1;
-  help_map["threshold_stream_order_for_snapping"] = {  "int","2","If you are snapping to a channel, it will ignore channel with lower stream order than this number.","Set this to a higher number to avoid snapping to small channels."};
+  help_map["threshold_stream_order_for_snapping"] = {  "int","2","If you are snapping to a channel this routine will ignore channel with lower stream order than this number.","Set this to a higher number to avoid snapping to small channels."};
   
   string_default_map["BaselevelJunctions_file"] = "NULL";
   help_map["BaselevelJunctions_file"] = {  "string","NULL","The name of a csv file with basin outlets for selecting basins using junction numbers.","An old method. You should use get_basins_from_outlets: true and basin_outlet_csv instead."};
@@ -278,13 +278,13 @@ int main (int nNumberofArgs,char *argv[])
 
   // Selecting basins
   int_default_map["minimum_basin_size_pixels"] = 1000;
-  help_map["minimum_basin_size_pixels"] = {  "int","1000","For basin finding algorithm, the minimum size of a selected basin.","Will reject basins along edge."};
+  help_map["minimum_basin_size_pixels"] = {  "int","1000","For basin finding algorithm this value is the minimum size of a selected basin.","Will reject basins along edge."};
   
   int_default_map["maximum_basin_size_pixels"] = 1000000000;
-  help_map["maximum_basin_size_pixels"] = {  "int","1000000000","For basin finding algorithm, the maximum size of a selected basin.","Will reject basins along edge."};
+  help_map["maximum_basin_size_pixels"] = {  "int","1000000000","For basin finding algorithm this value is the maximum size of a selected basin.","Will reject basins along edge."};
   
   bool_default_map["extend_channel_to_node_before_receiver_junction"] = true;
-  help_map["extend_channel_to_node_before_receiver_junction"] = {  "bool","true","For various basin extractions the basin snaps to the nearest junction. If this is true then the outlet of the basin is one pixel upstream of the reciever junction of the snapped channel.","If false it will pick the donor junction of the channel rather than one pixel above the reciever."};
+  help_map["extend_channel_to_node_before_receiver_junction"] = {  "bool","true","For various basin extractions the basin snaps to the nearest junction. If this is true then the outlet of the basin is one pixel upstream of the receiver junction of the snapped channel.","If false it will pick the donor junction of the channel rather than one pixel above the receiver."};
 
   bool_default_map["test_drainage_boundaries"] = true;
   help_map["test_drainage_boundaries"] = {  "bool","true","Looks for basins influenced by edge and removes them if they are.","chi coordinate must be calculated using complete basins so this tests for that."};
@@ -380,13 +380,13 @@ int main (int nNumberofArgs,char *argv[])
   help_map["A_0"] = {  "float","1.0","The A_0 parameter for chi computation. See https://doi.org/10.1002/esp.3302","Usually set to 1 so that the slope in chi-elevation space is the same as k_sn"};
    
   float_default_map["m_over_n"] = 0.5;
-  help_map["m_over_n"] = {  "float","0.5","The concavity index for chi calculations. Ususally denoted as the greek symbol theta.","Default is 0.5 but possibly 0.45 is better as Kwang and Parker suggest 0.5 leads to unrealistic behaviour in landscape evolution models."};
+  help_map["m_over_n"] = {  "float","0.5","The concavity index for chi calculations. Usually denoted as the Greek symbol theta.","Default is 0.5 but possibly 0.45 is better as Kwang and Parker suggest 0.5 leads to unrealistic behaviour in landscape evolution models."};
 
   bool_default_map["print_chi_data_maps"] = false;
   help_map["print_chi_data_maps"] = {  "bool","false","If true prints the chi network to csv.","csv file has chidatamaps in the filename. Has the locations of the channel pixels with their chi coordinates and other information."};
   
   int_default_map["threshold_pixels_for_chi"] = 0;
-  help_map["threshold_pixels_for_chi"] = {  "int","0","Minimum number of controbuting pixels for calculating chi.","You can reduce the size of the chi csv files by setting a high number."};
+  help_map["threshold_pixels_for_chi"] = {  "int","0","Minimum number of contributing pixels for calculating chi.","You can reduce the size of the chi csv files by setting a high number."};
 
 
   // These give unique IDs to each segment and then add this information to the
@@ -424,7 +424,7 @@ int main (int nNumberofArgs,char *argv[])
 
   // parameters for various chi calculations as well as slope-area
   int_default_map["n_iterations"] = 20;
-  help_map["n_iterations"] = {  "int","20","Number of interations of random sampling of chi-elevation space to make segments. Used to constrain segmentation uncertainty.","See Mudd et al 2014 JGR-ES for details.."};
+  help_map["n_iterations"] = {  "int","20","Number of iterations of random sampling of chi-elevation space to make segments. Used to constrain segmentation uncertainty.","See Mudd et al 2014 JGR-ES for details.."};
 
   int_default_map["minimum_segment_length"] = 10;
   help_map["minimum_segment_length"] = {  "int","10","The minimum number of pixels in a segment. If too short computation is very expensive.","See Mudd et al 2014 JGR-ES for details. Sensitivity testing suggest values between 8 and 14 are appropriate."};
@@ -786,7 +786,7 @@ int main (int nNumberofArgs,char *argv[])
 
     if (this_bool_map["print_wiener_channels"])
     {
-      cout << "I am calculating channels using the wiener algorithm (doi:10.1029/2012WR012452)." << endl;
+      cout << "I am calculating channels using the Wiener algorithm (doi:10.1029/2012WR012452)." << endl;
       cout << "This algorithm was used by Clubb et al. (2016, DOI: 10.1002/2015JF003747) " << endl;
       cout << "and Grieve et al. (2016, doi:10.5194/esurf-4-627-2016) " << endl;
       cout << "and combines elements of the Pelletier and Passalacqua et al  methods: " << endl;
@@ -1085,7 +1085,7 @@ int main (int nNumberofArgs,char *argv[])
     cout << endl << endl << "=====================================================" << endl;
     cout << "I am now getting the channels by basin." << endl;
     cout << "  These channels extend below the junction to the channel that stops" << endl;
-    cout << "  just before the reciever junction. This option is used to remain" << endl;
+    cout << "  just before the receiver junction. This option is used to remain" << endl;
     cout << "  consitent with basin ordering, since a 2nd order basin will begin" << endl;
     cout << "  at the channel one node upslope of the most upstream 3rd order junction." << endl;
     cout << "  If you simply want the channel starting from the selcted junction, " << endl;
@@ -1104,7 +1104,7 @@ int main (int nNumberofArgs,char *argv[])
     cout << "I am now getting the channels by basin." << endl;
     cout << "  These channels will start from the baselevel junctions selected. " << endl;
     cout << "  If you want them to extend to below the junction to the channel that stops" << endl;
-    cout << "  just before the reciever junction, then set the option:" << endl;
+    cout << "  just before the receiver junction, then set the option:" << endl;
     cout << "    extend_channel_to_node_before_receiver_junction" << endl;
     cout << "  to true." << endl;
     cout << "=====================================================" << endl << endl;

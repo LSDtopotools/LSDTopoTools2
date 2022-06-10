@@ -84,7 +84,7 @@
 int main (int nNumberofArgs,char *argv[])
 {
 
-  string version_number = "0.6";
+  string version_number = "0.7d";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -174,7 +174,7 @@ int main (int nNumberofArgs,char *argv[])
   //=================================================================================
   // Basic DEM preprocessing
   float_default_map["minimum_elevation"] = 0.0;
-  help_map["minimum_elevation"] = { "float","0.0","All elevation values below this become nodata if remove_seas is true.","Ususally 0."};
+  help_map["minimum_elevation"] = { "float","0.0","All elevation values below this become nodata if remove_seas is true.","Usually 0."};
 
   float_default_map["maximum_elevation"] = 30000;
   help_map["maximum_elevation"] = {  "float","0.0","All elevation values above this become nodata if remove_seas is true.","Pick a big number."};
@@ -285,15 +285,57 @@ int main (int nNumberofArgs,char *argv[])
   help_map["calculate_using_muons_and_errors"] = {  "bool","true", "If you want a very simple calculation just using spallation set this to false.","See Mudd et al 2016 ESURF for details"};
 
   bool_default_map["print_production_raster"] = false; 
-  help_map["print_production_raster"] = {  "bool","false", "Prints the production raster duh.","You can recyle the production raster in other analyses such as forward modelling of 10Be concentrations under different erosion scenarios"};
+  help_map["print_production_raster"] = {  "bool","false", "Prints the production raster duh.","You can recycle the production raster in other analyses such as forward modelling of 10Be concentrations under different erosion scenarios"};
 
   bool_default_map["print_pressure_raster"] = false; 
   help_map["print_pressure_raster"] = {  "bool","false", "Prints the pressure raster for bug checking.","Data comes from NCEP see balco's cronus calculator and this can be used to check if the numbers make sense."};
 
   bool_default_map["print_scaling_and_shielding_rasters"] = false;
-  help_map["print_scaling_and_shielding_rasters"] = {  "bool","false", "Prints scaling and shielding rasters.","You can recyle the production raster in other analyses such as forward modelling of 10Be concentrations under different erosion scenarios"};
+  help_map["print_scaling_and_shielding_rasters"] = {  "bool","false", "Prints scaling and shielding rasters.","You can recycle the production raster in other analyses such as forward modelling of 10Be concentrations under different erosion scenarios"};
+
 
   
+  // The stuff below here is for testing columns of particles
+  bool_default_map["transient_column_calculator"] = false;
+  help_map["transient_column_calculator"] = {  "bool","false", "A tool that allows calculation of multiple nuclides in a column of rock.","Used for testing some of the transient concentration scenarios."};
+
+  string_default_map["column_mode"] = "void";
+  help_map["column_mode"] = {  "string","void", "Sets the method of the transient column.","Options are step_change:full_transient:steady_state"};
+
+  float_default_map["effective_erosion_rate_new"] = 0.01;
+  help_map["effective_erosion_rate_new"] = {  "float","0.01", "Used for forward modelling of cosmogenic concentrations in the transient mode. This is the rate after the step change. Units are g/cm^2/yr.","To convert to mm/kyr you multiply by 10^7/(density in kg/m^3)  0.01 g/cm^2/yr is ~ 37 mm/kyr  0.1 g/cm^2/yr is ~ 370 mm/kyr or 0.37 mm/yr"};
+   
+  float_default_map["time_since_step"] = 0;
+  help_map["time_since_step"] = {  "float","0", "Used for testing of the particle column. Time since step change.","Can also be used to make a step change raster"};
+ 
+  float_default_map["total_shielding_test"] = 1;
+  help_map["total_shielding_test"] = {  "float","1", "The total shielding value for testing the CRN concentrations of particles.","This is used so you don't have to test shielding."};
+
+
+  // Some names for shielding and production rasters
+  string_default_map["self_shielding_raster_prefix"] = "NULL";
+  help_map["self_shielding_raster_prefix"] = {  "string","NULL", "Self shielding effective depth raster prefix. Used for forward modelling of cosmogenic concentrations and the new erosion calculations. Units are g/cm^2/yr.","If this is set to NULL then the value will be taken from self_shield_eff_thickness"};
+ 
+  string_default_map["snow_shielding_raster_prefix"] = "NULL";
+  help_map["snow_shielding_raster_prefix"] = {  "string","NULL", "Snow shielding effective depth raster prefix. Used for forward modelling of cosmogenic concentrations and the new erosion calculations. Units are g/cm^2/yr.","If this is set to NULL then the value will be taken from snow_shield_eff_thickness"};
+ 
+  string_default_map["topographic_shielding_raster_prefix"] = "NULL";
+  help_map["topographic_shielding_raster_prefix"] = {  "string","NULL", "Topographic shielding effective depth raster prefix. Used for forward modelling of cosmogenic concentrations and the new erosion calculations. Varies from 0 to 1.","If value is NULL the topographic shielding factor will be 1 everywhere based on a paper by DiBiase"};
+
+  string_default_map["background_erosion_rate_raster_prefix"] = "NULL";
+  help_map["background_erosion_rate_raster_prefix"] = {  "string","NULL", "Prefix of raster that has a background erosion rate. Used for forward modelling of cosmogenic concentrations and the new erosion calculations. Varies from 0 to 1.","If value is NULL the topographic shielding factor will be 1 everywhere based on a paper by DiBiase"};
+ 
+  string_default_map["quartz_content_raster_prefix"] = "NULL";
+  help_map["quartz_content_raster_prefix"] = {  "string","NULL", "Quartz content (as mass fraction). Used for forward modelling of cosmogenic concentrations and the new erosion calculations. Units are g/cm^2/yr.","If value is NULL then the whole raster gets the value of effective_erosion_rate. To convert to mm/kyr you multiply by 10^7/(density in kg/m^3)  0.01 g/cm^2/yr is ~ 37 mm/kyr  0.1 g/cm^2/yr is ~ 370 mm/kyr or 0.37 mm/yr"};
+ 
+  // Nuclide settings for prediction
+  string_default_map["muon_scheme_for_prediction"] = "BraucherBorchers";
+  help_map["muon_scheme_for_prediction"] = {  "string","BraucherBorchers", "The muon scaling scheme for predictive modelling of CRN concentrations","Options are newCRONUS:Schller:Granger:Borchers:BraucherBorchers"};
+   
+  string_default_map["nuclide_for_prediction"] = "Be10";
+  help_map["nuclide_for_prediction"] = {  "string","Be10", "The nuclide to be used for prediction","Options are Be10:C14:Al26:Cl36"};
+   
+
   // The stuff below here is all for creating rasters for forward prediction of 
   // erosion rates.
   // Note the effective erosion rate is in g/cm^2/yr
@@ -314,23 +356,53 @@ int main (int nNumberofArgs,char *argv[])
   help_map["snow_shield_eff_thickness"] = {  "float","0", "Single snow shielding used for forward modelling of cosmogenic concentrations. Units are g/cm^2/yr.","This is for removing chunks of surface material"};
 
   bool_default_map["load_production_raster"] = false;
-  help_map["load_production_raster"] = {  "bool","false", "For forward modelling of CRN concentrations.","You can precalculate a production ratster that then gets used for multiple 10Be concentration scenarios"};
+  help_map["load_production_raster"] = {  "bool","false", "For forward modelling of CRN concentrations.","You can precalculate a production raster that then gets used for multiple 10Be concentration scenarios"};
 
   string_default_map["production_raster_suffix"] = "_PROD";
   help_map["production_raster_suffix"] = {  "string","_PROD", "If you are loading a production raster using load_production_raster this is the extension of the production raster.","The suffix goes after the DEM_ID"};
 
-  bool_default_map["calculate_erosion_rates_new"] = true;
-  help_map["calculate_erosion_rates_new"] = {  "bool","true", "For cosmogenic calculations this turns on the new more computationally effience method of calculating denudation rates.","You still need to set calculate_erosion_rates to true"};
+  bool_default_map["calculate_erosion_rates_new"] = false;
+  help_map["calculate_erosion_rates_new"] = {  "bool","false", "For cosmogenic calculations this turns on the new more computationally efficient method of calculating denudation rates.","You still need to set calculate_erosion_rates to true"};
 
   string_default_map["concentration_column_name"] = "Be10_CONC";
-  help_map["concentration_column_name"] = {  "string","Be10_CONC", "If you use the calculate_erosion_rates_new this is the coluum in the points_filename file that has the 10Be concentration.","Only used with calculate_erosion_rates_new"};
+  help_map["concentration_column_name"] = {  "string","Be10_CONC", "If you use the calculate_erosion_rates_new this is the column in the points_filename file that has the 10Be concentration.","Only used with calculate_erosion_rates_new"};
 
   bool_default_map["calculate_accumulated_CRN_concentration"] = false;
-  help_map["calculate_accumulated_CRN_concentration"] = {  "bool","false", "Calculates accomulated CRN concentrations across a DEM.","For forward modelling of 10Be concentrations"};
-
+  help_map["calculate_accumulated_CRN_concentration"] = {  "bool","false", "Calculates accumulated CRN concentrations across a DEM.","For forward modelling of 10Be concentrations"};
 
   bool_default_map["calculate_accumulated_CRN_concentration_from_points"] = false;
-  help_map["calculate_accumulated_CRN_concentration_from_points"] = {  "bool","false", "Calculates accomulated CRN concentrations from a list of points.","For forward modelling of 10Be concentrations"};
+  help_map["calculate_accumulated_CRN_concentration_from_points"] = {  "bool","false", "Calculates accumulated CRN concentrations from a list of points.","For forward modelling of 10Be concentrations"};
+
+  string_default_map["cosmo_accumulated_concentration_points_fname"] = "NULL";
+  help_map["cosmo_accumulated_concentration_points_fname"] = {  "string","accumulated_conc.csv", "The filename of the accumulated cosmo points.","You will need to be a bit careful with the filenames. You probably should include the nuclide in the filename."};
+
+  string_default_map["cosmo_concentration_raster_prefix"] = "NULL";
+  help_map["production_raster_suffix"] = {  "string","NULL", "The prefix of the cosmogenic concentration raster.","You will need to be a bit careful with the filenames"};
+
+  string_default_map["cosmo_accumulated_concentration_raster_prefix"] = "NULL";
+  help_map["cosmo_accumulated_concentration_raster_prefix"] = {  "string","NULL", "The prefix of the cosmogenic accumulated concentration raster.","You will need to be a bit careful with the filenames"};
+
+  bool_default_map["print_outlet_accumulated_concentration"] = false;
+  help_map["print_outlet_accumulated_concentration"] = {  "bool","false", "This prints the accumulated concentration at the outlet.","This allows back calculation of the apparent erosion rate"};
+
+  bool_default_map["sample_accumulated_conc_in_channels"] = false;
+  help_map["sample_accumulated_conc_in_channels"] = {  "bool","false", "This prints the accumulated concentration in samples across the network","This allows back calculation of the apparent erosion rate"};
+
+  bool_default_map["calculate_average_erosion_from_erosion_raster"] = false;
+  help_map["calculate_average_erosion_from_erosion_raster"] = {  "bool","false", "Prints an raster with the average erosion rate from all upstream nodes","Used to look at the characteristics of upstream erosion in comparison to cosmogenic rates"};
+  
+
+  int_default_map["thinning_factor_for_sampling"] = 100;
+  help_map["thinning_factor_for_sampling"] = {  "int","100","When you sample accumulated cosmo this is the nodes to skip in the channel network between samples.","Used to get a representative number of sampling points but not at every point along the channel."};
+
+  int_default_map["threshold_pixels_for_sampling"] = 5000;
+  help_map["threshold_pixels_for_sampling"] = {  "int","5000","The number of contributing pixels needed to start a channel used for sampling accumulated CRN. This will be larger than normal to avoid lots of sampling above the knickpoint.","This is in pixels not drainage area."};
+
+  bool_default_map["erate_use_accumulated_points"] = false;
+  help_map["erate_use_accumulated_points"] = {  "bool","false", "If you use the erate calculator, this grabs the accumulated points csv.","Allows checking of apparent erosion rate against accumulated rate in one step"};
+
+
+
 
   // some parameters for getting points in the landscape
   // You need a river network for this. 
@@ -342,25 +414,8 @@ int main (int nNumberofArgs,char *argv[])
   string_default_map["points_filename"] ="CRN_points.csv";
   help_map["points_filename"] = {  "string","CRN_points.csv", "Name of the file where you pick points to calculate accumulated 10Be","You need to set read_points_csv to true for this to work"};
 
-
-
   int_default_map["threshold_contributing_pixels"] = 1000;
   help_map["threshold_contributing_pixels"] = {  "int","1000","The number of contributing pixels needed to start a channel using the threshold method.","This is in pixels not drainage area. More options are in the lsdtt-channel-extraction tool."};
-
-
-  // These parameters are for raster aggregation that is used for sediment routine and 
-  // CRN concentration prediction
-  bool_default_map["route_cosmo_concentrations"] = false;
-  help_map["route_cosmo_concentrations"] = {  "bool","false","Experimental. Doesn't do anything yet.","Experimental. Produces no outputs."};
-
-  string_default_map["raster_fnames_prefix"] = "NULL";
-  help_map["raster_fnames_prefix"] = {  "string","NULL","Experimental. Doesn't do anything yet.","Experimental. Produces no outputs."};
-
-  bool_default_map["accumulate_cosmo"] = false;
-  help_map["accumulate_cosmo"] = {  "bool","false","Experimental. Doesn't do anything yet.","Experimental. Produces no outputs."};
-
-  bool_default_map["check_sediment_routing_rasters"] = false;
-  help_map["check_sediment_routing_rasters"] = {  "bool","false","Experimental. Doesn't do anything yet.","Experimental. Produces no outputs."};
 
 
   // This burns a raster value to any csv output of chi data
@@ -376,6 +431,79 @@ int main (int nNumberofArgs,char *argv[])
 
   string_default_map["csv_to_burn_name"] = "NULL";
   help_map["csv_to_burn_name"] = {  "string","NULL","Name of csv file to which data will be burned.","You need to include the csv extension."};
+
+
+  // These are for the step change raster and associated tools
+  bool_default_map["make_step_change_rasters"] = false;
+  help_map["make_step_change_rasters"] = {  "bool","false","Switches on the step change raster routine.","To get at elevations and rates following a step change in uplift"};
+
+  bool_default_map["carve_before_fill"] = false; // Implements a carving algorithm
+  help_map["carve_before_fill"] = {  "bool","false","This implements a breaching algorithm before filling.","Good for landscapes with DEM obstructions (like roads) across the channels."};
+
+  // step change getting the outlets
+  bool_default_map["get_basins_from_outlets"] = false;
+  help_map["get_basins_from_outlets"] = {  "bool","false","Switches on the outlet based basin finding.","See BaselevelJunctions_file for format of outlets csv."};
+  
+  int_default_map["search_radius_nodes"] = 8;
+  help_map["search_radius_nodes"] = {  "int","8","A parameter for snapping to the nearest channel. It will search for the largest channel (by stream order) within the pixel window.","You will want smaller pixel numbers if you have a dense channel network."};
+ 
+  int_default_map["threshold_stream_order_for_snapping"] = 2;
+  help_map["threshold_stream_order_for_snapping"] = {  "int","2","If you are snapping to a channel the routine it will ignore channel with lower stream order than this number.","Set this to a higher number to avoid snapping to small channels."};
+  
+  string_default_map["basin_outlet_csv"] = "NULL";
+  help_map["basin_outlet_csv"] = {  "string","NULL","A csv file with the lat long of basin outlets.","csv should have latitude and longitude columns and rows with basin outlets."};
+
+  // step change upflift settings
+  float_default_map["step_change_uplift_old"] = 0.0001;
+  help_map["step_change_uplift_old"] = {  "float","0.0001", "Uplift rate in mm/yr of the old rate in the step change scenario","Used to calculate relief upstream of knickpoint"};
+
+  float_default_map["step_change_uplift_new"] = 0.001;
+  help_map["step_change_uplift_new"] = {  "float","0.001", "Uplift rate in mm/yr of the new rate in the step change scenario","Used to calculate relief downstream of knickpoint"};
+
+  float_default_map["step_change_old_relief"] = 1000;
+  help_map["step_change_old_relief"] = {  "float","1000", "The desired old relief of the landscape in metres","Used to back calculate K"};
+
+  float_default_map["step_change_uplift_age"] = 100000;
+  help_map["step_change_uplift_age"] = {  "float","100000", "The number of years ago the step change at the outlet happened","We assume all changes propigate upstream"};
+
+  float_default_map["step_change_Sc_old"] = 0.25;
+  help_map["step_change_uplift_old"] = {  "float","0.25", "Critical slope value in step change simulations. This is in the old erosion rate area","Dimensionless gradient on hillslopes"};
+
+  float_default_map["step_change_Sc_new"] = 0.4;
+  help_map["step_change_uplift_new"] = {  "float","0.4", "Critical slope value in step change simulations. This is in the new erosion rate area","Dimensionless gradient on hillslopes"};
+
+  int_default_map["step_change_contributing_pixels"] = 500;
+  help_map["step_change_contributing_pixels"] = {  "int","500", "For step change simulations this is the minimum conributing pixels for a channel","Anything with fewer than these contributing pixels will be calculated as a hillslope"};
+
+  // step change parameters for chi and knickpoint propigation
+  float_default_map["min_slope_for_fill"] = 0.0001;
+  help_map["min_slope_for_fill"] = {  "float","0.0001","Minimum slope between pixels for the filling algorithm.","Best not to change the default."};
+
+  float_default_map["A_0"] = 1.0;
+  help_map["A_0"] = {  "float","1.0","The A_0 parameter for chi computation. See https://doi.org/10.1002/esp.3302","Usually set to 1 so that the slope in chi-elevation space is the same as k_sn"};
+   
+  float_default_map["m_over_n"] = 0.5;
+  help_map["m_over_n"] = {  "float","0.5","The concavity index for chi calculations. Usually denoted as the Greek symbol theta.","Default is 0.5 but possibly 0.45 is better as Kwang and Parker suggest 0.5 leads to unrealistic behaviour in landscape evolution models."};
+
+  float_default_map["m"] = 0.5;
+  help_map["m"] = {  "float","0.5","The area exponent in the stream power law.","Defaults lead to m/n = 0.5"};
+
+  float_default_map["n"] = 1;
+  help_map["n"] = {  "float","1","The slope exponent in the stream power law.","Model slows down a lot if n does not equal 1 but there is much evidence that n is greater than 1 for example Harel et al 2016 Geomorphology."};
+
+  // step change printing and reading of raster options
+  string_default_map["time_since_change_raster_prefix"] = "NULL";
+  help_map["time_since_change_raster_prefix"] = {  "string","NULL","This prefix of the raster with the time since the stepchange","Used for stepchange raster prediction."};
+
+  // step change cosmo concentration prediction
+  bool_default_map["calculate_step_change_CRN_concentration_raster"] = false;
+  help_map["calculate_step_change_CRN_concentration_raster"] = {  "bool","false","Switches on the routine for calculating the step change concentration raster.","You will need to have the step change rasters calculated first"};
+  
+  float_default_map["rock_density_kg_m3"] = 2650;
+  help_map["rock_density_kg_m3"] = {  "float","2650","The rock density in kg per m^3","Used to convert between L/T and M/L^2/T in effecti e erosion rates."};
+
+  bool_default_map["convert_units_when_input_erosion_in_m_yr"] = false;
+  help_map["convert_units_when_input_erosion_in_m_yr"] = {  "bool","false", "If the input erosion raster is in m/yr use this to convert it to effective erosion.","You will need to supply the density if this is turned on"};
 
 
   //=========================================================================
@@ -433,7 +561,13 @@ int main (int nNumberofArgs,char *argv[])
 
 
   //============================================================================
-  // load the  DEM
+  //
+  //.##.......####....####...#####...........#####...######..##...##.
+  //.##......##..##..##..##..##..##..........##..##..##......###.###.
+  //.##......##..##..######..##..##..........##..##..####....##.#.##.
+  //.##......##..##..##..##..##..##..........##..##..##......##...##.
+  //.######...####...##..##..#####...........#####...######..##...##.
+  //
   //============================================================================
   LSDRaster topography_raster;
   if (this_bool_map["remove_seas"])
@@ -470,8 +604,13 @@ int main (int nNumberofArgs,char *argv[])
   }
 
   //============================================================================
-  // Snow shielding
-  // This makes a snow shielding raster
+  //
+  //..####...##..##...####...##...##..........#####...#####...######..#####...#####....####....####...######...####....####..
+  //.##......###.##..##..##..##...##..........##..##..##..##..##......##..##..##..##..##..##..##..##..##......##......##.....
+  //..####...##.###..##..##..##.#.##..........#####...#####...####....#####...#####...##..##..##......####.....####....####..
+  //.....##..##..##..##..##..#######..........##......##..##..##......##......##..##..##..##..##..##..##..........##......##.
+  //..####...##..##...####....##.##...........##......##..##..######..##......##..##...####....####...######...####....####..
+  //
   //============================================================================
   if (this_bool_map["calculate_snow_shielding"])
   {
@@ -507,7 +646,13 @@ int main (int nNumberofArgs,char *argv[])
   }  
 
   //============================================================================
-  // Raster burning
+  //
+  //.#####....####....####...######..######..#####...........#####...##..##..#####...##..##.
+  //.##..##..##..##..##........##....##......##..##..........##..##..##..##..##..##..###.##.
+  //.#####...######...####.....##....####....#####...........#####...##..##..#####...##.###.
+  //.##..##..##..##......##....##....##......##..##..........##..##..##..##..##..##..##..##.
+  //.##..##..##..##...####.....##....######..##..##..........#####....####...##..##..##..##.
+  //
   //============================================================================
   // if this gets burned, do it
   if(this_bool_map["burn_raster_to_csv"])
@@ -581,7 +726,12 @@ int main (int nNumberofArgs,char *argv[])
 
 
   //============================================================================
-  // This begins the cosmogenic routines
+  //..####...#####...##..##..........######..........#####....####...######..######.
+  //.##..##..##..##..###.##..........##..............##..##..##..##....##....##.....
+  //.##......#####...##.###..........####............#####...######....##....####...
+  //.##..##..##..##..##..##..........##..............##..##..##..##....##....##.....
+  //..####...##..##..##..##..........######..........##..##..##..##....##....######.
+  //
   //============================================================================  
   // load the CRNCosmoData object
   cout << "===============================" << endl;
@@ -720,14 +870,7 @@ int main (int nNumberofArgs,char *argv[])
   }            // End logic for routines that require checking of the cosmogenic data
 
 
-  //-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-  //
-  // CRN PREDICTION
-  //
-  // The following routines are for making predictions about CRN concentrations
-  // under a number of different scenarios
-  //
-  //-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
   if(this_bool_map["print_production_raster"])
   {
     cout << "I am going to print the production raster for you." << endl;
@@ -765,7 +908,475 @@ int main (int nNumberofArgs,char *argv[])
     pressure.write_raster(this_raster_name,raster_ext);
 
   }
- 
+
+  //============================================================================  
+  //
+  //..####...#####...##..##...........####....####...##......##..##..##...##..##..##...####..
+  //.##..##..##..##..###.##..........##..##..##..##..##......##..##..###.###..###.##..##.....
+  //.##......#####...##.###..........##......##..##..##......##..##..##.#.##..##.###...####..
+  //.##..##..##..##..##..##..........##..##..##..##..##......##..##..##...##..##..##......##.
+  //..####...##..##..##..##...........####....####...######...####...##...##..##..##...####..
+  //
+  //============================================================================  
+  if(this_bool_map["transient_column_calculator"])
+  {
+    cout << "Let me make a column for you to test some concentrations." << endl;
+    double this_conc  = -99;
+
+    // Later this will need to be updated to get the nuclide on other factors from input to the program
+    string Nuclide = this_string_map["nuclide_for_prediction"];
+    string Muon_scaling = this_string_map["muon_scheme_for_prediction"];
+
+    // the total shielding. A product of snow, topographic and production scaling
+    double total_shielding = this_float_map["total_shielding_test"];
+
+    // initiate a particle. We'll just repeatedly call this particle
+    // for the sample.
+    int startType = 0;
+    double Xloc = 0;
+    double Yloc = 0;
+    double  startdLoc = 0.0;
+    double  start_effdloc = 0.0;
+    double startzLoc = 0.0;
+
+    // create a particle at zero depth
+    LSDCRNParticle eroded_particle(startType, Xloc, Yloc,
+                                startdLoc, start_effdloc, startzLoc);
+
+    // now create the CRN parameters object
+    LSDCRNParameters LSDCRNP;
+
+    // set up the scaling
+    if (Muon_scaling == "Schaller" )
+    {
+      LSDCRNP.set_Schaller_parameters();
+    }
+    else if (Muon_scaling == "Braucher" )
+    {
+      LSDCRNP.set_Braucher_parameters();
+    }
+    else if (Muon_scaling == "BraucherBorchers" )
+    {
+      LSDCRNP.set_BraucherBorchers_parameters();
+    }
+    else if (Muon_scaling == "Granger" )
+    {
+      LSDCRNP.set_Granger_parameters();
+    }
+    else if (Muon_scaling == "newCRONUS" )
+    {
+      LSDCRNP.set_newCRONUS_parameters();
+    }
+    else
+    {
+      cout << "You didn't set the muon scaling." << endl
+          << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
+          << "You chose: " << Muon_scaling << endl
+          << "Defaulting to Braucher et al (2009) scaling" << endl;
+      LSDCRNP.set_Braucher_parameters();
+    }
+
+    // set the scaling vector
+    vector<bool> nuclide_scaling_switches(4,false);
+    if (Nuclide == "Be10")
+    {
+      nuclide_scaling_switches[0] = true;
+    }
+    else if (Nuclide == "Al26")
+    {
+      nuclide_scaling_switches[1] = true;
+    }
+    else if (Nuclide == "C14")
+    {
+      nuclide_scaling_switches[3] = true;
+    }
+    else
+    {
+      cout << "You didn't choose a valid nuclide for your test column. Defaulting"
+          << " to 10Be." << endl;
+      Nuclide = "Be10";
+      nuclide_scaling_switches[0] = true;
+    }
+
+    // Scale the F values
+    LSDCRNP.scale_F_values(total_shielding,nuclide_scaling_switches);
+
+    cout << endl << endl << endl << "===============================================================" << endl;
+    cout << "I am using the " << Muon_scaling << " scaling with a total shielding of: " << total_shielding << endl;
+    cout << "The nuclide parameters are: " << endl;
+    LSDCRNP.print_parameters_to_screen(nuclide_scaling_switches);
+    cout << "===============================================================" << endl << endl;
+
+
+    if(this_string_map["column_mode"] == "step_change")
+    { 
+      // get the nuclide concentration from this node
+      if (Nuclide == "Be10")
+      {
+        //cout << "LInE 2271, 10Be" << endl;
+        eroded_particle.update_10Be_step_change(this_float_map["effective_erosion_rate"], 
+                                               this_float_map["effective_erosion_rate_new"], 
+                                               this_float_map["time_since_step"],
+                                               LSDCRNP);
+        this_conc=eroded_particle.getConc_10Be();
+      }
+      else if (Nuclide == "Al26")
+      {
+        //cout << "LINE 2278, 26Al" << endl;
+        eroded_particle.update_26Al_step_change(this_float_map["effective_erosion_rate"], 
+                                               this_float_map["effective_erosion_rate_new"], 
+                                               this_float_map["time_since_step"],
+                                               LSDCRNP);
+        this_conc=eroded_particle.getConc_26Al();
+      }
+      else if (Nuclide == "C14")
+      {
+        eroded_particle.update_14C_step_change(this_float_map["effective_erosion_rate"], 
+                                               this_float_map["effective_erosion_rate_new"], 
+                                               this_float_map["time_since_step"],
+                                               LSDCRNP);
+        this_conc=eroded_particle.getConc_14C();
+      }
+      else
+      {
+        cout << "You didn't give a valid nuclide. You chose: " << Nuclide << endl;
+        cout << "Choices are Be10, Al26 or C14.  Note these case sensitive and cannot" << endl;
+        cout << "contain spaces or control characters. Defaulting to Be10." << endl;
+        eroded_particle.update_10Be_step_change(this_float_map["effective_erosion_rate"], 
+                                               this_float_map["effective_erosion_rate_new"], 
+                                               this_float_map["time_since_step"],
+                                               LSDCRNP);
+        this_conc=eroded_particle.getConc_10Be();
+      }  
+      cout << "Okay, I got particle with a step change." << endl;
+      cout << "The nuclide is "<< Nuclide << endl;
+      cout << "The initial ersion rate is: " << this_float_map["effective_erosion_rate"] << " and the new erosion rate is: " << this_float_map["effective_erosion_rate_new"] << endl;
+      cout << "The time since the step is: " << this_float_map["time_since_step"] << endl;
+      cout << " The concentration is: " << this_conc << " atoms/g"<< endl;  
+    }
+    else if(this_string_map["column_mode"] == "full_transient")
+    {
+      cout << "I haven't implemented the full transient run yet, exiting" << endl;
+      exit(0);
+    }
+    else if(this_string_map["column_mode"] == "steady_state")
+    {
+      double this_top_eff_depth = 0;
+      double this_bottom_eff_depth = 0;
+      // get the nuclide concentration from this node
+      if (Nuclide == "Be10")
+      {
+        //cout << "LInE 2271, 10Be" << endl;
+        eroded_particle.update_10Be_SSfull_depth_integrated(this_float_map["effective_erosion_rate"],LSDCRNP,
+                                            this_top_eff_depth, this_bottom_eff_depth);
+        this_conc=eroded_particle.getConc_10Be();
+      }
+      else if (Nuclide == "Al26")
+      {
+        //cout << "LINE 2278, 26Al" << endl;
+        eroded_particle.update_26Al_SSfull_depth_integrated(this_float_map["effective_erosion_rate"],LSDCRNP,
+                                            this_top_eff_depth, this_bottom_eff_depth);
+        this_conc=eroded_particle.getConc_26Al();
+      }
+      else if (Nuclide == "C14")
+      {
+        //cout << "LINE 2278, 26Al" << endl;
+        eroded_particle.update_14C_SSfull_depth_integrated(this_float_map["effective_erosion_rate"],LSDCRNP,
+                                            this_top_eff_depth, this_bottom_eff_depth);
+        this_conc=eroded_particle.getConc_14C();
+      }
+      else
+      {
+        cout << "You didn't give a valid nuclide. You chose: " << Nuclide << endl;
+        cout << "Choices are 10Be, 26Al.  Note these case sensitive and cannot" << endl;
+        cout << "contain spaces or control characters. Defaulting to 10Be." << endl;
+        eroded_particle.update_10Be_SSfull_depth_integrated(this_float_map["effective_erosion_rate"],LSDCRNP,
+                                            this_top_eff_depth, this_bottom_eff_depth);
+        this_conc=eroded_particle.getConc_10Be();
+      }  
+      cout << "Okay, I got a steady state particle, the nuclide is "<< Nuclide << " and the concentration is: " << this_conc << " atoms/g"<< endl;   
+    }
+    else
+    {
+      cout << "You said you wanted a transient column calculator but did not give me an appropriate mode" << endl;
+      cout << "Currently the functioning modes are step_change, full_transient, and steady_state" << endl;
+      cout << "You chose: " << this_string_map["column_mode"] << endl;
+      cout << "I am exiting the program." << endl;
+      exit(0);
+    }
+
+    if(this_conc != -99)
+    {
+      cout << "Let me check what the apparent erosion rate would be in COSMOCALC" << endl;
+      double this_top_eff_depth = 0;
+      double this_bottom_eff_depth = 0;
+      double rho = 2650;
+      vector<double> erate_vec;
+      if (Nuclide == "Be10")
+      {
+        erate_vec = eroded_particle.apparent_erosion_10Be_COSMOCALC(rho, LSDCRNP, total_shielding, Muon_scaling,
+                                                        this_top_eff_depth, this_bottom_eff_depth);       
+      }
+      else if (Nuclide == "Al26")
+      {
+        erate_vec = eroded_particle.apparent_erosion_26Al_COSMOCALC(rho, LSDCRNP, total_shielding, Muon_scaling,
+                                                        this_top_eff_depth, this_bottom_eff_depth);  
+      }
+      else if (Nuclide == "C14")
+      {
+        erate_vec = eroded_particle.apparent_erosion_14C_COSMOCALC(rho, LSDCRNP, total_shielding, Muon_scaling,
+                                                        this_top_eff_depth, this_bottom_eff_depth);  
+      }
+      cout << "Apparent erosion rates are:" << endl;
+      cout << erate_vec[0] << " g/cm^3/yr" << endl;
+      cout << erate_vec[1] << " m/yr" << endl;
+    }
+
+  }
+
+
+
+  //-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+  //
+  //..####...######..######..#####...........#####....####....####...######..######..#####..
+  //.##........##....##......##..##..........##..##..##..##..##........##....##......##..##.
+  //..####.....##....####....#####...........#####...######...####.....##....####....#####..
+  //.....##....##....##......##..............##..##..##..##......##....##....##......##..##.
+  //..####.....##....######..##..............##..##..##..##...####.....##....######..##..##.
+  //
+  //-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+  if (this_bool_map["make_step_change_rasters"])
+  {
+    cout << "Hi there. I am going to make some rasters to model a step change in erosion rate"<< endl;
+    cout << "I'll be using some theory from Royden and Perron 2013" << endl;
+    cout << "Which was nicely abbreviated by Mitchell and Yanites and Mitchell 2019" << endl;
+
+    // First, get either the largest basin or a basin determined by a source point
+    cout << endl << endl << endl << endl << "Before I start, I need to make sure the raster is filled. " << endl;
+    LSDRaster carved_topography;
+    LSDRaster filled_topography;
+    LSDRasterInfo RI(topography_raster);
+
+    if(this_bool_map["carve_before_fill"])
+    {
+      carved_topography = topography_raster.Breaching_Lindsay2016();
+      filled_topography = carved_topography.fill(this_float_map["min_slope_for_fill"]);
+    }
+    else
+    {
+      filled_topography = topography_raster.fill(this_float_map["min_slope_for_fill"]);
+    }
+
+    cout << "Flow routing in the initial DEM." << endl;
+    LSDFlowInfo FI(filled_topography);
+
+    cout << "Getting the junction network" << endl;
+    LSDIndexRaster FlowAcc = FI.write_NContributingNodes_to_LSDIndexRaster();
+    vector<int> sources;
+    sources = FI.get_sources_index_threshold(FlowAcc, this_int_map["threshold_contributing_pixels"]);
+    LSDRaster FlowDistance = FI.distance_from_outlet();
+    LSDJunctionNetwork JunctionNetwork(sources, FI);    
+
+    vector<int> BaseLevelJunctions;
+    if(this_bool_map["get_basins_from_outlets"])
+    {
+      cout << "I am getting a specific basin to simulate" << endl;
+      cout << "I am going to get basins lat-long coordinates" << endl;
+      cout << "I need a csv with a latitude and a longitude location of the basin outlet." << endl;
+      string full_BL_LL_name = DATA_DIR+this_string_map["basin_outlet_csv"];
+      cout << "The file is: " << full_BL_LL_name << endl;
+      int search_radius_nodes = this_int_map["search_radius_nodes"];
+      int threshold_stream_order = 3;
+      BaseLevelJunctions = JunctionNetwork.snap_point_locations_to_upstream_junctions_from_latlong_csv(full_BL_LL_name,
+                                                               search_radius_nodes, threshold_stream_order,FI, RI);
+    }
+    else
+    {
+      cout << "You did not supply a basin outlet file so I will assume you want the largest complete catchment in this DEM." << endl;
+      cout << "Let me get that for you now." << endl;
+      BaseLevelJunctions = JunctionNetwork.Prune_Junctions_Largest(BaseLevelJunctions, FI, FlowAcc);
+    } 
+
+    int single_junc = BaseLevelJunctions[0];
+    cout << "The junction number is: " << single_junc << endl;
+    int outlet_node = JunctionNetwork.get_Node_of_Junction(single_junc);
+    vector<int> outlet_nodes;
+    outlet_nodes.push_back(outlet_node);
+
+    
+    // get the elevation of the outlet
+    int this_row,this_col;
+    FI.retrieve_current_row_and_col(outlet_node,this_row,this_col);
+    float outlet_elevation = filled_topography.get_data_element(this_row,this_col);
+    cout << "The outlet elevation is: " << outlet_elevation << endl;
+
+    // Now get the chi coordinate of every pixel in the basin
+    LSDRaster chi_coordinate;       
+    cout << "I am calculating the chi coordinate." << endl;
+    float area_threshold_all_pixels_for_chi = 0.5;
+    vector<int> starting_nodes;
+
+    // get the chi coordinate
+    chi_coordinate = FI.get_upslope_chi_from_multiple_starting_nodes(outlet_nodes,
+                              this_float_map["m_over_n"], this_float_map["A_0"], 
+                              area_threshold_all_pixels_for_chi);
+
+    // print the chi coordinate to file
+    string chi_fname = OUT_DIR+OUT_ID+"_SC_CHI";
+    chi_coordinate.write_raster(chi_fname,raster_ext);
+
+    // now get the upslope nodes
+    vector<int> upslope_nodes = FI.get_upslope_nodes(outlet_node);
+    int n_upslope = int(upslope_nodes.size());
+    float max_chi = 0;
+    for(int i = 0; i< int(upslope_nodes.size()); i++)
+    {
+      FI.retrieve_current_row_and_col(upslope_nodes[i],this_row,this_col);
+      if ( chi_coordinate.get_data_element(this_row,this_col) > max_chi )
+      {
+        max_chi = chi_coordinate.get_data_element(this_row,this_col);
+      }
+    }
+    FI.retrieve_current_row_and_col(upslope_nodes[n_upslope-1],this_row,this_col);
+    float test_max_chi = chi_coordinate.get_data_element(this_row,this_col);
+    cout << "max_chi: " << max_chi << " and test max chi = " << test_max_chi << endl;
+
+    // IMPORTANT ALL BELOW ASSUMES A0 == 1
+    // YOU WILL NEED TO USE DIFFERENT EQUATIONS IF THIS IS NOT THE CASE
+    // MAKE MORE FLEXIBLE LATER
+
+    // Now back calculate K using the max chi coordinate
+    float calculated_K = this_float_map["step_change_uplift_old"]*pow(this_float_map["step_change_old_relief"]/max_chi,-this_float_map["n"]);
+    cout << "The calculated K value is: " << calculated_K << endl;
+
+    // calculate the various slopes and locations of the knickpoints analytically
+    // first, the slope 
+    float ks_upstream,ks_downstream;
+    if (this_float_map["n"] != 1)
+    {
+      ks_upstream = pow(this_float_map["step_change_uplift_old"]/calculated_K,(1/this_float_map["n"]));
+      ks_downstream = pow(this_float_map["step_change_uplift_new"]/calculated_K,(1/this_float_map["n"]));
+    } 
+    else 
+    {
+      ks_upstream = this_float_map["step_change_uplift_old"]/calculated_K;
+      ks_downstream = this_float_map["step_change_uplift_new"]/calculated_K;
+    }
+    cout << "The kn values are: " << ks_upstream << " upstream and " << ks_downstream << " downstream " << endl; 
+  
+    // now calculate the location and elevation of the knickpoint
+    // this comes from the mitchell and yanites paper
+    float chi_knickpoint;
+    float z_knickpoint;
+    
+    if (this_float_map["n"] == 1)
+    {
+      chi_knickpoint = calculated_K*this_float_map["step_change_uplift_age"];
+
+      z_knickpoint = outlet_elevation+this_float_map["step_change_uplift_new"]*this_float_map["step_change_uplift_age"];
+
+    }
+    else if ( this_float_map["n"] > 1)
+    {
+      float numerator = (this_float_map["step_change_uplift_old"]-this_float_map["step_change_uplift_old"])*this_float_map["step_change_uplift_age"];
+      float denominator1 = pow(this_float_map["step_change_uplift_old"]/calculated_K,1/this_float_map["n"]);
+      float denominator2 = pow(this_float_map["step_change_uplift_new"]/calculated_K,1/this_float_map["n"]);
+      chi_knickpoint = numerator/(denominator2-denominator1);
+
+
+      float n1 = pow(this_float_map["step_change_uplift_new"]/calculated_K,1/this_float_map["n"]);
+      float d1 = denominator2-denominator1;
+      z_knickpoint = outlet_elevation+(this_float_map["step_change_uplift_new"]-this_float_map["step_change_uplift_old"])*this_float_map["step_change_uplift_age"]*(n1/d1);
+
+    }
+    else
+    {
+      float numerator = this_float_map["n"]*this_float_map["step_change_uplift_old"]*this_float_map["step_change_uplift_age"];
+      float denominator = pow(this_float_map["step_change_uplift_old"]/calculated_K,1/this_float_map["n"]);
+      chi_knickpoint = numerator/denominator;
+
+      z_knickpoint = outlet_elevation + this_float_map["step_change_uplift_age"]*(this_float_map["step_change_uplift_new"]+(1-this_float_map["n"])*this_float_map["step_change_uplift_old"]);
+    }
+
+    cout << "The chi of the knickpoint is: " << chi_knickpoint << " and its elevation is: " << z_knickpoint << endl;
+
+    // Now we calculate the elevations an erosion rates in the basin
+    LSDCosmoRaster SC(chi_coordinate);
+    LSDRaster erate;
+    LSDRaster set_topography;
+    LSDRaster time_since_step;
+
+
+
+    SC.calculate_step_change_rasters(FI, upslope_nodes, chi_coordinate, erate, set_topography, 
+                                        time_since_step, this_float_map["step_change_uplift_age"], 
+                                        this_float_map["step_change_uplift_old"], this_float_map["step_change_uplift_new"],
+                                        chi_knickpoint, z_knickpoint, this_float_map["n"], ks_upstream, ks_downstream, 
+                                        outlet_elevation, calculated_K);  
+
+
+    float hs_azimuth = 315;
+    float hs_altitude = 45;
+    float hs_z_factor = 1;
+
+
+    // Now do the hillslopes
+    LSDRaster raster_tags;
+    LSDRaster hillslope_topography;
+    SC.calculate_step_change_hillslopes(set_topography, raster_tags, hillslope_topography, 
+                                        erate, time_since_step, boundary_conditions, 
+                                        this_int_map["step_change_contributing_pixels"], this_float_map["step_change_uplift_old"], 
+                                        this_float_map["step_change_Sc_old"], this_float_map["step_change_Sc_new"]);  
+
+    string ER_fname;
+    if (this_string_map["background_erosion_rate_raster_prefix"] == "NULL")
+    {
+      ER_fname = OUT_ID+"_SC_ERATE";
+    }
+    else
+    {
+      ER_fname = this_string_map["background_erosion_rate_raster_prefix"];
+    }
+    string erate_fname = OUT_DIR+ER_fname;
+    erate.write_raster(erate_fname,raster_ext);
+
+    string z_fname = OUT_DIR+OUT_ID+"_SC_DEM";
+    hillslope_topography.write_raster(z_fname,raster_ext);
+
+    string T_fname;
+    if (this_string_map["time_since_change_raster_prefix"] == "NULL")
+    {
+      T_fname = OUT_ID+"_SC_STEPTIME";
+    }
+    else
+    {
+      T_fname = this_string_map["time_since_change_raster_prefix"];
+    }
+    string time_fname = OUT_DIR+T_fname;
+    time_since_step.write_raster(time_fname,raster_ext);
+
+    string tag_fname = OUT_DIR+OUT_ID+"_SC_TAG";
+    raster_tags.write_raster(tag_fname,raster_ext);
+
+    LSDRaster hs_hs_raster = hillslope_topography.hillshade(hs_altitude,hs_azimuth,hs_z_factor);
+    string hs_fname = OUT_DIR+OUT_ID+"_SC_DEM_hs";
+    hs_hs_raster.write_raster(hs_fname,raster_ext);
+  }
+
+
+
+  //-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+  //
+  // CRN PREDICTION
+  //
+  //..####...#####...##..##..........#####...#####...######..#####...######...####...######
+  //.##..##..##..##..###.##..........##..##..##..##..##......##..##....##....##..##....##..
+  //.##......#####...##.###..........#####...#####...####....##..##....##....##........##..
+  //.##..##..##..##..##..##..........##......##..##..##......##..##....##....##..##....##..
+  //..####...##..##..##..##..........##......##..##..######..#####...######...####.....##..
+  //
+  //
+  //-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   // This makes all the appropriate rasters for constant values of the 
   // shielding and erosion. It prints the concentration raster,
   // and the erosion raster
@@ -773,7 +1384,7 @@ int main (int nNumberofArgs,char *argv[])
   // not accumulated concentration. 
   // For areas with landslides (e.g., nonzero pixel values in the self shielding raster)
   // the concentration is the average concentration of the evacuated material. 
-  if(this_bool_map["calculate_CRN_concentration_raster"])
+  if(this_bool_map["calculate_CRN_concentration_raster"] || this_bool_map["calculate_step_change_CRN_concentration_raster"])
   {
     cout << "I will now calculate the concentration of your nuclide at each pixel in your raster." << endl;
     cout << "For pixels with landslides, this is the mean concentration of the eroded material. " << endl;
@@ -809,53 +1420,128 @@ int main (int nNumberofArgs,char *argv[])
     }
     cout << "I've got the production raster." << endl;
     
-    // Now make the shielding and other rasters
-    // TODO
-    // This needs to be make more flexible in the future to allow
-    // loading of rasters
-    MakeItYeah.set_to_constant_value(this_float_map["effective_erosion_rate"]);
-    LSDRaster ErosionRaster =  MakeItYeah.return_as_raster();
+    // Now make or load the shield and other rasters
+    LSDRaster SelfShield;
+    if (this_string_map["self_shielding_raster_prefix"] != "NULL")
+    {
+      LSDRaster temp(DATA_DIR+this_string_map["self_shielding_raster_prefix"],raster_ext);
+      SelfShield= temp;
+    }
+    else
+    {
+      MakeItYeah.set_to_constant_value(this_float_map["self_shield_eff_thickness"]);
+      SelfShield =  MakeItYeah.return_as_raster(); 
+    }
     
-    MakeItYeah.set_to_constant_value(this_float_map["self_shield_eff_thickness"]);
-    LSDRaster SelfShield =  MakeItYeah.return_as_raster();    
-                                                        
-    MakeItYeah.set_to_constant_value(this_float_map["snow_shield_eff_thickness"]);
-    LSDRaster SnowShield =  MakeItYeah.return_as_raster();   
+    LSDRaster SnowShield;
+    if (this_string_map["snow_shielding_raster_prefix"] != "NULL")
+    {
+      LSDRaster temp(DATA_DIR+this_string_map["snow_shielding_raster_prefix"],raster_ext);
+      SnowShield= temp;
+    }
+    else
+    {
+      MakeItYeah.set_to_constant_value(this_float_map["snow_shield_eff_thickness"]);
+      SnowShield =  MakeItYeah.return_as_raster(); 
+    }
     
-    MakeItYeah.set_to_constant_value(1.0);
-    LSDRaster TopoShield =  MakeItYeah.return_as_raster();      
-    
-    // TODO
+    LSDRaster TopoShield;
+    if (this_string_map["topographic_shielding_raster_prefix"] != "NULL")
+    {
+      LSDRaster temp(DATA_DIR+this_string_map["topographic_shielding_raster_prefix"],raster_ext);
+      TopoShield= temp;
+    }
+    else
+    {
+      MakeItYeah.set_to_constant_value(1.0);
+      TopoShield =  MakeItYeah.return_as_raster();  
+    }
+
+    LSDRaster ErosionRaster;
+    if (this_string_map["background_erosion_rate_raster_prefix"] != "NULL")
+    {
+      cout << "I am loading an erosion raster. This is typically in g/cm^2/yr but for the step change it is in m/yr" << endl;
+      LSDRaster temp(DATA_DIR+this_string_map["background_erosion_rate_raster_prefix"],raster_ext);
+      ErosionRaster= temp;
+    }
+    else
+    {
+      MakeItYeah.set_to_constant_value(this_float_map["effective_erosion_rate"]);
+      ErosionRaster =  MakeItYeah.return_as_raster(); 
+    }
+
+    LSDRaster time_since_change;
+    if (this_string_map["time_since_change_raster_prefix"] != "NULL")
+    {
+      LSDRaster temp(DATA_DIR+this_string_map["time_since_change_raster_prefix"],raster_ext);
+      time_since_change= temp;
+    }
+    else
+    {
+      MakeItYeah.set_to_constant_value(0.0);
+      time_since_change =  MakeItYeah.return_as_raster();  
+    }
+
+       
     // Later this will need to be updated to get the nuclide on other factors from input to the program
-    string Nuclide = "Be10";
-    string Muon_scaling = "newCRONUS";
+    string Nuclide = this_string_map["nuclide_for_prediction"];
+    string Muon_scaling = this_string_map["muon_scheme_for_prediction"];
+
+    cout << "The nuclide you are using is: " << this_string_map["nuclide_for_prediction"] << endl;
     
     bool is_production_uncertainty_plus_on = false;
     bool is_production_uncertainty_minus_on = false;
-    
-    LSDRaster CRNConc = ThisCosmoRaster.calculate_CRN_concentration_raster(Nuclide, Muon_scaling, ErosionRaster,
+
+    LSDRaster CRNConc;
+    if(this_bool_map["calculate_step_change_CRN_concentration_raster"])    
+    {
+      CRNConc = ThisCosmoRaster.calculate_CRN_concentration_raster_step_change(Nuclide, Muon_scaling, 
+                                           ErosionRaster, time_since_change,
+                                           ProductionRaster, TopoShield,   
+                                           this_float_map["step_change_uplift_old"],
+                                           this_float_map["step_change_uplift_new"],
+                                           this_float_map["rock_density_kg_m3"],
+                                           is_production_uncertainty_plus_on,
+                                           is_production_uncertainty_minus_on);
+    }
+    else
+    {
+      CRNConc = ThisCosmoRaster.calculate_CRN_concentration_raster(Nuclide, Muon_scaling, ErosionRaster,
                                           ProductionRaster, TopoShield, 
                                           SelfShield, SnowShield, 
                                           is_production_uncertainty_plus_on,
                                           is_production_uncertainty_minus_on);
+    }
 
     // This writes the concentration raster 
-    string this_raster_name = OUT_DIR+OUT_ID+"_"+Nuclide+"_Conc";                                      
+    string conc_fname;
+    if (this_string_map["cosmo_concentration_raster_prefix"] == "NULL")
+    {
+      conc_fname = OUT_ID+"_CONC";
+    }
+    else
+    {
+      conc_fname = this_string_map["cosmo_concentration_raster_prefix"];
+    }
+    string this_raster_name = OUT_DIR+conc_fname;                                  
     CRNConc.write_raster(this_raster_name,raster_ext);
     
-    // This writes the erosion raster
-    this_raster_name = OUT_DIR+OUT_ID+"_EffEros";                                      
-    ErosionRaster.write_raster(this_raster_name,raster_ext);
   }
 
 
-
-
   //===================================================================================================
-  //===================================================================================================
+  //..####....####....####...##..##..##...##...........####....####...##..##...####..
+  //.##..##..##..##..##..##..##..##..###.###..........##..##..##..##..###.##..##..##.
+  //.######..##......##......##..##..##.#.##..........##......##..##..##.###..##.....
+  //.##..##..##..##..##..##..##..##..##...##..........##..##..##..##..##..##..##..##.
+  //.##..##...####....####....####...##...##...........####....####...##..##...####..
+  //
   // This accumulates CRN. It wraps the concentration calculation
+  //===================================================================================================
   if( this_bool_map["calculate_accumulated_CRN_concentration"] ||
-      this_bool_map["calculate_accumulated_CRN_concentration_from_points"] ) 
+      this_bool_map["calculate_accumulated_CRN_concentration_from_points"] ||
+      this_bool_map["calculate_erosion_rates_new"] ||
+      this_bool_map["calculate_average_erosion_from_erosion_raster"]) 
   {
     // First some housekeeping: we need the flow info object for these routines
     // Get the filled topography
@@ -881,7 +1567,9 @@ int main (int nNumberofArgs,char *argv[])
 
     // We need this to make the production raster
     LSDCosmoRaster ThisCosmoRaster(topography_raster);
-    
+
+    // This will be used to make some secondary rasters
+    LSDRasterMaker MakeItYeah(topography_raster);
 
     cout << "Let me make or get the production raster." << endl;
     LSDRaster ProductionRaster;
@@ -907,89 +1595,156 @@ int main (int nNumberofArgs,char *argv[])
       ProductionRaster = LoadProductionRaster;                                           
     }
     cout << "I've got the production raster." << endl;
-
-    // This will be used to make some secondary rasters
-    LSDRasterMaker MakeItYeah(topography_raster);
     
+    // Now make or load the shield and other rasters
+    LSDRaster ErosionRaster;
+    if (this_string_map["background_erosion_rate_raster_prefix"] != "NULL")
+    {
+      cout << "I am loading an erosion raster. This is typically in g/cm^2/yr but for the step change it is in m/yr" << endl;
+      LSDRaster temp(DATA_DIR+this_string_map["background_erosion_rate_raster_prefix"],raster_ext);
 
+      if(this_bool_map["convert_units_when_input_erosion_in_m_yr"])
+      {
+        float multiplier = this_float_map["rock_density_kg_m3"]*0.1;
+        temp.raster_multiplier(multiplier);
+      }
+      ErosionRaster= temp;
+    }
+    else
+    {
+      cout << "I am accumulating based on a steady raster" << endl;
+      cout << "The erosion rate is based on the parameter effective_erosion_rate" << endl;
+      MakeItYeah.set_to_constant_value(this_float_map["effective_erosion_rate"]);
+      ErosionRaster =  MakeItYeah.return_as_raster(); 
+    }
+
+    if(this_bool_map["calculate_average_erosion_from_erosion_raster"])
+    {
+      cout << "I am getting the averaged erosion rate. It will be in the same units as the erosion raster" << endl;
+      LSDRaster AvgErosion =  FlowInfo.upslope_average(ErosionRaster);
+      string this_fname = OUT_DIR+OUT_ID+"_AVGEROS";
+      AvgErosion.write_raster(this_fname,raster_ext);
+
+    }
     
-    // Now make the shielding and other rasters
-    // TODO
-    // This will need to be more flexible and allow for reading of rasters
-    MakeItYeah.set_to_constant_value(this_float_map["effective_erosion_rate"]);
-    LSDRaster ErosionRaster =  MakeItYeah.return_as_raster();    
-    MakeItYeah.set_to_constant_value(this_float_map["self_shield_eff_thickness"]);
-    LSDRaster SelfShield =  MakeItYeah.return_as_raster();                                                            
-    MakeItYeah.set_to_constant_value(this_float_map["snow_shield_eff_thickness"]);
-    LSDRaster SnowShield =  MakeItYeah.return_as_raster();       
-    MakeItYeah.set_to_constant_value(1.0);
-    LSDRaster TopoShield =  MakeItYeah.return_as_raster();  
-    MakeItYeah.set_to_constant_value(TopoShield.get_NoDataValue());
-    LSDRaster NoDataRaster =  MakeItYeah.return_as_raster();  
-
-    // These are used to calculate uncertainties so are only switched on when you 
-    // are looking for errors. 
-    bool is_production_uncertainty_plus_on = false;
-    bool is_production_uncertainty_minus_on = false;
-
-    // TODO
-    // Later you need to read this from file
-    string Nuclide = "Be10";
-    string Muon_scaling = "newCRONUS";
-
     if(this_bool_map["calculate_accumulated_CRN_concentration"])
     {
-      cout << "I will now calculate the accumulated concentration of your nuclide." << endl;
-      
-      auto t1 = std::chrono::high_resolution_clock::now();   
-      LSDRaster CRN_conc = ThisCosmoRaster.calculate_CRN_concentration_raster(Nuclide, Muon_scaling, ErosionRaster,
-                                            ProductionRaster, TopoShield, 
-                                            SelfShield, SnowShield, 
-                                            is_production_uncertainty_plus_on,
-                                            is_production_uncertainty_minus_on);
-      auto t2 = std::chrono::high_resolution_clock::now();
-      auto duration = std::chrono::duration_cast<std::chrono::seconds>( t2 - t1 ).count();
-      cout << "Full concentration calculation took: " << duration << endl;
 
-      // This writes the concentration raster 
-      string this_raster_name = OUT_DIR+OUT_ID+"_"+Nuclide+"_Conc";                                   
-      CRN_conc.write_raster(this_raster_name,raster_ext);
-      
-      // This writes the erosion raster
-      this_raster_name = OUT_DIR+OUT_ID+"_EffEros";                                      
-      ErosionRaster.write_raster(this_raster_name,raster_ext);
-
-      // Some testing
-      // This will be used to make some secondary rasters
-      //MakeItYeah.set_to_constant_value(0.5);
-      //LSDRaster AreaPixelRaster =  MakeItYeah.return_as_raster();
-
-      // Need to test this function
-      //LSDIndexRaster IntContrib = FlowInfo.write_NContributingNodes_to_LSDIndexRaster();
-      //LSDRaster Contrib(IntContrib);
-
-      // PLACEHOLDER
-      //float minimum_val = 0.001;
-      //float maximum_val = 0.005;
-      //MakeItYeah.random_values(minimum_val,maximum_val);
-      //LSDRaster Random_erosion =  MakeItYeah.return_as_raster();  
+      LSDRaster CRN_conc;
+      if (this_string_map["cosmo_concentration_raster_prefix"] != "NULL")
+      {
+        LSDRaster temp(DATA_DIR+this_string_map["cosmo_concentration_raster_prefix"],raster_ext);
+        CRN_conc= temp;
+      }
+      else
+      {
+        cout << "You have asked me to accumulate cosmo but you didn't give me a concentration raster" << endl;
+        exit(0);
+      }
 
       cout << endl << endl << "=================================" << endl;
-      cout << "This is currently in testing phase. I am trying to accumulate the cosogenic concentration." << endl;
+      cout << "I will now calculate the accumulated concentration of your nuclide." << endl;
       LSDRaster AccConc = ThisCosmoRaster.calculate_accumulated_CRN_concentration(CRN_conc, ErosionRaster,FlowInfo);   
       cout << "Done with accumulating the concentration." << endl;
 
       // This writes the accumulation raster
-      this_raster_name = OUT_DIR+OUT_ID+"_AccConc";                                      
+      string conc_fname;
+      if (this_string_map["cosmo_accumulated_concentration_raster_prefix"] == "NULL")
+      {
+        conc_fname = OUT_ID+"_ACCCONC";
+      }
+      else
+      {
+        conc_fname = this_string_map["cosmo_accumulated_concentration_raster_prefix"];
+      }
+      string this_raster_name = OUT_DIR+conc_fname;                                     
       AccConc.write_raster(this_raster_name,raster_ext);
-    }
 
 
-    if(this_bool_map["calculate_accumulated_CRN_concentration_from_points"] ||
-       this_bool_map["calculate_erosion_rates"])
+      if(this_bool_map["sample_accumulated_conc_in_channels"])
+      {
+        cout << "Let me sample the accumulated concentration in the channels." << endl;
+        string value_column_name = this_string_map["concentration_column_name"];
+        int thinning_factor = this_int_map["thinning_factor_for_sampling"];
+        int thresh_pixels_for_accumulated_conc = this_int_map["threshold_pixels_for_sampling"];
+
+        // You need to get the node indices of the points first
+        // get some relevant rasters
+        LSDRaster DistanceFromOutlet = FlowInfo.distance_from_outlet();
+        LSDIndexRaster ContributingPixels = FlowInfo.write_NContributingNodes_to_LSDIndexRaster();     
+
+        vector<int> sources;
+        sources = FlowInfo.get_sources_index_threshold(ContributingPixels, thresh_pixels_for_accumulated_conc);
+
+        // now get the junction network
+        LSDJunctionNetwork ChanNetwork(sources, FlowInfo);
+
+        // Print channels and junctions if you want them.
+
+        cout << "I am going to print the thinned channel network now." << endl;
+        string channel_csv_name = OUT_DIR+OUT_ID+"_SAMPLED_CN";
+        ChanNetwork.PrintChannelNetworkToCSV_WithValuesThinned(FlowInfo, channel_csv_name, 
+                                                                AccConc, thinning_factor,
+                                                                value_column_name);
+        cout << "I've printed the channel network. " << endl;        
+      }
+
+      if(this_bool_map["print_outlet_accumulated_concentration"])
+      {
+        int outlet = 0;     // this just gest the first value in the stack
+        vector<int> cosmo_nodes;
+        cosmo_nodes.push_back(outlet);
+
+        string conc_pts_fname;
+        if (this_string_map["cosmo_accumulated_concentration_points_fname"] == "NULL")
+        {
+          conc_pts_fname = OUT_ID+"_ACCCONC_pts.csv";
+        }
+        else
+        {
+          conc_pts_fname = this_string_map["cosmo_accumulated_concentration_points_fname"];
+        }
+        string acc_points_out_fname = OUT_DIR+conc_pts_fname;  
+        string add_column_name = this_string_map["concentration_column_name"];
+        FlowInfo.print_vector_of_nodeindices_to_csv_file_with_latlong(cosmo_nodes, acc_points_out_fname, AccConc, add_column_name);
+      }
+    }   // end logic for accumulation
+  
+
+    //=======================================================================================
+    //
+    //.##..##..######..##...##..........######..#####....####...######..######.
+    //.###.##..##......##...##..........##......##..##..##..##....##....##.....
+    //.##.###..####....##.#.##..........####....#####...######....##....####...
+    //.##..##..##......#######..........##......##..##..##..##....##....##.....
+    //.##..##..######...##.##...........######..##..##..##..##....##....######.
+    //
+    //=======================================================================================    
+    if(this_bool_map["calculate_erosion_rates_new"])
     {
-      cout << "I am reading points from the file: "+ this_string_map["points_filename"] << endl;
-      LSDSpatialCSVReader CRN_points_data( RI, (DATA_DIR+this_string_map["points_filename"]) );
+      cout << endl << endl << "===================================" << endl;
+      cout << "I am now entering the erosion rate calculator." << endl;
+      
+      string Nuclide = this_string_map["nuclide_for_prediction"];
+      string Muon_scaling = this_string_map["muon_scheme_for_prediction"];
+
+      LSDSpatialCSVReader CRN_points_data;
+      if (this_bool_map["erate_use_accumulated_points"])
+      {
+        cout << "I'm going to use accumulated points for the point file." << endl;
+        cout << "This is typicall calculated alongside accumulation rasters to check" << endl;
+        cout << "If the erosion calculator is working or for step change simulations" << endl;
+        string acc_points_out_fname = OUT_DIR+OUT_ID+"_SAMPLED_CN.csv";
+        cout << "The points file is " << acc_points_out_fname << endl;
+        LSDSpatialCSVReader CRNPD( RI, acc_points_out_fname );
+        CRN_points_data = CRNPD;
+      }
+      else
+      {
+        cout << "I am reading points from the file: "+ this_string_map["points_filename"] << endl;
+        LSDSpatialCSVReader CRNPD( RI, (DATA_DIR+this_string_map["points_filename"]) );
+        CRN_points_data = CRNPD;
+      } 
 
       // You need to get the node indices of the points first
       // get some relevant rasters
@@ -1046,82 +1801,92 @@ int main (int nNumberofArgs,char *argv[])
         cout << fUTM_easting[i] << "," << fUTM_northing[i] << endl;
       }
       
-      int search_radius_nodes = 8;
-      int threshold_stream_order = 3;
+      int search_radius_nodes = 4;
       vector<int> valid_cosmo_points;
       vector<int> snapped_node_indices;
       vector<int> snapped_junction_indices;
 
       // Now get the snapped points 
       // The snapped points are in a vector called snapped_node_indices  
-      cout << "I'm snapping some points" << endl; 
+      cout << "I'm snapping some points" << endl;
+      cout << "I am going for the closest channel of first order." << endl; 
+      int snap_threshold_stream_order = 1;
       ChanNetwork.snap_point_locations_to_nearest_channel_node_index(fUTM_easting, fUTM_northing, 
-            search_radius_nodes, threshold_stream_order, FlowInfo, 
+            search_radius_nodes, snap_threshold_stream_order, FlowInfo, 
             valid_cosmo_points, snapped_node_indices);
       cout << "The number of snapped points is: " <<   valid_cosmo_points.size() << endl;   
 
-      // Now get accumulated cosmo for testing
-      auto t1 = std::chrono::high_resolution_clock::now();   
-      LSDRaster CRN_conc = ThisCosmoRaster.calculate_CRN_concentration_raster(Nuclide, Muon_scaling, ErosionRaster,
-                                            ProductionRaster, TopoShield, 
-                                            SelfShield, SnowShield, 
-                                            is_production_uncertainty_plus_on,
-                                            is_production_uncertainty_minus_on);
-      auto t2 = std::chrono::high_resolution_clock::now();
-      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
-      cout << "Full concentration calculation took: " << duration << endl;
 
-      t1 = std::chrono::high_resolution_clock::now();   
-      LSDRaster AccConc = ThisCosmoRaster.calculate_accumulated_CRN_concentration(CRN_conc, ErosionRaster,FlowInfo);   
-      t2 = std::chrono::high_resolution_clock::now();
-      duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
-      cout << "Accumulation calculation took: " << duration << endl;       
-
-
-      if(this_bool_map["calculate_accumulated_CRN_concentration_from_points"])
+      // Now make or load the shield and other rasters
+      LSDRaster SelfShield;
+      if (this_string_map["self_shielding_raster_prefix"] != "NULL")
       {
-
-        // now loop through the valid node indices:
-        int n_nodes = int(snapped_node_indices.size());
-        for(int node = 0; node<n_nodes; node++)
-        {
-          cout << "Found the node " << snapped_node_indices[node] << endl;
-
-          t1 = std::chrono::high_resolution_clock::now();   
-          LSDRaster CRNConc_node = ThisCosmoRaster.calculate_CRN_concentration_raster(Nuclide, Muon_scaling, ErosionRaster,
-                                            ProductionRaster, TopoShield, 
-                                            SelfShield, SnowShield, 
-                                            FlowInfo,snapped_node_indices[node],
-                                            is_production_uncertainty_plus_on,
-                                            is_production_uncertainty_minus_on);
-
-          t2 = std::chrono::high_resolution_clock::now();
-          duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
-          cout << "Basin concentration calculation took: " << duration << endl;
-
-          // This writes the concentration raster 
-          string this_raster_name = OUT_DIR+OUT_ID+"_"+Nuclide+"_Conc_"+itoa(node);                                   
-          CRNConc_node.write_raster(this_raster_name,raster_ext);
-
-          // Now accumulate from this node
-          float This_accumulated_cosmo = ThisCosmoRaster.calculate_accumulated_CRN_concentration(CRNConc_node, 
-                                            ErosionRaster, FlowInfo, 
-                                            snapped_node_indices[node]);
-
-          cout << endl << endl << "===========================" << endl;
-          cout << "Accumulated concentration is: " << This_accumulated_cosmo << " atoms/g" <<endl;
-
-          int row,col;
-          FlowInfo.retrieve_current_row_and_col(snapped_node_indices[node],row,col);
-          cout << "And same accumulation from the raster I previously calculated: " <<  AccConc.get_data_element(row,col);
-          cout << "========================" << endl << endl;
-
-        }
+        LSDRaster temp(DATA_DIR+this_string_map["self_shielding_raster_prefix"],raster_ext);
+        SelfShield= temp;
+      }
+      else
+      {
+        MakeItYeah.set_to_constant_value(this_float_map["self_shield_eff_thickness"]);
+        SelfShield =  MakeItYeah.return_as_raster(); 
+      }
+      
+      LSDRaster SnowShield;
+      if (this_string_map["snow_shielding_raster_prefix"] != "NULL")
+      {
+        LSDRaster temp(DATA_DIR+this_string_map["snow_shielding_raster_prefix"],raster_ext);
+        SnowShield= temp;
+      }
+      else
+      {
+        MakeItYeah.set_to_constant_value(this_float_map["snow_shield_eff_thickness"]);
+        SnowShield =  MakeItYeah.return_as_raster(); 
+      }
+      
+      LSDRaster TopoShield;
+      if (this_string_map["topographic_shielding_raster_prefix"] != "NULL")
+      {
+        LSDRaster temp(DATA_DIR+this_string_map["topographic_shielding_raster_prefix"],raster_ext);
+        TopoShield= temp;
+      }
+      else
+      {
+        MakeItYeah.set_to_constant_value(1.0);
+        TopoShield =  MakeItYeah.return_as_raster();  
       }
 
+      LSDRaster NoDataRaster;
+      MakeItYeah.set_to_constant_value(ProductionRaster.get_NoDataValue());
+      NoDataRaster = MakeItYeah.return_as_raster();
+
+      // The erosion rate calculation
+      // This version will work from a specific node rather than a channel junction
+      // It uses a hybrid newton-raphson and bisection method (the latter if the former fails)
+      // to converge on the correct erosion rate
+      // There is no error analysis in this version, you just get the closest number. 
+      // For a representative error analysis we would need to know local variation in
+      // quartz content, erosion rate, storage, etc. So instead I suggest a blanket 20% uncertainty.
+      // You only need a concentration for this routine
+      // you tell the routine which nuclide to use in the driver file
+      // In this case we do not use nested basins so we do not use an erosion raster
+      // there is also an option for including a quartz concentration but that has yet to be implemented
+      // SMM, 04 June 2022
       if( this_bool_map["calculate_erosion_rates_new"])
       {
         cout << "Let me calculate the erosion rate for you. "  << endl;
+
+        // Set up the output file
+        string erate_calc_fname = OUT_DIR+OUT_ID+"_CN_ERATE.csv";
+        string erate_calc_column = "apparent_eff_e";
+        double this_lat, this_long;
+        float predicted_conc;
+        LSDCoordinateConverterLLandUTM Converter;
+
+
+        // open the outfile
+        ofstream csv_out;
+        csv_out.open(erate_calc_fname.c_str());
+        csv_out.precision(8);
+        csv_out << "latitude,longitude,concentration,predicted_conc,apparent_eff_e,apparent_e_mm_yr" << endl;
 
         // This looks for concentrations data
         cout << "The concentration column name is: " << this_string_map["concentration_column_name"] << endl;
@@ -1131,6 +1896,7 @@ int main (int nNumberofArgs,char *argv[])
         int n_valid_samples = int(valid_cosmo_points.size());
         for(int sample = 0; sample< n_valid_samples; sample++)
         {
+          cout << endl << endl << "Processing sample " << sample+1 << " of " << n_valid_samples << ". ";
           cout << "The concentration is: " << concentrations[ valid_cosmo_points[sample]  ] << endl;
 
           float This_erate = ThisCosmoRaster.calculate_eff_erate_from_conc(concentrations[ valid_cosmo_points[sample] ],
@@ -1138,81 +1904,22 @@ int main (int nNumberofArgs,char *argv[])
                                             ProductionRaster, TopoShield, 
                                             SelfShield, SnowShield, 
                                             NoDataRaster,FlowInfo,
-                                            snapped_node_indices[sample]);
+                                            snapped_node_indices[sample],
+                                            predicted_conc);
 
+          FlowInfo.get_lat_and_long_from_current_node(snapped_node_indices[sample], this_lat, this_long, Converter);
           cout << "The erosion rate is: " << This_erate << endl;
+          csv_out << this_lat << "," << this_long << "," << concentrations[ valid_cosmo_points[sample] ]
+                  << "," << predicted_conc << "," << This_erate << "," 
+                  << 10000*This_erate/this_float_map["rock_density_kg_m3"] << endl;
         }
+        csv_out.close();
       }
+    }  // end logic for new erate
 
-    } // end logic for getting points
-  } // end logic for getting flow info
-
-
-  //================================================================================================
-  // This checks the sediment routing components
-  // it is essentially used to both debug the raster aggregator as well
-  // as test of the raster file is working properly
-  // AT THE MOMENT THIS DOES NOTHING
-  if(this_bool_map["check_sediment_routing_rasters"])
-  {
-    cout << "Let me check some sediment routing for you!" << endl;
-    // Make a raster aggregator object
-    LSDRasterAggregator LSDRA(DATA_DIR,this_string_map["raster_fnames_prefix"]);
-    
-    // Print the rasters and keys to screen.
-    LSDRA.print_raster_names_and_types_to_screen();
-
-    // See if all the keys are represented
-    vector<string> required_rasters;
-    required_rasters.push_back("DEM");
-    required_rasters.push_back("10BeCONC");
-    required_rasters.push_back("Funky CHICKEN");
-    LSDRA.check_raster_types(required_rasters);
-  }
+  } // end logic for accumulation and erate, which both involve flowinfo and production
 
 
-
-
-  // This is the logic for sediment routing
-  if(this_bool_map["route_cosmo_concentrations"])
-  {
-
-    // Get the filled topography
-    LSDRaster filled_topography;
-    // now get the flow info object
-    if ( this_bool_map["raster_is_filled"] )
-    {
-      cout << "You have chosen to use a filled raster." << endl;
-      filled_topography = topography_raster;
-    }
-    else
-    {
-      cout << "Let me fill that raster for you, the min slope is: "
-           << this_float_map["min_slope_for_fill"] << endl;
-      filled_topography = topography_raster.fill(this_float_map["min_slope_for_fill"]);
-    }
-
-    if (this_bool_map["print_fill_raster"])
-    {
-      cout << "Let me print the fill raster for you."  << endl;
-      string filled_raster_name = OUT_DIR+OUT_ID+"_Fill";
-      filled_topography.write_raster(filled_raster_name,raster_ext);
-    }
-
-    // I am going to route some sediment concentrations for you so I need to do some 
-    // flow routing
-    cout << "\t Flow routing..." << endl;
-    // get a flow info object
-    LSDFlowInfo FlowInfo(boundary_conditions,filled_topography);
-
-    // Now create a raster aggregator
-    LSDRasterAggregator LSDRA();
-  }
-  
-  bool_default_map["route_cosmo_concentrations"] = false;
-  string_default_map["raster_fnames_prefix"] = "NULL";
-  bool_default_map["accumulate_cosmo"] = false;  
-  
 
   cout << "I'm all finished! Have a nice day." << endl;
 }

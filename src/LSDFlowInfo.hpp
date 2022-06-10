@@ -289,6 +289,16 @@ class LSDFlowInfo
   /// @date 20/05/16
   void print_vector_of_nodeindices_to_csv_file_with_latlong(vector<int>& nodeindex_vec, string outfilename);
 
+  /// @brief This function takes a vector of node indices and prints a csv
+  ///  file that can be read by arcmap: similar to above but also prints lat and long
+  ///  This version adds a column from a raster
+  /// @param nodeindex vec is a vector of nodeindices (which are ints)
+  /// @param outfilename is a string of the filename
+  /// @param add_value a raster from which to add the value to the point
+  /// @param add_column_name the name of the column to add
+  /// @author SMM
+  /// @date 20/05/16
+  void print_vector_of_nodeindices_to_csv_file_with_latlong(vector<int>& nodeindex_vec, string outfilename, LSDRaster& add_value, string add_column_name);
 
   /// @brief This function takes a vector of node indices and prints a csv
   ///  file that can be read by arcmap: similar to above but also prints lat and long
@@ -299,6 +309,8 @@ class LSDFlowInfo
   /// @author SMM
   /// @date 20/05/16
   void print_vector_of_nodeindices_to_csv_file_with_latlong(vector<int> node_list,string path, string filename);
+
+
 
 
   /// @brief This function takes a vector of node indices and prints a csv
@@ -700,7 +712,7 @@ class LSDFlowInfo
   ///@return A raster containing the accumulated variable
   ///@author BG, SMM
   ///@date 17/04/2019
-  LSDRaster upslope_variable_accumulator_v2(LSDRaster& accum_raster);
+  void upslope_variable_accumulator_v2(LSDRaster& accum_raster);
   LSDRaster upslope_variable_accumulator_v2(LSDRaster& accum_raster, bool accum_current_node);
 
   ///@brief This function accumulates some variable from an LSDRaster
@@ -1548,6 +1560,17 @@ void get_nodeindices_from_csv(string csv_filename, vector<int>& NIs, vector<floa
   /// @author FJC
   /// @date 04/06/21
   int find_nearest_node_in_vector(int target_node, vector<int> node_vector);
+
+  /// @brief function to calculate the hypsometric integral for a node
+  /// @param node starting node to calculate HI for
+  /// @param FlowInfo
+  /// @param Elevation elev raster
+  /// @author FJC
+  /// @date 26/01/22
+  float calculate_upstream_HI(int node, LSDRaster& Elevation);
+
+  void calculate_upstream_elevations(int node, LSDRaster& Elevation, float bin_width, float lower_limit, float upper_limit, vector<float>& Midpoints, vector<float>& ProbabilityDensity);
+
 
   /// @brief Find the elevation difference between the channel and surrounding pixels using the
   /// swath tool.

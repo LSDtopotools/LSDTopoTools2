@@ -454,6 +454,28 @@ class LSDJunctionNetwork
   /// @date 08/11/2020
   void PrintChannelNetworkToCSV_WithElevation_WithDonorJunction(LSDFlowInfo& flowinfo, string fname_prefix,LSDRaster& elevation);
 
+  /// @brief This prints a stream network to a csv in WGS84. It includes surface fitting metrics along the channel
+  /// @param FlowInfo the flow info object which translates node indices to actual points
+  /// @param FileName_prefix The prefix of the file to write, if no path is included it will write to the current directory.
+  ///  The csv extension is added automatically.
+  /// @param elevation The elevation raster
+  /// @author FJC
+  /// @date 28/01/2022
+  void PrintChannelNetworkToCSV_WithSurfaceMetrics(LSDFlowInfo& flowinfo, string fname_prefix, LSDRaster& Elevation, LSDRaster& Slope, LSDRaster& Relief, LSDRaster& Curvature);
+
+  /// @brief This prints a stream network to a csv in WGS84. It only has latitude, longitude and a valu from a raster
+  ///   it can also thin the data
+  /// @param FlowInfo the flow info object which translates node indices to actual points
+  /// @param FileName_prefix The prefix of the file to write, if no path is included it will write to the current directory.
+  ///  The csv extension is added automatically.
+  /// @param values A raster with some values
+  /// @param thinning_factor by how much the data is thinned
+  /// @param value_column_name the name of the column 
+  /// @author SMM
+  /// @date 03/06/2022
+  void PrintChannelNetworkToCSV_WithValuesThinned(LSDFlowInfo& flowinfo, string fname_prefix, 
+                                                                    LSDRaster& Values, int thinning_factor,
+                                                                    string value_column_name);
 
   /// @brief This sends the JunctionArray to a LSDIndexRaster.
   /// @return LSDIndexRaster of JunctionArray.
@@ -568,6 +590,24 @@ class LSDJunctionNetwork
     /// @author SMM
     /// @date 26/06/17
     vector<int>  Prune_Junctions_By_Contributing_Pixel_Window_Remove_Nested_And_Nodata(LSDFlowInfo& FlowInfo,
+                                              LSDRaster& TestRaster, LSDIndexRaster& FlowAcc,
+                                              int lower_limit, int upper_limit);
+
+    /// @brief This function removes basins that fall outside a contributing pixel
+    ///  Window and those that
+    ///  are nested. A rather intensive pruning process that hopeuflly results
+    ///  in a number of basins that are a similar size
+    /// @detail This doesn't just look for baselevel junctions: it goes through
+    ///  all junctions in the DEM. Warning: computationally expensive!
+    /// @param FlowInfo The LSDFlowInfo object
+    /// @param TestRaster A raster that is just used to look for nodata
+    /// @param FlowAcc an LSDIndexRaster with the number of pixels for flow accumulation
+    /// @param lower_limit The minimum number of contributing pixels
+    /// @param upper_limit The maximum number of contributing pixels
+    /// @return a pruned list of base level nodes
+    /// @author SMM
+    /// @date 26/06/17
+    vector<int>  Prune_Junctions_By_Contributing_Pixel_Window_Remove_Nested_Keep_Edge(LSDFlowInfo& FlowInfo,
                                               LSDRaster& TestRaster, LSDIndexRaster& FlowAcc,
                                               int lower_limit, int upper_limit);
 
@@ -2202,6 +2242,19 @@ void write_river_profiles_to_csv_all_sources(float channel_length, int slope_win
 /// @date 12/11/2018
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
 map<int,bool> GetMapOfChannelNodes(LSDFlowInfo& flowinfo);
+
+/// @brief Calculate the hypsometric integral for every point in the channel network and write to csv
+/// @param fname_prefix csv filename prefix
+/// @param FlowInfo
+/// @param Elevation elev raster
+/// @author FJC
+/// @date 26/01/22
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+void calculate_hypsometric_integral(string fname_prefix, LSDFlowInfo& FlowInfo, LSDRaster& Elevation);
+
+void calculate_upstream_elevations_network(string fname_prefix, LSDFlowInfo& FlowInfo, LSDRaster& Elevation, float bin_width, float lower_limit, float upper_limit);
+
+
 
   protected:
 

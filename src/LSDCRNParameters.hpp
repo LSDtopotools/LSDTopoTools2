@@ -217,7 +217,14 @@ class LSDCRNParameters
   /// @author SMM
   /// @date 27/01/2015
   void set_Braucher_parameters();
-  
+
+  /// @brief This resets the F, Gamma and P0 values so that they conform to 
+  /// parameters from Braucher et al 2011 and Brchers et al 2016
+  /// @detail From personal communication with Mirjam Schaller
+  /// @author SMM
+  /// @date 04/02/2022
+  void set_BraucherBorchers_parameters(); 
+
   /// @brief This resets the F, Gamma and P0 values 
   /// For 10Be, these correspond to new production curves provided by Shasta Marerro
   //  For the rest they conform to 

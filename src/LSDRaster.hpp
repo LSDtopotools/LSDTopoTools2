@@ -589,6 +589,14 @@ class LSDRaster
   /// @date 5/11/14
   LSDRaster RasterTrimmerSpiral();
 
+  /// @brief This replaces the first and last row and column with nodata
+  ///  used in drainage extraction where removal of all pixels that are 
+  ///  influenced by the edge is important
+  /// @return void but updates the data in the raster object
+  /// @author SMM
+  /// @date 15/01/2022
+  void replace_edges_with_nodata();
+
   /// @brief This returns a clipped raster that has the same dimensions as the
   ///  smaller raster
   /// @param smaller_raster the raster to which the bigger raster should be
@@ -653,6 +661,23 @@ class LSDRaster
   /// @author SMM
   /// @date 15/02/2021
   vector< LSDRaster > find_nearest_point_from_list_of_points(vector<float> Eastings, vector<float> Northings,
+                                              vector<float> values, float swath_width);
+
+
+  /// @brief This takes a list of points. Then, for every pixel in the
+  ///  raster it finds the point amongst that list that is closest to the given pixel.
+  /// @param Eastings a vector of easting locations
+  /// @param Northings a vector of northing locations
+  /// @param values The value of the list of points to map onto the raster.
+  ///  This functions is most commonly used for swath mapping so the value is usually a distance
+  /// @param swath_width the width of the swath in metres
+  /// @return A vector or rasters. The first is the closest distance to each pixel in the list
+  ///  the second is the value of the pixel in the list, the third is the index in the list
+  ///  of the closest pixel, the fourth is the relief between the nearest point value and the value
+  ///  of the raster at that point 
+  /// @author SMM
+  /// @date 09/06/2022
+  vector< LSDRaster > find_nearest_point_from_list_of_points_with_relief(vector<float> Eastings, vector<float> Northings,
                                               vector<float> values, float swath_width);
 
   /// @brief This takes a list of points and makes a swath profile around them.
@@ -747,9 +772,30 @@ class LSDRaster
   /// @brief Calculates the mean difference between two rasters
   /// @details checks raster dimensions  but not georeferencing since it
   ///  is used to compare asc format model results
+  /// @param compare_raster the raster with which the raster is compared  
+  /// @return the average difference between the two rasters
   /// @author SMM
   /// @date 04/05/2015
   float difference_rasters(LSDRaster& compare_raster);
+
+  /// @brief Calculates the mean difference between two rasters
+  /// @details checks raster dimensions  but not georeferencing since it
+  ///  is used to compare asc format model results
+  /// @param compare_raster the raster with which the raster is compared
+  /// @return the number of pixels that are different between the two pixels
+  /// @author SMM
+  /// @date 07/06/2022
+  int find_n_different_pixels(LSDRaster& compare_raster);
+
+  /// @brief Calculates the mean difference between two rasters. Uses a threshold for difference
+  /// @details checks raster dimensions  but not georeferencing since it
+  ///  is used to compare asc format model results
+  /// @param compare_raster the raster with which the raster is compared
+  /// @param threshold the value that the difference must be above for change to be recorded
+  /// @return the number of pixels that are different between the two pixels
+  /// @author SMM
+  /// @date 07/06/2022
+  int find_n_different_pixels(LSDRaster& compare_raster, float threshold);
 
   /// @brief This multiplies the raster data by a multiplier
   /// @detail Note that values are replaced
@@ -1468,6 +1514,19 @@ class LSDRaster
   /// @author SMM
   /// @date 28/9/2016
   LSDRaster mask_to_nodata_using_threshold_using_other_raster(float threshold,bool belowthresholdisnodata, LSDRaster& MaskingRaster);
+
+  /// @brief This function changes any data point either above or below threshold to NoDataValue
+  ///  The threshold is determined by a second raster. In this version any nodata in the masking raster
+  ///  is converted to nodata in the masked raster
+  /// @param threshold The threshold value
+  /// @param belowthresholdisnodata a boolean that if true means anything below the
+  ///   threshold turns to nodata
+  /// @param MaskingRaster an LSDRaster that is used to define the mask
+  /// @return Returns the masked raster
+  /// @author SMM
+  /// @date 31/05/2022
+  LSDRaster mask_to_nodata_using_threshold_using_other_raster_expunge_nodata_in_mask(float threshold,bool belowthresholdisnodata, 
+                                                                        LSDRaster& MaskingRaster);
 
   /// @brief This function creats an LSDIndexRaster mask (with true == 1 and otherwise nodata)
   /// from an LSDRaster. Can mask either above or below a threshold

@@ -75,7 +75,7 @@ int main (int nNumberofArgs,char *argv[])
   //start the clock
   clock_t begin = clock();
 
-  string version_number = "0.6";
+  string version_number = "0.7d";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -90,7 +90,7 @@ int main (int nNumberofArgs,char *argv[])
   cout << "|| " << citation << endl;
   cout << "|| If you use these routines please cite:              ||" << endl;   
   cout << "|| https://www.doi.org/10.1002/2013WR015167            ||" << endl;
-  cout << "|| If you use the wiener routine please cite:          ||" << endl;   
+  cout << "|| If you use the Wiener routine please cite:          ||" << endl;   
   cout << "|| https://www.doi.org/10.5194/esurf-4-627-2016        ||" << endl;  
   cout << "=========================================================" << endl;
   cout << "|| Documentation can be found at:                      ||" << endl;
@@ -169,7 +169,7 @@ int main (int nNumberofArgs,char *argv[])
   //=================================================================================  
   // Basic DEM preprocessing
   float_default_map["minimum_elevation"] = 0.0;
-  help_map["minimum_elevation"] = { "float","0.0","All elevation values below this become nodata if remove_seas is true.","Ususally 0."};
+  help_map["minimum_elevation"] = { "float","0.0","All elevation values below this become nodata if remove_seas is true.","Usually 0."};
 
   float_default_map["maximum_elevation"] = 30000;
   help_map["maximum_elevation"] = {  "float","0.0","All elevation values above this become nodata if remove_seas is true.","Pick a big number."};
@@ -192,19 +192,19 @@ int main (int nNumberofArgs,char *argv[])
   help_map["threshold_contributing_pixels"] = {  "int","1000","The number of contributing pixels needed to start a channel using the threshold method.","This is in pixels not drainage area. More options are in the lsdtt-channel-extraction tool."};
 
   int_default_map["connected_components_threshold"] = 100;
-  help_map["connected_components_threshold"] = {  "int","100","Number of connected pixels to classify as a channel.","Used in pelletier and wiener methods."};
+  help_map["connected_components_threshold"] = {  "int","100","Number of connected pixels to classify as a channel.","Used in Pelletier and Wiener methods."};
 
   float_default_map["surface_fitting_radius"] = 6;
   help_map["surface_fitting_radius"] = {  "float","6","Our surface fitting routines fit a polynomial over the points with in a radius defined by surface_fitting_radius and then differentiate this surface to get the surface metrics like gradient and curvature","If not bigger than the pixel_size*sqrt(2) then will increase to that number. Unlike lsdtt-basic-metrics this default is tuned for lidar data"};
 
   float_default_map["pruning_drainage_area"] = 1000;
-  help_map["pruning_drainage_area"] = {  "float","1000","In both driech and wiener channels with less than this drainage area are removed during the pruning process.","In m^2."};
+  help_map["pruning_drainage_area"] = {  "float","1000","In both driech and Wiener channels with less than this drainage area are removed during the pruning process.","In m^2."};
 
   float_default_map["curvature_threshold"] = 0.1;
-  help_map["curvature_threshold"] = {  "float","0.1","For the pelletier method this is the threshold of planform curvature for a channel head.","In 1/m"};
+  help_map["curvature_threshold"] = {  "float","0.1","For the Pelletier method this is the threshold of planform curvature for a channel head.","In 1/m"};
 
   float_default_map["minimum_drainage_area"] = 400;
-  help_map["minimum_drainage_area"] = {  "float","400","For the pelletier method this is the minimum drainage area for a channel head.","In m^2"};
+  help_map["minimum_drainage_area"] = {  "float","400","For the Pelletier method this is the minimum drainage area for a channel head.","In m^2"};
 
   int_default_map["number_of_junctions_dreich"] = 1;
   help_map["number_of_junctions_dreich"] = {  "int","1","For driech the number of junctions to pass to construct the chi profile at the upstream end of the channel.","Applies only to dreich"};
@@ -215,7 +215,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["A_0"] = {  "float","1.0","The A_0 parameter for chi computation. See https://doi.org/10.1002/esp.3302","Usually set to 1 so that the slope in chi-elevation space is the same as k_sn"};
    
   float_default_map["m_over_n"] = 0.5;
-  help_map["m_over_n"] = {  "float","0.5","The concavity index for chi calculations. Ususally denoted as the greek symbol theta.","Default is 0.5 but possibly 0.45 is better as Kwang and Parker suggest 0.5 leads to unrealistic behaviour in landscape evolution models."};
+  help_map["m_over_n"] = {  "float","0.5","The concavity index for chi calculations. Usually denoted as the Greek symbol theta.","Default is 0.5 but possibly 0.45 is better as Kwang and Parker suggest 0.5 leads to unrealistic behaviour in landscape evolution models."};
 
 
   // The actual channel extraction routines
@@ -226,10 +226,10 @@ int main (int nNumberofArgs,char *argv[])
   help_map["print_dreich_channels"] = {  "bool","false","Prints the channel network determined by the driech method.","Output is a csv file."};
 
   bool_default_map["print_pelletier_channels"] = false;
-  help_map["print_pelletier_channels"] = {  "bool","false","Prints the channel network determined by the pelletier method.","Output is a csv file."};
+  help_map["print_pelletier_channels"] = {  "bool","false","Prints the channel network determined by the Pelletier method.","Output is a csv file."};
 
   bool_default_map["print_wiener_channels"] = false;
-  help_map["print_wiener_channels"] = {  "bool","false","Prints the channel network determined by the the wiener method which is a mashup of passalacqua and pelletier methods first reported by grieve et al 2016.","Output is a csv file."};
+  help_map["print_wiener_channels"] = {  "bool","false","Prints the channel network determined by the Wiener method which is a mashup of Passalacqua and Pelletier methods first reported by grieve et al 2016.","Output is a csv file."};
 
   bool_default_map["print_stream_order_raster"] = false;
   help_map["print_stream_order_raster"] = {  "bool","false","Prints a raster with _SO in filename with stream orders of channel in the appropriate pixel.","Generates a big file so we suggest printing the network to csv."};
@@ -238,7 +238,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["print_sources_to_raster"] = {  "bool","false","If true the sources to a raster.","Inefficient so print_sources_to_csv is preferred."};
   
   bool_default_map["print_wiener_filtered_raster"] = false;
-  help_map["print_wiener_filtered_raster"] = {  "bool","false","Runs the raster through a wiener filter and prints the result.","Output file has _Wfilt in filename."};
+  help_map["print_wiener_filtered_raster"] = {  "bool","false","Runs the raster through a Wiener filter and prints the result.","Output file has _Wfilt in filename."};
 
 
   // some simple raster printing
@@ -328,8 +328,8 @@ int main (int nNumberofArgs,char *argv[])
   {
     cout << "I am going to print the help and exit." << endl;
     cout << "You can find the help in the file:" << endl;
-    cout << "./lsdtt-basic-metrics-README.csv" << endl;
-    string help_prefix = "lsdtt-channel_extraction-README";
+    cout << "./lsdtt-channel-extraction-README.csv" << endl;
+    string help_prefix = "lsdtt-channel-extraction-README";
     LSDPP.print_help(help_map, help_prefix, version_number, citation);
     exit(0);
   }
@@ -760,7 +760,7 @@ int main (int nNumberofArgs,char *argv[])
   //===============================================================
   if (this_bool_map["print_pelletier_channels"])
   {
-    cout << "I am calculating channels using the pelletier algorighm (doi:10.1029/2012WR012452)." << endl;
+    cout << "I am calculating channels using the Pelletier algorighm (doi:10.1029/2012WR012452)." << endl;
     cout << endl << "!!!!WARNING!!!" << endl;
     cout << "This routine is memory intensive! You will need ~20-30 times as much memory as the size of your DEM!" << endl;
     cout << "On a 3 Gb vagrant box a 100 Mb DEM is likeley to crash the machine." << endl;
@@ -768,7 +768,7 @@ int main (int nNumberofArgs,char *argv[])
     cout << "or tile your DEM and run this multiple times. Or get a linux workstation." << endl << endl;
     LSDRasterSpectral SpectralRaster(topography_raster);
 
-    cout << "I am running a wiener filter" << endl;
+    cout << "I am running a Wiener filter" << endl;
     LSDRaster topo_test_wiener = SpectralRaster.fftw2D_wiener();
     int border_width = 100;
     topo_test_wiener = topo_test_wiener.border_with_nodata(border_width);

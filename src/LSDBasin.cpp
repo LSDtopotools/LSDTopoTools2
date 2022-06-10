@@ -3497,6 +3497,8 @@ vector<double> LSDCosmoBasin::full_CRN_erosion_analysis(double Nuclide_conc, str
   // first set the scaling
   // reset scaling parameters. This is necessary since the F values are
   // reset for local scaling
+
+  cout << endl << endl << endl << "I am getting the erosion rate for a basin and the muon scaling is: " << Muon_scaling << endl << endl;
   if (Muon_scaling == "Schaller" )
   {
     LSDCRNP.set_Schaller_parameters();
@@ -3513,10 +3515,14 @@ vector<double> LSDCosmoBasin::full_CRN_erosion_analysis(double Nuclide_conc, str
   {
     LSDCRNP.set_newCRONUS_parameters();
   }
+  else if (Muon_scaling == "BraucherBorchers" )
+  {
+    LSDCRNP.set_BraucherBorchers_parameters();
+  }
   else
   {
     cout << "You didn't set the muon scaling." << endl
-         << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+         << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
          << "You chose: " << Muon_scaling << endl
          << "Defaulting to Braucher et al (2009) scaling" << endl;
     LSDCRNP.set_Braucher_parameters();
@@ -3734,6 +3740,7 @@ vector<double> LSDCosmoBasin::full_CRN_erosion_analysis_nested(LSDRaster& known_
   // first set the scaling
   // reset scaling parameters. This is necessary since the F values are
   // reset for local scaling
+  cout << endl << endl << endl << "I am getting the erosion rate for a basin and the muon scaling is: " << Muon_scaling << endl << endl;
   if (Muon_scaling == "Schaller" )
   {
     LSDCRNP.set_Schaller_parameters();
@@ -3750,10 +3757,14 @@ vector<double> LSDCosmoBasin::full_CRN_erosion_analysis_nested(LSDRaster& known_
   {
     LSDCRNP.set_newCRONUS_parameters();
   }
+  else if (Muon_scaling == "BraucherBorchers" )
+  {
+    LSDCRNP.set_BraucherBorchers_parameters();
+  }
   else
   {
     cout << "You didn't set the muon scaling." << endl
-         << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+         << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
          << "You chose: " << Muon_scaling << endl
          << "Defaulting to Braucher et al (2009) scaling" << endl;
     LSDCRNP.set_Braucher_parameters();
@@ -3928,10 +3939,14 @@ double LSDCosmoBasin::predict_CRN_erosion(double Nuclide_conc, string Nuclide,
   {
     LSDCRNP.set_newCRONUS_parameters();
   }
+  else if (Muon_scaling == "BraucherBorchers" )
+  {
+    LSDCRNP.set_BraucherBorchers_parameters();
+  }
   else
   {
     cout << "You didn't set the muon scaling." << endl
-         << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+         << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
          << "You chose: " << Muon_scaling << endl
          << "Defaulting to Braucher et al (2009) scaling" << endl;
     LSDCRNP.set_Braucher_parameters();
@@ -4213,10 +4228,14 @@ double LSDCosmoBasin::predict_CRN_erosion_nested(double Nuclide_conc, string Nuc
   {
     LSDCRNP.set_newCRONUS_parameters();
   }
+  else if (Muon_scaling == "BraucherBorchers" )
+  {
+    LSDCRNP.set_BraucherBorchers_parameters();
+  }
   else
   {
     cout << "You didn't set the muon scaling." << endl
-         << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+         << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
          << "You chose: " << Muon_scaling << endl
          << "Defaulting to Braucher et al (2009) scaling" << endl;
     LSDCRNP.set_Braucher_parameters();
@@ -4541,10 +4560,14 @@ double LSDCosmoBasin::predict_mean_CRN_conc(double eff_erosion_rate, string Nucl
       {
         LSDCRNP.set_newCRONUS_parameters();
       }
+      else if (Muon_scaling == "BraucherBorchers" )
+      {
+        LSDCRNP.set_BraucherBorchers_parameters();
+      }
       else
       {
         cout << "You didn't set the muon scaling." << endl
-             << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+            << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
              << "You chose: " << Muon_scaling << endl
              << "Defaulting to Braucher et al (2009) scaling" << endl;
         LSDCRNP.set_Braucher_parameters();
@@ -4760,10 +4783,14 @@ double LSDCosmoBasin::predict_mean_CRN_conc_with_snow_and_self(double eff_erosio
       {
         LSDCRNP.set_newCRONUS_parameters();
       }
+      else if (Muon_scaling == "BraucherBorchers" )
+      {
+        LSDCRNP.set_BraucherBorchers_parameters();
+      }
       else
       {
         cout << "You didn't set the muon scaling." << endl
-             << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+            << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
              << "You chose: " << Muon_scaling << endl
              << "Defaulting to Braucher et al (2009) scaling" << endl;
         LSDCRNP.set_Braucher_parameters();
@@ -5006,10 +5033,14 @@ double LSDCosmoBasin::predict_mean_CRN_conc_with_snow_and_self_nested(double eff
       {
         LSDCRNP.set_newCRONUS_parameters();
       }
+      else if (Muon_scaling == "BraucherBorchers" )
+      {
+        LSDCRNP.set_BraucherBorchers_parameters();
+      }
       else
       {
         cout << "You didn't set the muon scaling." << endl
-             << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+            << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
              << "You chose: " << Muon_scaling << endl
              << "Defaulting to Braucher et al (2009) scaling" << endl;
         LSDCRNP.set_Braucher_parameters();
@@ -5302,10 +5333,14 @@ double LSDCosmoBasin::predict_mean_CRN_conc_centroid(double eff_erosion_rate, st
   {
     LSDCRNP.set_newCRONUS_parameters();
   }
+  else if (Muon_scaling == "BraucherBorchers" )
+  {
+    LSDCRNP.set_BraucherBorchers_parameters();
+  }
   else
   {
     cout << "You didn't set the muon scaling." << endl
-         << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+         << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
          << "You chose: " << Muon_scaling << endl
          << "Defaulting to Braucher et al (2009) scaling" << endl;
     LSDCRNP.set_Braucher_parameters();
@@ -6341,10 +6376,14 @@ void LSDCosmoBasin::print_CRN_conc_raster(string filename,
       {
         LSDCRNP.set_newCRONUS_parameters();
       }
+      else if (Muon_scaling == "BraucherBorchers" )
+      {
+        LSDCRNP.set_BraucherBorchers_parameters();
+      }
       else
       {
         cout << "You didn't set the muon scaling." << endl
-             << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+            << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
              << "You chose: " << Muon_scaling << endl
              << "Defaulting to Braucher et al (2009) scaling" << endl;
         LSDCRNP.set_Braucher_parameters();

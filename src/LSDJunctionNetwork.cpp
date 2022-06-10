@@ -2307,7 +2307,7 @@ void LSDJunctionNetwork::print_complete_junction_angles_to_csv(vector<int> Junct
                                                        LSDRaster& FlowDistance, float vertical_interval,
                                                        string csv_name)
 {
-  cout << "Let me fun the full junction angle code that includes elevations and flow distances." << endl;
+  cout << "Let me run the full junction angle code that includes elevations and flow distances." << endl;
 
   ofstream csv_out;
   csv_out.open(csv_name.c_str());
@@ -7228,6 +7228,65 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV_WithElevation(LSDFlowInfo& flo
 
 }
 
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+// This prints a channel network to csv in WGS84
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+void LSDJunctionNetwork::PrintChannelNetworkToCSV_WithValuesThinned(LSDFlowInfo& flowinfo, string fname_prefix, 
+                                                                    LSDRaster& Values, int thinning_factor,
+                                                                    string value_column_name)
+{
+
+  // first get the vectors
+  vector<int> NIvec;
+  vector<int> SOvec;
+  vector<int> JIvec;
+  GetChannelNodesAndJunctions(flowinfo, NIvec, JIvec, SOvec);
+
+  // Deal with setting up the file
+  // append csv to the filename
+  string FileName = fname_prefix+".csv";
+
+  //open a file to write
+  ofstream WriteData;
+  WriteData.open(FileName.c_str());
+
+  WriteData.precision(8);
+  WriteData << "latitude,longitude," << value_column_name << endl;
+
+  // the x and y locations
+  double latitude,longitude;
+
+  // this is for latitude and longitude
+  LSDCoordinateConverterLLandUTM Converter;
+
+
+  // now get the number of channel nodes
+  int this_NI;
+  int row,col;
+  int NNodes = int(NIvec.size());
+  float this_elev;
+  int RJ;
+  //cout << "The number of nodes is: " << NNodes << endl;
+  for(int node = 0; node<NNodes; node++)
+  {
+    if (node%thinning_factor == 0)
+    {
+      this_NI = NIvec[node];
+      flowinfo.retrieve_current_row_and_col(this_NI,row,col);
+      get_lat_and_long_locations(row, col, latitude, longitude, Converter);
+      this_elev = Values.get_data_element(row,col);
+
+      WriteData << latitude << "," << longitude << "," << this_elev << endl;
+    }
+
+  }
+
+  WriteData.close();
+
+}
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
 // This prints a channel network to csv in WGS84
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
@@ -7279,6 +7338,64 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV_WithElevation_WithDonorJunctio
     WriteData << latitude << "," << longitude << "," << JIvec[node] << ","
               << SOvec[node] << "," << NIvec[node] << "," << receiver_NI << ","
               << this_elev << "," << RJ << "," << UJ << endl;
+
+  }
+
+  WriteData.close();
+
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+// This prints a channel network to csv in WGS84 with additional surface fitting metrics
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+void LSDJunctionNetwork::PrintChannelNetworkToCSV_WithSurfaceMetrics(LSDFlowInfo& flowinfo, string fname_prefix, LSDRaster& Elevation, LSDRaster& Slope, LSDRaster& Relief, LSDRaster& Curvature)
+{
+
+  // first get the vectors
+  vector<int> NIvec;
+  vector<int> SOvec;
+  vector<int> JIvec;
+  GetChannelNodesAndJunctions(flowinfo, NIvec, JIvec, SOvec);
+
+  // Deal with setting up the file
+  // append csv to the filename
+  string FileName = fname_prefix+".csv";
+
+  //open a file to write
+  ofstream WriteData;
+  WriteData.open(FileName.c_str());
+
+  WriteData.precision(8);
+  WriteData << "latitude,longitude,Junction Index,Stream Order,NI,receiver_NI,elevation(m),receiver_JI,slope,relief(m),curvature" << endl;
+
+  // the x and y locations
+  double latitude,longitude;
+
+  // this is for latitude and longitude
+  LSDCoordinateConverterLLandUTM Converter;
+
+
+  // now get the number of channel nodes
+  int this_NI, receiver_NI;
+  int row,col;
+  int NNodes = int(NIvec.size());
+  float this_elev,this_slope,this_relief,this_curv;
+  int RJ;
+  //cout << "The number of nodes is: " << NNodes << endl;
+  for(int node = 0; node<NNodes; node++)
+  {
+    this_NI = NIvec[node];
+    flowinfo.retrieve_current_row_and_col(this_NI,row,col);
+    get_lat_and_long_locations(row, col, latitude, longitude, Converter);
+    flowinfo.retrieve_receiver_information(this_NI, receiver_NI);
+    this_elev = Elevation.get_data_element(row,col);
+    this_slope = Slope.get_data_element(row,col);
+    this_relief = Relief.get_data_element(row,col);
+    this_curv = Curvature.get_data_element(row,col);
+    RJ = get_Receiver_of_Junction(JIvec[node]);
+
+    WriteData << latitude << "," << longitude << "," << JIvec[node] << "," << SOvec[node] << "," << NIvec[node] << "," << receiver_NI <<
+                "," << this_elev << "," << RJ << "," << this_slope << "," << this_relief << "," << this_curv << endl;
 
   }
 
@@ -7922,6 +8039,40 @@ vector<int> LSDJunctionNetwork::Prune_Junctions_By_Contributing_Pixel_Window_Rem
   cout << "Finished with pruning, I have " << third_pruning.size() << " junctions left." << endl;
   return third_pruning;
 }
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function loops through all basins and gets basins within the 
+// contributing pixels between the upper an lower limits
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<int> LSDJunctionNetwork::Prune_Junctions_By_Contributing_Pixel_Window_Remove_Nested_Keep_Edge(LSDFlowInfo& FlowInfo,
+                                              LSDRaster& TestRaster, LSDIndexRaster& FlowAcc,
+                                              int lower_limit, int upper_limit)
+{
+
+  // We use ALL the junctions for this operation
+  vector<int> Junctions_Initial;
+  for (int i = 0; i< NJunctions; i++)
+  {
+    Junctions_Initial.push_back(i);
+  }
+
+  // get the flow accumulation (in pixels) from each of these basins
+  cout << "First let me prune within the contributing area window." << endl;
+  cout << " I'm starting with " << Junctions_Initial.size() << " junctions." << endl;
+  cout << "The lower limit is: " << lower_limit << " and upper limit "<< upper_limit << endl;
+  vector<int> first_pruning = Prune_Junctions_By_Contributing_Pixel_Window(Junctions_Initial,FlowInfo,
+                                              FlowAcc, lower_limit, upper_limit);
+  cout << "Right, I've pruned those and have " << first_pruning.size() << " junctions left." << endl;
+
+
+  // Now prune based on nesting
+  cout << "Now I'm pruning out any nested junctions." << endl;
+  vector<int> third_pruning = Prune_Junctions_If_Nested(first_pruning,FlowInfo, FlowAcc);
+  cout << "Finished with pruning, I have " << third_pruning.size() << " junctions left." << endl;
+  return third_pruning;
+}
+
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -11027,6 +11178,136 @@ void LSDJunctionNetwork::write_river_profiles_to_csv_all_sources(float channel_l
     }
 
     chan_out.close();
+}
+
+//------------------------------------------------------------------------------------------------------------------------------------------//
+// Function to calculate the hypsometric integral for each point along the channel network and write to csv
+// FJC 26/01/22
+//------------------------------------------------------------------------------------------------------------------------------------------//
+void LSDJunctionNetwork::calculate_hypsometric_integral(string fname_prefix, LSDFlowInfo& FlowInfo, LSDRaster& Elevation)
+{
+
+  // first get the vectors
+  vector<int> NIvec;
+  vector<int> SOvec;
+  vector<int> JIvec;
+  GetChannelNodesAndJunctions(FlowInfo, NIvec, JIvec, SOvec);
+
+  // Deal with setting up the file
+  // append csv to the filename
+  string FileName = fname_prefix+".csv";
+
+  //open a file to write
+  ofstream WriteData;
+  WriteData.open(FileName.c_str());
+
+  WriteData.precision(8);
+  WriteData << "latitude,longitude,Junction Index,Stream Order,NI,receiver_NI,receiver_JI,HI" << endl;
+
+  // the x and y locations
+  double latitude,longitude;
+
+  // this is for latitude and longitude
+  LSDCoordinateConverterLLandUTM Converter;
+
+
+  // now get the number of channel nodes
+  int this_NI, receiver_NI, RJ;
+  int row,col;
+  int NNodes = int(NIvec.size());
+  float HI;
+  //cout << "The number of nodes is: " << NNodes << endl;
+  for(int node = 0; node<NNodes; node++)
+  {
+    this_NI = NIvec[node];
+    FlowInfo.retrieve_current_row_and_col(this_NI,row,col);
+    get_lat_and_long_locations(row, col, latitude, longitude, Converter);
+    FlowInfo.retrieve_receiver_information(this_NI, receiver_NI);
+    RJ = get_Receiver_of_Junction(JIvec[node]);
+    HI = FlowInfo.calculate_upstream_HI(this_NI, Elevation);
+    WriteData << latitude << "," << longitude << "," << JIvec[node] << "," << SOvec[node] << "," << NIvec[node] << "," << receiver_NI << "," << RJ  << "," << HI <<endl;
+
+  }
+
+  WriteData.close();
+
+}
+
+//------------------------------------------------------------------------------------------------------------------------------------------//
+// Function to calculate the histogram of upstream elevations for each point along the channel network and write to csv
+// FJC 26/01/22
+//------------------------------------------------------------------------------------------------------------------------------------------//
+void LSDJunctionNetwork::calculate_upstream_elevations_network(string fname_prefix, LSDFlowInfo& FlowInfo, LSDRaster& Elevation, float bin_width, float lower_limit, float upper_limit)
+{
+
+  // first get the vectors
+  vector<int> NIvec;
+  vector<int> SOvec;
+  vector<int> JIvec;
+  GetChannelNodesAndJunctions(FlowInfo, NIvec, JIvec, SOvec);
+
+  // Deal with setting up the file
+  // append csv to the filename
+  string FileName = fname_prefix+".csv";
+
+  //open a file to write
+  ofstream WriteData;
+  WriteData.open(FileName.c_str());
+
+  WriteData.precision(8);
+  WriteData << "latitude,longitude,Junction Index,Stream Order,NI,receiver_NI,receiver_JI,";
+
+  // get the bin midpoints for writing to the header
+  vector<int> bin_midpoints;
+  int n_bins = int((upper_limit - lower_limit)/bin_width)+1;
+  int mp = bin_width/2;
+  for (int i = 0; i < n_bins; i++)
+  {
+    if (i < n_bins-1) { WriteData << "midpoint_" << to_string(mp) << ","; }
+    else { WriteData << "midpoint_" << to_string(mp);}
+    mp+=bin_width;
+  }
+  WriteData << endl;
+
+
+  // the x and y locations
+  double latitude,longitude;
+
+  // this is for latitude and longitude
+  LSDCoordinateConverterLLandUTM Converter;
+
+
+  // now get the number of channel nodes
+  int this_NI, receiver_NI, RJ;
+  int row,col;
+  int NNodes = int(NIvec.size());
+  float HI;
+  //cout << "The number of nodes is: " << NNodes << endl;
+  // vectors for histogram
+  vector<float> Midpoints, ProbabilityDensity;
+  for(int node = 0; node<NNodes; node++)
+  {
+    this_NI = NIvec[node];
+    FlowInfo.retrieve_current_row_and_col(this_NI,row,col);
+    get_lat_and_long_locations(row, col, latitude, longitude, Converter);
+    FlowInfo.retrieve_receiver_information(this_NI, receiver_NI);
+    RJ = get_Receiver_of_Junction(JIvec[node]);
+    FlowInfo.calculate_upstream_elevations(this_NI, Elevation, bin_width, lower_limit, upper_limit, Midpoints, ProbabilityDensity);
+    //cout << "N bins: " << Midpoints.size() << endl;
+    WriteData << latitude << "," << longitude << "," << JIvec[node] << "," << SOvec[node] << "," << NIvec[node] << "," << receiver_NI << "," << RJ  << ",";
+    for (int j = 0; j < int(Midpoints.size()); j++)
+    {
+      if (j < (int(Midpoints.size()) - 1))
+      {
+        WriteData << ProbabilityDensity[j] << ","; 
+      }
+      else { WriteData << ProbabilityDensity[j]; }
+    }
+    WriteData << endl;
+  }
+
+  WriteData.close();
+
 }
 
 #endif

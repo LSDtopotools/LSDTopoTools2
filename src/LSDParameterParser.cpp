@@ -634,22 +634,46 @@ void LSDParameterParser::print_help(map< string, vector<string> > help_map, stri
   string help_fname_html = write_path+help_prefix+".html";
   help_ofs_html.open(help_fname_html.c_str());
 
+  string program_name = help_prefix.erase(help_prefix.length()-7);
+
   cout << "Printing the help files to: " << endl;
   cout << help_fname << endl;
   cout << help_fname_html << endl;
 
-  help_ofs_html << "<!DOCTYPE html>\n<html>\n<head>\n\t<title>Help information for " << help_prefix << "</title>";
+  help_ofs_html << "<!DOCTYPE html>\n<html>\n<head>\n\t<title>Help information for " << program_name << "</title>";
   help_ofs_html << "<style>table, th, td {\n\tborder: 1px solid black;\n\tborder-collapse: collapse;\n}\n</style>\n</head>\n<body>" << endl << endl;
 
-  help_ofs_html << "<h1>Help information for " << help_prefix << "</h1>" << endl << endl;
-  help_ofs_html << "<p>You are using version " << version << " of this software.</p>" << endl; 
+  help_ofs_html << "<h1>Help information for " << program_name << "</h1>" << endl << endl;
+  help_ofs_html << "<p>You are using version " << version << " of the lsdtopotools command line program " << program_name << ".</p>" << endl; 
   help_ofs_html << "<p>If the use of this software results in a publication, please cite <a href=\"" << citation << "\">" << citation << "</a>. In addition please also look at statements printed by the code for citations to specific routines and algorithms.</p>" << endl; 
 
+  help_ofs_html << "<h2>How this software works</h2>" << endl;
+  help_ofs_html << "<p>This software is called from a command line." << endl;
+  help_ofs_html << "We will designate a command prompt in these instructions with the <code>#</code> symbol.</p>" << endl;
+  help_ofs_html << "<p>The program does not work on its own, it needs instructions. You give it instructions using a parameter file." << endl;
+  help_ofs_html << "Usually you will keep the parameter file in the same directory as your data." << endl;
+  help_ofs_html << "You will need to write the parameter file yourself using a text editor (for example brackets, atom, sublime text, pspad, notepad, emacs or similar." << endl;
+  help_ofs_html << "If your parameter file is called <code>my_parameter_file.driver</code> then the call to the program would look like this: </p>" << endl;
+  help_ofs_html << "<p><code># "<< program_name << " my_parameter_file.driver</code></p>" << endl;
+  help_ofs_html << "<p>The file extension of the parameter file can be anything (we commonly use the extension <code>driver</code> but you can add any extension you want).</p>" << endl; 
+
+  help_ofs_html << "<h2>Data input format</h2>" << endl;
+  help_ofs_html << "<p>This program reads <strong>ENVI bil</strong> format rasters projected into UTM (the WGS84 version). <strong>You must convert and project your DEM before using these tools. ENVI bil and ESRI bil are two different file formats so make sure you use ENVI bil.</strong>" << endl; 
+  help_ofs_html << "You can read about converting file formats at the <a href=\"https://lsdtopotools.github.io/LSDTT_documentation/LSDTT_introduction_to_geospatial_data.html#_gdal\">lsdtopotools documentation site</a>.</p>" << endl; 
+   
+  help_ofs_html << "<h2>Data output format</h2>" << endl;
+  help_ofs_html << "<p>This program writes <strong>ENVI bil</strong> format rasters projected into UTM (the WGS84 version). </p>" << endl; 
+  help_ofs_html << "This program also writes csv and geojson files for point data, which are projected into geographic WGS 84 (<a href=\"https://epsg.io/4326\">EPSG:4326</a>)</p>" << endl;   
+ 
   help_ofs_html << "<h2>Making the parameter file</h2>" << endl;
-  help_ofs_html << "<p>You call lsdtt command line tools with a parameter file. This file can be made in a text editor. ";
-  help_ofs_html << "The programs read ENVI bil format rasters projected into UTM (the WGS84 version). You must convert and project your DEM before using these tools. "; 
-  help_ofs_html << "You should have a line of your parameter file that reads:.</p>" << endl; 
-  help_ofs_html << "<p>read fname: FILE_PREFIX</p>" << endl; 
+  help_ofs_html << "<p>You call lsdtt command line tools with a parameter file. This file can be made in a text editor. " << endl;
+  help_ofs_html << "Lines in the parameter file that start with the hash symbol (<code>#</code>) are ignored. " << endl;
+  help_ofs_html << "Lines that are read have a keyword followed by a colon and then a value: </p>" << endl;   
+  help_ofs_html << "<p><code>keyword: value</code></p>" << endl;
+  help_ofs_html << "<p>If you scroll down in this file you will see the parameters available for this program.</p>" << endl;     
+  help_ofs_html << "<p>In addition <strong>you need to tell the program what your data is called</strong>. " << endl;
+  help_ofs_html << "<p>For this you need this line: </p>" << endl;
+  help_ofs_html << "<p><code>read fname: FILE_PREFIX</code></p>" << endl; 
   help_ofs_html << "<p>where FILE_PREFIX is the name of the raster without the .bil extension</p>" << endl;
   help_ofs_html << "<p>The rest of the parameter file has the format:</p>\n<p>PARAMETER_NAME: VALUE</p><p>That is, there needs to be a colon and a space after the parameter name." << endl;
   help_ofs_html << "The default parameter value will be used if you don't give the parameter file the name and value of a parameter</p>" << endl << endl;

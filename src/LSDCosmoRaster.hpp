@@ -168,6 +168,46 @@ class LSDCosmoRaster: public LSDRaster
 
 
     /// @brief this predicts the concentration of a nuclide for each pixel within a basin. 
+    /// It does a full analytical solution to account for a step change in the erosion rate
+    /// there are functions here that calculate timing of step change so use those to prepare 
+    /// input rasters
+    /// @detail This is NOT an accumulator function! It is the concentration at that specific pixel. 
+    ///  For pixels with a landslide (e.g, places with TopoShield not = 0)
+    ///  This is the depth averaged concentration of particles emerging from that pixel during the landslide. 
+    /// @param Nuclide a string with the nuclide name. At the moment the options are:
+    ///   Be10
+    ///   Al26
+    ///  These are case sensitive
+    /// @param Muon_scaling a string that gives the muon scaling scheme.
+    ///  options are Schaller, Braucher and Granger, and newCRONUS
+    /// @param erosion_rate_m_yr A raster of the erosion rate (in m/yr)
+    /// @param time_since_change The time since the change in erosion rate
+    /// @param ProductionScale A raster of the production scaling (uses Lal/Stone scheme)
+    /// @param TopoShield A raster of the topographic shielding. Varies from 0 to 1.
+    /// @param old_erosion_rate_m_yr Erosion rate before step change in m/yr
+    /// @param new_erosion_rate_m_yr Erosion rate after step change in m/yr  
+    /// @param rock_density_kg_m3 rock density to convert to g/cm^2/yr for the effective erosion rates
+    /// @param is_production_uncertainty_plus_on a boolean that is true if the
+    ///  production rate uncertainty (+) is switched on
+    /// @param is_production_uncertainty_minus_on a boolean that is true if the
+    ///  production rate uncertainty (-) is switched on. If the + switch is
+    ///  true this parameter defauts to false.
+    /// @return the concentration of the nuclide at each pixel for the given erosion rate
+    /// @author SMM
+    /// @date 03/06/2022
+    LSDRaster calculate_CRN_concentration_raster_step_change(string Nuclide,
+                                           string Muon_scaling, 
+                                           LSDRaster& erosion_rate_m_yr,
+                                           LSDRaster& time_since_change,
+                                           LSDRaster& ProductionScale, 
+                                           LSDRaster& TopoShield,  
+                                           float old_erosion_rate_m_yr, float new_erosion_rate_m_yr,
+                                           float rock_density_kg_m3,
+                                           bool is_production_uncertainty_plus_on,
+                                           bool is_production_uncertainty_minus_on);
+
+
+    /// @brief this predicts the concentration of a nuclide for each pixel within a basin. 
     /// It does a full analytical solution to account for
     ///  snow and self sheilding
     /// @detail This is NOT an accumulator function! It is the concentration at that specific pixel. 
@@ -435,6 +475,8 @@ class LSDCosmoRaster: public LSDRaster
     /// @param is_production_uncertainty_minus_on a boolean that is true if the
     ///  production rate uncertainty (-) is switched on. If the + switch is
     ///  true this parameter defauts to false.
+    /// @param predicted_nuclide_conc this is return by reference so it takes
+    ///   it is replaced by the function. The predicted cosmo concentration
     /// @return the concentration of the nuclide averaged across the DEM
     /// @author SMM
     /// @date 18/11/2018
@@ -447,7 +489,8 @@ class LSDCosmoRaster: public LSDRaster
                                     LSDRaster& SnowShield,
                                     LSDRaster& quartz_concentration,
                                     LSDFlowInfo& FlowInfo,
-                                    int outlet_node);
+                                    int outlet_node,
+                                    float& predicted_nuclide_conc);
 
 
     /// @brief This uses newton-raphson iteration to get the erosion rate in unknown pixels
@@ -490,6 +533,24 @@ class LSDCosmoRaster: public LSDRaster
                                     LSDRaster& known_erate_raster,
                                     int outlet_node,
                                     LSDFlowInfo& FlowInfo);                                   
+
+
+    /// @brief This returns the rasters for a step change 
+    /// @author SMM
+    /// @date 02/06/2022
+    void calculate_step_change_rasters(LSDFlowInfo& FlowInfo, vector<int>& basin_nodes, LSDRaster& chi_coordinate, LSDRaster& erate, LSDRaster& set_topography, 
+                                        LSDRaster& time_since_step, float time_since_start_of_step, float old_uplift, float new_uplift,
+                                        float chi_knickpoint, float z_knickpoint, float n, float ksn_old, float ksn_new, 
+                                        float z_outlet, float K);  
+
+    /// @brief This returns the rasters for a step change 
+    /// @author SMM
+    /// @date 03/06/2022
+    void calculate_step_change_hillslopes(LSDRaster& fluvial_topography, LSDRaster& raster_tags, LSDRaster& new_topography, 
+                                                      LSDRaster& erate, LSDRaster& time_since_step, vector<string> boundary_conditions, 
+                                                      int threshold_pixels, float erate_old, float Sc_value_old, float Sc_value_new);                                      
+
+
   protected:
 
 

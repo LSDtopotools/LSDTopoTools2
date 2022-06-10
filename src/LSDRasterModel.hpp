@@ -746,6 +746,26 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @date 03/09/2017
   void run_components_combined( LSDRaster& URaster, LSDRaster& KRaster, bool use_adaptive_timestep );
 
+  /// @brief This allows the user to uplift the raster at different rates through time
+  /// @detail Variable U and K rasters can be used.
+  /// @param UpliftRaster A raster of uplift rates
+  /// @param KRaster A raster of K values
+  /// @param ScRaster A raster of Sc
+  /// @param phase_time a vector of times for different base level fall rates
+  /// @param phase_rates a vector of the uplift rates associated with the times
+  /// @param use_hillslope_hybrid if true, turns on the hybrid model that does linear diffusion but uses a critical
+  ///  slope if too steep
+  /// @param threshold_contributing_pixels Number of pixels to designate as hillslopes for the hillslope model
+  /// @param minimum_slope the minimum slope for elevation change between pixels. This replaces overexcavated nodes
+  /// @author SMM
+  /// @date 26/05/2022
+  void run_components_combined_stepped_uplift( LSDRaster& UpliftRaster, 
+                                          LSDRaster& KRaster, LSDRaster& ScRaster, 
+                                          vector<float> phase_time, vector< float > phase_rates,
+                                          bool use_hillslope_hybrid,
+                                          int threshold_contributing_pixels,
+                                          float minimum_slope);
+
   /// @brief This is a wrapper similar to run_components but sends the
   /// fluvial and uplfit fields to the nonlinear solver.
   /// This one allows you to put in a base level
@@ -983,11 +1003,13 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @param Source_points_data a spatialc csv reader with the appropriate file
   /// @param carve_before_fill if true, run the carving algorithm before the filling algorithm
   /// @param column_name the name of the elevation column
+  /// @param min_slope_for_fill the minimum slope for snapping
   /// @author SMM
   /// @date 01/10/2019
   void fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_values, LSDRaster& U_values, 
                                                     LSDSpatialCSVReader& Source_points_data, 
-                                                    bool carve_before_fill, string column_name);
+                                                    bool carve_before_fill, string column_name, 
+                                                    float min_slope_for_fill);
 
 
   /// @brief This is a hybrid model that calculates hillslope diffusion as well as a critical slope
@@ -1703,6 +1725,22 @@ class LSDRasterModel: public LSDRasterSpectral
   /// @author FJC
   /// @date 22/08/17
   void print_rasters_and_csv( int frame );
+
+  /// @brief This function prints a series of rasters.
+  /// The rasters printed depend on the switches
+  /// print_elevation,  print_erosion, print_erosion_cycle, print_hillshade;
+  /// and print_slope_area
+  /// The filename inculdes the frame_num
+  /// It also prints a csv of the model info which can be ingested by pandas
+  /// for visualisation
+  /// @param the frame of the rasters to be printed
+  /// @param URaster the uplift raster
+  /// @author SMM
+  /// @date 26/05/22
+  void print_rasters_and_csv( int frame, LSDRaster& URaster );
+
+
+
 
   /// @brief This function prints the apparent cosmogenic rates from a collection
   /// of LSDParticle Columns

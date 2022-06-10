@@ -588,6 +588,10 @@ void LSDCosmoRaster::reset_scaling(LSDCRNParameters& LSDCRNP, string Muon_scalin
   {
     LSDCRNP.set_Braucher_parameters();
   }
+  else if (Muon_scaling == "BraucherBorchers" )
+  {
+    LSDCRNP.set_BraucherBorchers_parameters();
+  }
   else if (Muon_scaling == "Granger" )
   {
     LSDCRNP.set_Granger_parameters();
@@ -599,12 +603,229 @@ void LSDCosmoRaster::reset_scaling(LSDCRNParameters& LSDCRNP, string Muon_scalin
   else
   {
     cout << "You didn't set the muon scaling." << endl
-         << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+         << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
          << "You chose: " << Muon_scaling << endl
          << "Defaulting to Braucher et al (2009) scaling" << endl;
     LSDCRNP.set_Braucher_parameters();
   }
 }
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This calculates the cosmogenic concentration eroded from each pixel
+// It is NOT a mass flux. This will be calculated using an accumulator function
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDRaster LSDCosmoRaster::calculate_CRN_concentration_raster_step_change(string Nuclide,
+                                           string Muon_scaling, 
+                                           LSDRaster& erosion_rate_m_yr,
+                                           LSDRaster& time_since_change,
+                                           LSDRaster& ProductionScale, 
+                                           LSDRaster& TopoShield,  
+                                           float old_erosion_rate_m_yr, float new_erosion_rate_m_yr,
+                                           float rock_density_kg_m3,
+                                           bool is_production_uncertainty_plus_on,
+                                           bool is_production_uncertainty_minus_on)
+{
+  int NRows = ProductionScale.get_NRows();
+  int NCols = ProductionScale.get_NCols();
+  float NDV =  ProductionScale.get_NoDataValue();
+  
+  Array2D<float> CRN_conc_at_pixel(NRows,NCols,NDV);
+   
+  // the CRN conc in each pixel
+  float this_conc;
+
+  // convert to g/cm^2
+  float eff_erate_old = old_erosion_rate_m_yr*rock_density_kg_m3*0.1;
+  float eff_erate_new = new_erosion_rate_m_yr*rock_density_kg_m3*0.1;
+  float this_eff_erate;
+  float this_top_eff_depth = 0;
+  float this_bottom_eff_depth = 0;
+  float this_time_since_step;
+
+  
+  // set the scaling vector
+  vector<bool> nuclide_scaling_switches(4,false);
+  if (Nuclide == "Be10")
+  {
+    nuclide_scaling_switches[0] = true;
+  }
+  else if (Nuclide == "Al26")
+  {
+    nuclide_scaling_switches[1] = true;
+  }
+  else if (Nuclide == "C14")
+  {
+    nuclide_scaling_switches[3] = true;
+  }
+  else
+  {
+    cout << "LSDBasin line 1583, You didn't choose a valid nuclide. Defaulting"
+         << " to 10Be." << endl;
+    Nuclide = "Be10";
+    nuclide_scaling_switches[0] = true;
+  }
+
+  // the total shielding. A product of snow, topographic and production scaling
+  double total_shielding;
+
+  // initiate a particle. We'll just repeatedly call this particle
+  // for the sample.
+  int startType = 0;
+  double Xloc = 0;
+  double Yloc = 0;
+  double  startdLoc = 0.0;
+  double  start_effdloc = 0.0;
+  double startzLoc = 0.0;
+
+  // create a particle at zero depth
+  LSDCRNParticle eroded_particle(startType, Xloc, Yloc,
+                               startdLoc, start_effdloc, startzLoc);
+
+  // now create the CRN parameters object
+  LSDCRNParameters LSDCRNP;
+
+  // loop through the raster
+  for (int col = 0; col < NCols; col++)
+  {  
+    for (int row = 0; row < NRows; row++)
+    {
+      //exclude NDV from average
+      if (ProductionScale.get_data_element(row,col) == NoDataValue ||
+          TopoShield.get_data_element(row,col) == NoDataValue ||
+          erosion_rate_m_yr.get_data_element(row,col) == NoDataValue ||
+          time_since_change.get_data_element(row,col) == NoDataValue )
+      {
+        RasterData[row][col] == NoDataValue;    
+      }
+      else
+      { 
+
+        // Get the erosion rates
+        this_eff_erate = erosion_rate_m_yr.get_data_element(row,col)*rock_density_kg_m3*0.1;
+        this_time_since_step = time_since_change.get_data_element(row,col);
+
+        // reset scaling parameters. This is necessary since the F values are
+        // reset for local scaling
+        reset_scaling(LSDCRNP, Muon_scaling);
+  
+        // set the scaling to the correct production uncertainty
+        vector<double> test_uncert;
+        if(is_production_uncertainty_plus_on)
+        {
+          test_uncert = LSDCRNP.set_P0_CRONUS_uncertainty_plus();
+        }
+        else if(is_production_uncertainty_minus_on)
+        {
+          test_uncert = LSDCRNP.set_P0_CRONUS_uncertainty_minus();
+        }
+
+        // Get the scaling and shielding
+        total_shielding = ProductionScale.get_data_element(row,col)*TopoShield.get_data_element(row,col);
+
+        // scale the F values
+        LSDCRNP.scale_F_values(total_shielding,nuclide_scaling_switches);
+ 
+        // get the nuclide concentration from this node
+        if (Nuclide == "Be10")
+        {
+          //cout << "LInE 2271, 10Be" << endl;
+          if (this_time_since_step > 0 )
+          {
+            if (this_eff_erate != eff_erate_new)
+            {
+              cout << "Something is fishy, you have a step change but this erate " << this_eff_erate << " is not the same as the new erate " << eff_erate_new << endl;
+              exit(0);
+            }
+            eroded_particle.update_10Be_step_change(double(eff_erate_old),double(eff_erate_new),double(this_time_since_step),LSDCRNP);
+          }
+          else
+          {
+            eroded_particle.update_10Be_SSfull_depth_integrated(double(this_eff_erate),LSDCRNP,
+                                             this_top_eff_depth, this_bottom_eff_depth);
+          }
+          this_conc=eroded_particle.getConc_10Be();
+        }
+        else if (Nuclide == "Al26")
+        {
+          //cout << "LINE 2278, 26Al" << endl;
+          if (this_time_since_step > 0 )
+          {
+            if (this_eff_erate != eff_erate_new)
+            {
+              cout << "Something is fishy, you have a step change but this erate " << this_eff_erate << " is not the same as the new erate " << eff_erate_new << endl;
+              exit(0);
+            }
+            eroded_particle.update_26Al_step_change(double(eff_erate_old),double(eff_erate_new),double(this_time_since_step),LSDCRNP);
+          }
+          else
+          {
+            eroded_particle.update_26Al_SSfull_depth_integrated(double(this_eff_erate),LSDCRNP,
+                                             this_top_eff_depth, this_bottom_eff_depth);
+          }
+          this_conc=eroded_particle.getConc_26Al();
+        }
+        else if (Nuclide == "C14")
+        {
+          //cout << "LINE 2278, 14C" << endl;
+          if (this_time_since_step > 0 )
+          {
+            if (this_eff_erate != eff_erate_new)
+            {
+              cout << "Something is fishy, you have a step change but this erate " << this_eff_erate << " is not the same as the new erate " << eff_erate_new << endl;
+              exit(0);
+            }
+            eroded_particle.update_14C_step_change(double(eff_erate_old),double(eff_erate_new),double(this_time_since_step),LSDCRNP);
+          }
+          else
+          {
+            eroded_particle.update_14C_SSfull_depth_integrated(double(this_eff_erate),LSDCRNP,
+                                             this_top_eff_depth, this_bottom_eff_depth);
+          }
+          this_conc=eroded_particle.getConc_14C();
+        }
+        else
+        {
+          cout << "You didn't give a valid nuclide. You chose: " << Nuclide << endl;
+          cout << "Choices are 10Be, 26Al.  Note these case sensitive and cannot" << endl;
+          cout << "contain spaces or control characters. Defaulting to 10Be." << endl;
+          if (this_time_since_step > 0 )
+          {
+            if (this_eff_erate != eff_erate_new)
+            {
+              cout << "Something is fishy, you have a step change but this erate " << this_eff_erate << " is not the same as the new erate " << eff_erate_new << endl;
+              exit(0);
+            }
+            eroded_particle.update_10Be_step_change(double(eff_erate_old),double(eff_erate_new),double(this_time_since_step),LSDCRNP);
+          }
+          else
+          {
+            eroded_particle.update_10Be_SSfull_depth_integrated(double(this_eff_erate),LSDCRNP,
+                                             this_top_eff_depth, this_bottom_eff_depth);
+          }
+          this_conc=eroded_particle.getConc_10Be();
+        }
+        
+        CRN_conc_at_pixel[row][col] = this_conc;
+        
+        
+      }           // End nodata logic                 
+    }             // End cols loop                 
+  }               // End rows loop  
+  
+  float XMinimum = ProductionScale.get_XMinimum();
+  float YMinimum = ProductionScale.get_YMinimum();
+  float DataResolution = ProductionScale.get_DataResolution();
+  map<string,string> GeoReferencingStrings = ProductionScale.get_GeoReferencingStrings();
+
+  LSDRaster CRN_conc(NRows, NCols, XMinimum, YMinimum, DataResolution,
+                               NDV, CRN_conc_at_pixel,GeoReferencingStrings);  
+  return  CRN_conc;
+}          
+
+
+
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -643,6 +864,10 @@ LSDRaster LSDCosmoRaster::calculate_CRN_concentration_raster(string Nuclide,
   else if (Nuclide == "Al26")
   {
     nuclide_scaling_switches[1] = true;
+  }
+  else if (Nuclide == "C14")
+  {
+    nuclide_scaling_switches[3] = true;
   }
   else
   {
@@ -726,6 +951,13 @@ LSDRaster LSDCosmoRaster::calculate_CRN_concentration_raster(string Nuclide,
           eroded_particle.update_26Al_SSfull_depth_integrated(double(eff_erosion_rate.get_data_element(row,col)),LSDCRNP,
                                              this_top_eff_depth, this_bottom_eff_depth);
           this_conc=eroded_particle.getConc_26Al();
+        }
+        else if (Nuclide == "C14")
+        {
+          //cout << "LINE 2278, 26Al" << endl;
+          eroded_particle.update_14C_SSfull_depth_integrated(double(eff_erosion_rate.get_data_element(row,col)),LSDCRNP,
+                                             this_top_eff_depth, this_bottom_eff_depth);
+          this_conc=eroded_particle.getConc_14C();
         }
         else
         {
@@ -833,6 +1065,10 @@ LSDRaster LSDCosmoRaster::calculate_CRN_concentration_raster(string Nuclide,
   {
     nuclide_scaling_switches[1] = true;
   }
+  else if (Nuclide == "C14")
+  {
+    nuclide_scaling_switches[3] = true;
+  }
   else
   {
     cout << "LSDBasin line 1583, You didn't choose a valid nuclide. Defaulting"
@@ -918,10 +1154,16 @@ LSDRaster LSDCosmoRaster::calculate_CRN_concentration_raster(string Nuclide,
                                            this_top_eff_depth, this_bottom_eff_depth);
         this_conc=eroded_particle.getConc_26Al();
       }
+      else if (Nuclide == "C14")
+      {
+        eroded_particle.update_14C_SSfull_depth_integrated(double(eff_erosion_rate.get_data_element(row,col)),LSDCRNP,
+                                           this_top_eff_depth, this_bottom_eff_depth);
+        this_conc=eroded_particle.getConc_14C();
+      }
       else
       {
         cout << "You didn't give a valid nuclide. You chose: " << Nuclide << endl;
-        cout << "Choices are 10Be, 26Al.  Note these case sensitive and cannot" << endl;
+        cout << "Choices are 10Be, 26Al, or 14C.  Note these case sensitive and cannot" << endl;
         cout << "contain spaces or control characters. Defaulting to 10Be." << endl;
         eroded_particle.update_10Be_SSfull_depth_integrated(double(eff_erosion_rate.get_data_element(row,col)),LSDCRNP,
                                            this_top_eff_depth, this_bottom_eff_depth);
@@ -1239,6 +1481,8 @@ float LSDCosmoRaster::calculate_accumulated_CRN_concentration(LSDRaster& CRN_con
 //===================================================================
 // Newton-raphson routines for getting the correct erosion rate
 // Will be overloaded to have a number of different scenarios
+// This includes a bisection method of the Newton-raphson does 
+// not converge
 //===================================================================                                          
 float LSDCosmoRaster::calculate_eff_erate_from_conc(float Nuclide_conc,
                                     string Nuclide,string Muon_scaling, 
@@ -1249,21 +1493,11 @@ float LSDCosmoRaster::calculate_eff_erate_from_conc(float Nuclide_conc,
                                     LSDRaster& SnowShield,
                                     LSDRaster& quartz_concentration,
                                     LSDFlowInfo& FlowInfo,
-                                    int outlet_node)
+                                    int outlet_node,
+                                    float& predicted_nuclide_conc)
 {
 
-  // WORKING HERE!!
-  // NEED TO TEST THIS FUNCTION
-  // SMM 22-AUG-2019
-
-  // Need to put in the logic for the newton raphson
-  // it iterates on an effective erate that will reproduce the nuclide concentration
-  // 
-  // calculate concentration
-  // accumulate concentration
-  // do iteration on accumulated concentration
-  // repeat.
-
+  float pred;
   // First set all the scalings
 
   // First thing to do is to make an erosion rate guess
@@ -1271,12 +1505,12 @@ float LSDCosmoRaster::calculate_eff_erate_from_conc(float Nuclide_conc,
                                             Production_raster,TopoShield, 
                                             SelfShield,SnowShield,
                                             FlowInfo, outlet_node);
-  cout << "The first guess is: " << eff_erate_guess << endl;
+  //cout << "The first guess is: " << eff_erate_guess << endl;
 
   // now we enter the Newton-Raphson
   double eff_e_new = double(eff_erate_guess); // the erosion rate upon which we iterate
   double eff_e_change;                // the change in erosion rate between iterations
-  int threshold_steps = 15;           // the maximum number of iterations before it just takes the best guess
+  int threshold_steps = 5;           // the maximum number of iterations before it moves on to bisection
   double tolerance = 1e-7;            // tolerance for a change in the erosion rate
                                       // between Newton-Raphson iterations
   double eff_e_displace = 1e-4;       // A small displacment in the erosion rate used
@@ -1325,10 +1559,6 @@ float LSDCosmoRaster::calculate_eff_erate_from_conc(float Nuclide_conc,
     // derived from the erosion rate raster which can be modified by the known erosion rate
     // and then calculate the accumulated concentration. 
     // The whole thing takes three steps.
-    
-    //eff_erosion_raster = make_eff_erate_raster_from_known_erate_and_float_erate(eff_e_new, 
-    //                                                known_eff_erosion_rate,
-    //                                                outlet_node, FlowInfo);
 
     MakeItYeah.set_to_constant_value(float(eff_e_new));
     eff_erosion_raster =  MakeItYeah.return_as_raster();
@@ -1341,12 +1571,6 @@ float LSDCosmoRaster::calculate_eff_erate_from_conc(float Nuclide_conc,
     N_this_step = calculate_accumulated_CRN_concentration(cosmo_conc_raster, 
                                           eff_erosion_raster, 
                                           FlowInfo, outlet_node); 
-    //cout << " Conc: " << N_this_step << endl;
-
-    // now get the derivative
-    //eff_erosion_rate = make_eff_erate_raster_from_known_erate_and_float_erate(eff_e_new+eff_e_displace, 
-    //                                                known_eff_erosion_rate,
-    //                                                outlet_node, FlowInfo);
     
     MakeItYeah.set_to_constant_value(float(eff_e_new+eff_e_displace));
     eff_erosion_raster =  MakeItYeah.return_as_raster();
@@ -1391,8 +1615,8 @@ float LSDCosmoRaster::calculate_eff_erate_from_conc(float Nuclide_conc,
       }     
     }
 
-    cout << "Conc diff is: " << N_this_step - N_displace << endl;
-    cout << "Diff from target conc is: " << f_x << endl;
+    //cout << "Conc diff is: " << N_this_step - N_displace << endl;
+    //cout << "Diff from target conc is: " << f_x << endl;
     //cout << "f_x displace is: " << f_x_displace << endl;
 
     N_derivative = (f_x_displace-f_x)/eff_e_displace;
@@ -1416,7 +1640,8 @@ float LSDCosmoRaster::calculate_eff_erate_from_conc(float Nuclide_conc,
     }
     else
     {
-      eff_e_change = 0;
+      // if the derivative is zero something has gone wrong and you need to go to bisection
+      N_steps = threshold_steps+1;
     }
 
     // This is an escape hatch that converts to bisection method if there is no convergence. 
@@ -1425,18 +1650,25 @@ float LSDCosmoRaster::calculate_eff_erate_from_conc(float Nuclide_conc,
       //eff_e_change = 0;
       //eff_e_new = closest_guess;
 
-      cout << "Failed to converge using Newton. Now using bisection method." << endl;
-      cout << "This might take a while." << endl;
-
+      //cout << "Failed to converge using Newton. Now using bisection method." << endl;
+      //cout << "This might take a while." << endl;
+      if (closest_neg_N_diff_erate < closest_pos_N_diff_erate)
+      {
+        float swap = closest_pos_N_diff_erate;
+        closest_pos_N_diff_erate = closest_neg_N_diff_erate;
+        closest_neg_N_diff_erate = swap;
+      }
+      
+      cout << "erate brackets: " << closest_neg_N_diff_erate << " , " << closest_pos_N_diff_erate << endl;
       midpoint_e = 0.5*(closest_neg_N_diff_erate-closest_pos_N_diff_erate)+closest_pos_N_diff_erate;
       last_midpoint_e = midpoint_e;
 
       do
       {
-        cout << "erate brackets: " << closest_neg_N_diff_erate << " , " << closest_pos_N_diff_erate << endl;
-        cout << "N brackets and actual N: " << closest_neg_N_difference << ", " << closest_pos_N_difference << ", " <<N_this_step << endl;
+        //cout << "erate brackets: " << closest_neg_N_diff_erate << " , " << closest_pos_N_diff_erate << endl;
+        //cout << "N brackets and actual N: " << closest_neg_N_difference << ", " << closest_pos_N_difference << ", " <<N_this_step << endl;
 
-
+        N_steps++;
         MakeItYeah.set_to_constant_value(float(midpoint_e));
         eff_erosion_raster =  MakeItYeah.return_as_raster();
         cosmo_conc_raster = calculate_CRN_concentration_raster(Nuclide, Muon_scaling, 
@@ -1474,20 +1706,32 @@ float LSDCosmoRaster::calculate_eff_erate_from_conc(float Nuclide_conc,
         eff_e_new = midpoint_e;
         last_midpoint_e = midpoint_e;
 
-        cout << "Bisection f_x: " << f_x << " atoms/g and midpoint e is: " << midpoint_e << endl;
+        //cout << "Bisection f_x: " << f_x << " atoms/g and midpoint e is: " << midpoint_e << endl;
+
+        if (fabs(eff_e_change) < tolerance)
+        {
+          if (N_steps < 10)
+            if (fabs(f_x) > Nuclide_conc*0.02)
+            {
+              //cout << "Something funny happened with bisection, I need to look across a bigger range" << endl;
+              closest_neg_N_diff_erate = 2;
+              closest_pos_N_diff_erate = 0.0001;
+              midpoint_e = 0.5*(closest_neg_N_diff_erate-closest_pos_N_diff_erate)+closest_pos_N_diff_erate;
+              last_midpoint_e = midpoint_e;  
+              eff_e_change = 100;     
+              N_steps = 10;     
+            }
+        }
 
       } while (fabs(eff_e_change) > tolerance);
-      
-
-
-
     }
 
   } while(fabs(eff_e_change) > tolerance);
 
   
-  //cout << "I got an erosion rate after " << N_steps <<" steps! It is: " << eff_e_new << endl; 
-  //cout << "==============================" << endl << endl << endl;
+  cout << "I got an erosion rate after " << N_steps <<" steps! It is: " << eff_e_new << endl; 
+  cout << "Conc is: " << Nuclide_conc << " and predicted conc is: " << N_this_step << endl;
+  predicted_nuclide_conc = N_this_step;
   return eff_e_new;
 }
 
@@ -1513,6 +1757,10 @@ float LSDCosmoRaster::get_erate_guess(float Nuclide_conc, string Nuclide,string 
   else if (Nuclide == "Al26")
   {
     nuclide_scaling_switches[1] = true;
+  }
+  else if (Nuclide == "C14")
+  {
+    nuclide_scaling_switches[3] = true;
   }
   else
   {
@@ -1568,7 +1816,7 @@ float LSDCosmoRaster::get_erate_guess(float Nuclide_conc, string Nuclide,string 
     }
   }
   total_shielding = sum_shielding/N_shielding; 
-  cout << "total_shielding is: " << total_shielding << " and nuclide concentration is: " <<Nuclide_conc << endl;
+  //cout << "total_shielding is: " << total_shielding << " and nuclide concentration is: " <<Nuclide_conc << endl;
 
   // scale the F values
   float rho = 2650;
@@ -1589,6 +1837,12 @@ float LSDCosmoRaster::get_erate_guess(float Nuclide_conc, string Nuclide,string 
   {
     eroded_particle.setConc_26Al(Nuclide_conc);
     first_erate_guess = eroded_particle.apparent_erosion_26Al_neutron_only(rho, LSDCRNP);
+    first_eff_erate = eroded_particle.convert_m_to_gpercm2(first_erate_guess,rho);
+  }
+  else if (Nuclide == "C14")
+  {
+    eroded_particle.setConc_14C(Nuclide_conc);
+    first_erate_guess = eroded_particle.apparent_erosion_14C_neutron_only(rho, LSDCRNP);
     first_eff_erate = eroded_particle.convert_m_to_gpercm2(first_erate_guess,rho);
   }
   else
@@ -1647,5 +1901,205 @@ LSDRaster LSDCosmoRaster::make_eff_erate_raster_from_known_erate_and_float_erate
   return thiserate;
 }
 
+void LSDCosmoRaster::calculate_step_change_rasters(LSDFlowInfo& FlowInfo, vector<int>& basin_nodes, LSDRaster& chi_coordinate, LSDRaster& erate, LSDRaster& set_topography, 
+                                                    LSDRaster& time_since_step, float time_since_start_of_step, float old_uplift, float new_uplift, 
+                                                    float chi_knickpoint, float z_knickpoint, float n, float ksn_old, float ksn_new, float z_outlet, 
+                                                    float K)
+{
+  LSDRasterMaker temp_erate(chi_coordinate); 
+  LSDRasterMaker temp_z(chi_coordinate); 
+  LSDRasterMaker temp_time_since_step(chi_coordinate); 
+
+  int this_row, this_col;
+  float this_chi;
+  int n_nodes_in_basin = int(basin_nodes.size());
+  for(int n = 0; n< n_nodes_in_basin; n++)
+  {
+    FlowInfo.retrieve_current_row_and_col(basin_nodes[n],this_row,this_col);
+
+    this_chi = chi_coordinate.get_data_element(this_row,this_col);
+    //if (n%2000 == 0)
+    //{
+    //  cout << "This chi is: " << this_chi << endl;
+    //}
+
+    if(this_chi < chi_knickpoint)
+    {
+      temp_z.set_data_element(this_row,this_col, z_outlet+this_chi*ksn_new);
+      temp_erate.set_data_element(this_row,this_col, new_uplift);
+      temp_time_since_step.set_data_element(this_row,this_col, time_since_start_of_step-this_chi/K);
+    }
+    else
+    {
+      temp_z.set_data_element(this_row,this_col, z_knickpoint+(this_chi-chi_knickpoint)*ksn_old);
+      temp_erate.set_data_element(this_row,this_col, old_uplift);
+      temp_time_since_step.set_data_element(this_row,this_col, 0.0);
+    }
+  }
+
+  erate = temp_erate.return_as_raster();
+  set_topography = temp_z.return_as_raster();
+  time_since_step = temp_time_since_step.return_as_raster();
+
+}
+
+
+void LSDCosmoRaster::calculate_step_change_hillslopes(LSDRaster& fluvial_topography, LSDRaster& raster_tags, LSDRaster& new_topography, 
+                                                      LSDRaster& erate, LSDRaster& time_since_step, vector<string> boundary_conditions, 
+                                                      int threshold_pixels, float erate_old, float Sc_value_old, float Sc_value_new)
+{
+  // we use the old zeta as this is meant to be used after the fluvial step
+  Array2D<float> zeta_fluvial=fluvial_topography.get_RasterData();
+  Array2D<float> zeta_new=zeta_fluvial.copy();
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDRasterMaker tag_raster(fluvial_topography);
+  int starting_tag = 0;
+  int fluvial_tag_old = 1;
+  int hillslope_tag_old = 2;
+  int fluvial_tag_new = 3;
+  int hillslope_tag_new = 4;
+  tag_raster.set_to_constant_value(starting_tag);
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDFlowInfo flow(boundary_conditions, fluvial_topography);
+  
+  float Sc_value, receiver_elev;
+  float erate_for_tagging;
+  float time_for_tagging;
+  int this_hillslope_tag_value;
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  vector <int> nodeList = flow.get_SVector();
+  int numNodes = nodeList.size();
+  int node, row, col, receiver, receiver_row, receiver_col, contributing_pixels;
+  int tagged_node, tag_row, tag_col;
+  float dx;
+
+  // these save a bit of computational expense.
+  float root_2 = pow(2, 0.5);
+  float dx_root2 = root_2*DataResolution;
+  float DR2 = DataResolution*DataResolution;
+
+  // Step two calculate new height
+  //for (int i=numNodes-1; i>=0; --i)
+  float new_zeta;
+  for (int i=0; i<numNodes; ++i)
+  {
+
+    // get the information about node relationships from the flow info object
+    node = nodeList[i];
+    flow.retrieve_current_row_and_col(node, row, col);
+    flow.retrieve_receiver_information(node, receiver, receiver_row, receiver_col);
+    contributing_pixels = flow.retrieve_contributing_pixels_of_node(node);
+
+    // get the distance between nodes. Depends on flow direction
+    switch (flow.retrieve_flow_length_code_of_node(node))
+    {
+      case 0:
+        dx = -99;
+      break;
+      case 1:
+        dx = DataResolution;
+      break;
+      case 2:
+        dx = dx_root2;
+      break;
+      default:
+        dx = -99;
+      break;
+    }
+
+    if (contributing_pixels > threshold_pixels)
+    {
+      if (erate.get_data_element(row,col)==erate_old)
+      {
+        tag_raster.set_data_element(row,col,fluvial_tag_old);
+      }
+      else
+      {
+        tag_raster.set_data_element(row,col,fluvial_tag_new);
+      }
+      zeta_new[row][col] = zeta_fluvial[row][col];
+    }
+    else 
+    {
+      //cout << "Hillslope pixel!" << endl;
+      // this is a hillslope node
+      // now we check the elevation using the critical slope snapping
+      // If it is a base level node set zeta new to something large so that we always get the diffused node
+      if (node != receiver)
+      {
+        //cout << "Lets go!!" << endl;
+        // This isn't a baselevel node. Get the receiver elevation
+        receiver_elev = zeta_new[receiver_row][receiver_col];
+        
+        // now check to see if this node has been tagged       
+        if (tag_raster.get_data_element(row,col) == 0)
+        {
+          //cout << "I found an untagged pixel!" << endl;
+          // this pixel has not been tagged. We need to tag and update all upslope nodes
+          // First we need to figure out if this is the old or new erosion rate
+          erate_for_tagging = erate.get_data_element(receiver_row,receiver_col);
+          time_for_tagging = time_since_step.get_data_element(receiver_row,receiver_col);
+          if(erate_for_tagging==erate_old)
+          {
+            this_hillslope_tag_value = hillslope_tag_old;
+          }
+          else
+          {
+            this_hillslope_tag_value = hillslope_tag_new;
+          }
+
+          // get the uplsope nodes
+          vector<int> tagging_node_vec = flow.get_upslope_nodes_include_outlet(node);
+          for (int tag_node = 0; tag_node < int(tagging_node_vec.size()); tag_node++)
+          {
+            flow.retrieve_current_row_and_col(tagging_node_vec[tag_node], tag_row, tag_col);
+            tag_raster.set_data_element(tag_row,tag_col,this_hillslope_tag_value);
+            erate.set_data_element(tag_row,tag_col,erate_for_tagging);
+            time_since_step.set_data_element(tag_row,tag_col,time_for_tagging);
+          }
+
+          // Now change the elevation of this node
+          if (tag_raster.get_data_element(row,col) == hillslope_tag_old)
+          {
+            zeta_new[row][col] = receiver_elev+ dx*Sc_value_old;
+          }
+          else if (tag_raster.get_data_element(row,col) == hillslope_tag_new)
+          {
+            zeta_new[row][col] = receiver_elev+ dx*Sc_value_new;
+          }
+        }
+        else
+        {
+          // this pixel has been tagged. All we do is update the elevation
+          if (tag_raster.get_data_element(row,col) == hillslope_tag_old)
+          {
+            zeta_new[row][col] = receiver_elev+ dx*Sc_value_old;
+          }
+          else if (tag_raster.get_data_element(row,col) == hillslope_tag_new)
+          {
+            zeta_new[row][col] = receiver_elev+ dx*Sc_value_new;
+          }
+
+        }       
+      }
+      else
+      {
+        // we don't do anything to baselevel nodes
+        zeta_new[row][col] = zeta_fluvial[row][col];
+      }
+      
+    }
+  }
+
+  LSDRaster new_hillslope(fluvial_topography);
+  new_hillslope.set_data_array(zeta_new);
+
+  new_topography = new_hillslope;
+  raster_tags = tag_raster.return_as_raster();
+
+}
 
 #endif

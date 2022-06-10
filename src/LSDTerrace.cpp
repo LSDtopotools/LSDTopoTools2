@@ -82,33 +82,37 @@ using namespace TNT;
 // FJC 18/10/16
 //
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDTerrace::create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, float relief_thresh, float slope_thresh, int min_patch_size, int threshold_SO, int RemoveChannelThreshold)
+void LSDTerrace::create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, float relief_thresh, float slope_thresh, int min_patch_size, int threshold_SO, float RemoveChannelThreshold)
 {
 
   /// set the protected variables
-	NRows = FlowInfo.get_NRows();
-	NCols = FlowInfo.get_NCols();
-	XMinimum = FlowInfo.get_XMinimum();
-	YMinimum = FlowInfo.get_YMinimum();
-	DataResolution = FlowInfo.get_DataResolution();
-	NoDataValue = FlowInfo.get_NoDataValue();
-	GeoReferencingStrings = FlowInfo.get_GeoReferencingStrings();
+  NRows = FlowInfo.get_NRows();
+  NCols = FlowInfo.get_NCols();
+  XMinimum = FlowInfo.get_XMinimum();
+  YMinimum = FlowInfo.get_YMinimum();
+  DataResolution = FlowInfo.get_DataResolution();
+  NoDataValue = FlowInfo.get_NoDataValue();
+  GeoReferencingStrings = FlowInfo.get_GeoReferencingStrings();
 
-	relief_threshold = relief_thresh;
-	slope_threshold = slope_thresh;
+  relief_threshold = relief_thresh;
+  slope_threshold = slope_thresh;
 
-	//declare the arrays
-	Array2D<int> TempBinArray(NRows,NCols,0);
-	Array2D<int> TempLinkArray(NRows,NCols,NoDataValue);
-	BinaryArray = TempBinArray.copy();
-	ConnectedComponents_Array = TempLinkArray.copy();
-	Array2D<int> StreamOrderArray = ChanNetwork.get_StreamOrderArray();
-	TerraceNodes_array = TempLinkArray.copy();
+  cout << "NRows from FI: " << NRows << " and NCols from FI: " << NCols << endl;
 
-	//declare the vectors
-	vector<int> TerraceNodes_temp, patch_ids_channel;
+  //declare the arrays
+  Array2D<int> TempBinArray(NRows,NCols,0);
+  Array2D<int> TempLinkArray(NRows,NCols,NoDataValue);
+  Array2D<float> TempReliefArray(NRows,NCols,NoDataValue);
+  BinaryArray = TempBinArray.copy();
+  ConnectedComponents_Array = TempLinkArray.copy();
+  Array2D<int> StreamOrderArray = ChanNetwork.get_StreamOrderArray();
+  TerraceNodes_array = TempLinkArray.copy();
 
-	//loop through every row and col and get the slope and relief values
+  //declare the vectors
+  vector<int> TerraceNodes_temp, patch_ids_channel;
+
+  //loop through every row and col and get the slope and relief values
+  cout << "Looking for nodes that qualify as potential terraces" << endl;
   for (int i =0; i < NRows; i++)
   {
     for (int j = 0; j < NCols; j++)
@@ -122,13 +126,16 @@ void LSDTerrace::create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionN
 				if (relief < relief_threshold && relief > RemoveChannelThreshold && slope < slope_threshold)
         {
           BinaryArray[i][j] = 1;
+          TempReliefArray[i][j] = relief;
         }
       }
     }
   }
+  ChannelRelief_array= TempReliefArray;
 	LSDIndexRaster TerraceRaster(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,BinaryArray,GeoReferencingStrings);
 
 	// run the connected components algorithm on the terrace array
+  cout << "Connecting the components" << endl;
 	LSDIndexRaster ConnectedComponents = TerraceRaster.ConnectedComponents();
 	if (min_patch_size > 0)
 	{
@@ -139,6 +146,20 @@ void LSDTerrace::create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionN
 	{
 		ConnectedComponents_Array = ConnectedComponents.get_RasterData();
 	}
+
+  cout << "Getting the relief array from connected components" << endl;
+  // Now get the relief array from the connected components array
+  for (int i =0; i < NRows; i++)
+  {
+    for (int j = 0; j < NCols; j++)
+    {
+      if (ConnectedComponents_Array[i][j] != NoDataValue)
+      {
+        ChannelRelief_array[i][j] = ChannelRelief.get_data_element(i,j);
+      }
+    }
+  }
+  cout << "Done with initial terrace processing!" << endl;
 
 	// push back the terrace IDs to vector
 	vector<int> TerraceIDs_temp = Unique(ConnectedComponents_Array, NoDataValue);
@@ -189,9 +210,9 @@ void LSDTerrace::Get_Relief_of_Nearest_Channel(LSDJunctionNetwork& ChanNetwork, 
 
 	cout << "\t Getting elevations of nearest channels for the terraces" << endl;
 
-  // START WITH THE TERRACES
+  	// START WITH THE TERRACES
 	for (int i = 0; i < int(TerraceNodes.size()); i++)
-  {
+  	{
 		int row, col, ChannelNode;
 		FlowInfo.retrieve_current_row_and_col(TerraceNodes[i], row, col);
 		float FlowLength, DistanceUpstream;

@@ -695,6 +695,11 @@ void LSDCosmoData::load_parameters(string filename)
         Muon_scaling = "Braucher";
         cout << "You have selected Braucher scaling" << endl;
       }
+      if(value.find("braucherborchers") == 0 || value.find("BraucherBorchers") == 0)
+      {
+        Muon_scaling = "BraucherBorchers";
+        cout << "You have selected Braucher/Borchers scaling" << endl;
+      }
       else if(value.find("granger") == 0 || value.find("Granger") == 0)
       {
         Muon_scaling = "Granger";
@@ -1238,7 +1243,8 @@ void LSDCosmoData::check_parameter_values()
   }
   
   if (Muon_scaling != "Braucher" && Muon_scaling != "Granger" && 
-      Muon_scaling != "Schaller" && Muon_scaling != "newCRONUS")
+      Muon_scaling != "Schaller" && Muon_scaling != "newCRONUS" &&
+      Muon_scaling != "BraucherBorchers")
   {
     cout << "You have not seleceted a valid scaling. Defaulting to Braucher" << endl;
     Muon_scaling = "Braucher";
@@ -2246,7 +2252,7 @@ void LSDCosmoData::convert_to_UTM(int UTM_zone)
   int eId = 22;             // defines the ellipsiod. This is WGS
   for(int i = 0; i<N_samples; i++)
   {
-    cout << "Converting point " << i << " to UTM." << endl;
+    //cout << "Converting point " << i << " to UTM." << endl;
     Converter.LLtoUTM_ForceZone(eId, latitude[i], longitude[i], 
                       this_Northing, this_Easting, UTM_zone);
     this_UTMN[i] = this_Northing;
@@ -4053,6 +4059,10 @@ vector<double> LSDCosmoData::full_CRN_erosion_analysis_point(double Nuclide_conc
   {
     LSDCRNP.set_Braucher_parameters();
   }
+  else if (Muon_scaling == "BraucherBorchers" )
+  {
+    LSDCRNP.set_BraucherBorchers_parameters();
+  }
   else if (Muon_scaling == "Granger" )
   {
     LSDCRNP.set_Granger_parameters();
@@ -4064,7 +4074,7 @@ vector<double> LSDCosmoData::full_CRN_erosion_analysis_point(double Nuclide_conc
   else
   {
     cout << "You didn't set the muon scaling." << endl
-         << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+         << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
          << "You chose: " << Muon_scaling << endl
          << "Defaulting to Braucher et al (2009) scaling" << endl;
     LSDCRNP.set_Braucher_parameters();     
@@ -4226,6 +4236,10 @@ double LSDCosmoData::predict_CRN_erosion_point(double Nuclide_conc, string Nucli
   {
     LSDCRNP.set_Braucher_parameters();
   }
+  else if (Muon_scaling == "BraucherBorchers" )
+  {
+    LSDCRNP.set_BraucherBorchers_parameters();
+  }
   else if (Muon_scaling == "Granger" )
   {
     LSDCRNP.set_Granger_parameters();
@@ -4237,7 +4251,7 @@ double LSDCosmoData::predict_CRN_erosion_point(double Nuclide_conc, string Nucli
   else
   {
     cout << "You didn't set the muon scaling." << endl
-         << "Options are Schaller, Braucher, newCRONUS and Granger." << endl
+         << "Options are Schaller, Braucher, BraucherBorchers, newCRONUS and Granger." << endl
          << "You chose: " << Muon_scaling << endl
          << "Defaulting to Braucher et al (2009) scaling" << endl;
     LSDCRNP.set_Braucher_parameters();     
@@ -4440,6 +4454,10 @@ double LSDCosmoData::predict_mean_CRN_conc_point(double eff_erosion_rate, string
   {
     LSDCRNP.set_Braucher_parameters();
   }
+  else if (Muon_scaling == "BraucherBorchers" )
+  {
+    LSDCRNP.set_BraucherBorchers_parameters();
+  }
   else if (Muon_scaling == "Granger" )
   {
     LSDCRNP.set_Granger_parameters();
@@ -4451,7 +4469,7 @@ double LSDCosmoData::predict_mean_CRN_conc_point(double eff_erosion_rate, string
   else
   {
     cout << "You didn't set the muon scaling." << endl
-         << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+         << "Options are Schaller, Braucher, BraucherBorchers, newCRONUS, and Granger." << endl
          << "You chose: " << Muon_scaling << endl
          << "Defaulting to Braucher et al (2009) scaling" << endl;
     LSDCRNP.set_Braucher_parameters();     
@@ -4973,9 +4991,13 @@ void LSDCosmoData::point_measurements(vector<int> valid_samples,vector<double> s
     {
       LSDCRNP.set_Schaller_parameters();
     }
-      else if (Muon_scaling == "Braucher" )
+    else if (Muon_scaling == "Braucher" )
     {
       LSDCRNP.set_Braucher_parameters();
+    }
+    else if (Muon_scaling == "BraucherBorchers" )
+    {
+      LSDCRNP.set_BraucherBorchers_parameters();
     }
     else if (Muon_scaling == "Granger" )
     {
@@ -4988,7 +5010,7 @@ void LSDCosmoData::point_measurements(vector<int> valid_samples,vector<double> s
     else
     {
       cout << "You didn't set the muon scaling." << endl
-           << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+           << "Options are Schaller, Braucher, BraucherBorchers, newCRONUS, and Granger." << endl
            << "You chose: " << Muon_scaling << endl
            << "Defaulting to Braucher et al (2009) scaling" << endl;
       LSDCRNP.set_Braucher_parameters();     
@@ -5937,20 +5959,17 @@ void LSDCosmoData::print_basins_to_for_checking()
     cout << "Getting the junction network...";
     LSDJunctionNetwork JNetwork(sources, FlowInfo);
     cout << "...got it." << endl;
-    
-    // print the stream order raster (to check against points)
-    //LSDIndexRaster SO_raster = JNetwork.StreamOrderArray_to_LSDIndexRaster();
-    //string SO_filename = DEM_fname+"_SO";
-    //SO_raster.write_raster(SO_filename,DEM_bil_extension);
 
     // Also print a csv of the channel nodes
-    string channel_csv_name = DEM_fname+"_CN";
-    cout << "Bear with me while I print the junction network..." << endl;
-    JNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
-    cout << "Finished printing channel network." << endl;
+    //string channel_csv_name = DEM_fname+"_CN";
+    //cout << "Bear with me while I print the junction network..." << endl;
+    //JNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
+    //cout << "Finished printing channel network." << endl;
 
     // Now convert the data into this UTM zone
+    //cout << "Converting point locations to UTM";
     convert_to_UTM(filled_raster);
+    //cout << "...done" << endl;
 
     // convert UTM vectors to float
     vector<float> fUTM_easting;

@@ -66,7 +66,19 @@ using namespace std;
 class LSDSpatialCSVReader
 {
   public:
+    /// @brief Assignment operator.
+    LSDSpatialCSVReader& operator=(const LSDSpatialCSVReader& LSDR);
 
+    /// @brief Create an empty LSDSpatialCSVReader 
+    /// @author SMM
+    /// @date 04/06/2022
+    LSDSpatialCSVReader()  { create(); }
+
+    /// @brief Create an empty LSDSpatialCSVReader but that has geospatial information 
+    /// @param ThisRI a rasterinfo object that has georeferencing
+    /// @author SMM
+    /// @date 04/06/2022
+    LSDSpatialCSVReader(LSDRasterInfo& ThisRI)  { create(ThisRI); }
 
     /// @brief Create an LSDSpatialCSVReader from a raster and csv filenname
     /// @param csv_fname The name of the csv file including extension  and path
@@ -106,8 +118,8 @@ class LSDSpatialCSVReader
     /// @date 15/03/2017
    LSDSpatialCSVReader(int nrows, int ncols, float xmin, float ymin,
            float cellsize, float ndv, map<string,string> temp_GRS,
-           vector<double>& this_latitude, vector<double>& this_longitude,
-           vector<bool>& this_is_point_in_raster, map<string, vector<string> >& this_data_map)
+           vector<double> this_latitude, vector<double> this_longitude,
+           vector<bool> this_is_point_in_raster, map<string, vector<string> > this_data_map)
              { create(nrows, ncols, xmin, ymin, cellsize, ndv, temp_GRS,
                     this_latitude, this_longitude,this_is_point_in_raster, this_data_map); }
 
@@ -444,10 +456,40 @@ class LSDSpatialCSVReader
     /// @date 04/03/21
     void interpolate_across_gap(LSDRaster& ThisRaster, string X_column_name, string Y_column_name, string fd_column_name);
 
-    // @brief Returns the data map
-    /// @author BG/ELSG
-    /// @date 01/03/21
+
     map<string,vector<string> >& get_data_map();
+
+    // Get functions
+
+    /// @return Number of rows as an integer.
+    int get_NRows() const        { return NRows; }
+
+    /// @return Number of columns as an integer.
+    int get_NCols() const        { return NCols; }
+
+    /// @return Minimum X coordinate as an integer.
+    float get_XMinimum() const      { return XMinimum; }
+
+    /// @return Minimum Y coordinate as an integer.
+    float get_YMinimum() const      { return YMinimum; }
+
+    /// @return Data resolution as an integer.
+    float get_DataResolution() const  { return DataResolution; }
+
+    /// @return No Data Value as an integer.
+    int get_NoDataValue() const      { return NoDataValue; }
+
+    /// @return the point in raster vector
+    vector<bool> get_is_point_in_raster() const {return is_point_in_raster; }
+
+    /// @return Georeferencing information
+    map<string,string> get_GeoReferencingStrings() const { return GeoReferencingStrings; }
+
+    //. @brief Returns the data map
+    /// @author BG/ELSG updated SMM 04/06/2022
+    /// @date 01/03/21
+    map<string,vector<string> > get_data_map() const { return data_map; }
+
 
     // @brief Appends a value to a column
     /// @author BG/ELSG
@@ -497,6 +539,8 @@ class LSDSpatialCSVReader
 
     void create();
 
+    void create(LSDRasterInfo&);
+
     void create(string);
 
     void create(LSDRaster&,string);
@@ -505,8 +549,8 @@ class LSDSpatialCSVReader
 
     void create(int nrows, int ncols, float xmin, float ymin,
            float cellsize, float ndv, map<string,string> temp_GRS,
-           vector<double>& this_latitude, vector<double>& this_longitude,
-           vector<bool>& this_is_point_in_raster, map<string, vector<string> >& this_data_map);
+           vector<double> this_latitude, vector<double> this_longitude,
+           vector<bool> this_is_point_in_raster, map<string, vector<string> > this_data_map);
 
 
 };

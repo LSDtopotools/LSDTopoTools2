@@ -1044,6 +1044,51 @@ void LSDFlowInfo::print_vector_of_nodeindices_to_csv_file_with_latlong(vector<in
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// This function takes a list of junctions and prints them to a csv file
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDFlowInfo::print_vector_of_nodeindices_to_csv_file_with_latlong(vector<int>& nodeindex_vec, string outfilename, LSDRaster& add_value, string add_column_name)
+{
+  int n_nodes = (nodeindex_vec.size());
+  int this_node;
+  int row,col;
+  double x_loc,y_loc;
+  double latitude,longitude;
+
+  // open the outfile
+  ofstream sources_out;
+  sources_out.open(outfilename.c_str());
+  sources_out.precision(9);
+
+  sources_out << "id,x,y,latitude,longitude," << add_column_name << endl;
+
+  // this is for latitude and longitude
+  LSDCoordinateConverterLLandUTM Converter;
+
+  for (int i = 0; i<n_nodes; i++)
+  {
+    this_node = nodeindex_vec[i];
+
+    // get the row and column
+    retrieve_current_row_and_col(this_node,row,col);
+
+    // get the x and y locations
+    get_x_and_y_locations(row, col, x_loc, y_loc);
+
+    // get the lat and long locations
+    get_lat_and_long_locations(row, col, latitude, longitude, Converter);
+
+    // print to file
+    sources_out << this_node << "," << x_loc << ","
+                << y_loc << "," << latitude << "," << longitude << "," << add_value.get_data_element(row,col) << endl;
+
+  }
+
+  sources_out.close();
+
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Write nodeindex vector to csv file, and give each row a unique ID
 //
@@ -3061,7 +3106,7 @@ LSDRaster LSDFlowInfo::upslope_variable_accumulator(LSDRaster& accum_raster)
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 
-LSDRaster LSDFlowInfo::upslope_variable_accumulator_v2(LSDRaster& accum_raster)
+void LSDFlowInfo::upslope_variable_accumulator_v2(LSDRaster& accum_raster)
 {
   this->upslope_variable_accumulator_v2(accum_raster, true);
 }
@@ -11324,6 +11369,61 @@ int LSDFlowInfo::find_nearest_node_in_vector(int target_node, vector<int> node_v
     }
   }
   return nearest_node;
+
+}
+
+//-----------------------------------------------------------------------------//
+// Function to calculate the upstream hypsometric integral from a node
+// HI = (Z_mean - Z_min) / (Z_max - Z_min)
+//-----------------------------------------------------------------------------//
+float LSDFlowInfo::calculate_upstream_HI(int node, LSDRaster& Elevation)
+{
+  float HI;
+  // get the vector of upstream nodes
+  vector<int> upstream_nodes = get_upslope_nodes_include_outlet(node);
+  // get a vector of elevation of each of these nodes
+  int this_elev, this_row, this_col;
+  vector<float> upstream_elevs;
+  for (int i = 0; i < int(upstream_nodes.size()); i++)
+  {
+    retrieve_current_row_and_col(upstream_nodes[i], this_row, this_col);
+    this_elev = Elevation.get_data_element(this_row, this_col);
+    upstream_elevs.push_back(this_elev);
+  }
+
+  // now work out the HI from the mean, max and min elevations
+  float mean_elev = get_mean_ignore_ndv(upstream_elevs, NoDataValue);
+  float min_elev = Get_Minimum(upstream_elevs, NoDataValue);
+  float max_elev = Get_Maximum(upstream_elevs, NoDataValue);
+  HI = (mean_elev - min_elev)/(max_elev - min_elev);
+
+  return HI;
+}
+
+//-----------------------------------------------------------------------------//
+// Function to calculate the % upstream elevation within specific elevation 
+// bands for a node
+// FJC
+//-----------------------------------------------------------------------------//
+void LSDFlowInfo::calculate_upstream_elevations(int node, LSDRaster& Elevation, float bin_width, float lower_limit, float upper_limit, vector<float>& Midpoints, vector<float>& ProbabilityDensity)
+{
+  float HI;
+  // get the vector of upstream nodes
+  vector<int> upstream_nodes = get_upslope_nodes_include_outlet(node);
+  // get a vector of elevation of each of these nodes
+  int this_elev, this_row, this_col;
+  vector<float> upstream_elevs;
+  for (int i = 0; i < int(upstream_nodes.size()); i++)
+  {
+    retrieve_current_row_and_col(upstream_nodes[i], this_row, this_col);
+    this_elev = Elevation.get_data_element(this_row, this_col);
+    upstream_elevs.push_back(this_elev);
+  }
+
+  // calculate histogram from the vector of upstream elevations
+  vector<float> LLims, ULims;
+  vector<int> Count;
+  calculate_histogram_fixed_limits(upstream_elevs, bin_width, lower_limit, upper_limit, Midpoints, LLims, ULims, Count, ProbabilityDensity);
 
 }
 

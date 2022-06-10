@@ -188,7 +188,7 @@ PointData LoadShapefile(string Filename){
   ByteData = new BYTE[fileSize];
 
   // Read the file in to the buffer
-  fread(ByteData, fileSize, 1, file);
+  size_t filesize = fread(ByteData, fileSize, 1, file);
 
   //Declare variables used in the method
   int FileLength;
@@ -353,7 +353,7 @@ vector<PointData> LoadPolyline(string Filename){
   ByteData = new BYTE[fileSize];
 
   // Read the file in to the buffer
-  fread(ByteData, fileSize, 1, file);
+  size_t filesize = fread(ByteData, fileSize, 1, file);
 
   //Declare variables used in the method
   int FileLength;

@@ -68,7 +68,7 @@
 int main (int nNumberofArgs,char *argv[])
 {
 
-  string version_number = "0.6";
+  string version_number = "0.7d";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -188,7 +188,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["replace_pixels"] = {  "bool","false","When true the raster will replace specific pixels designated by a csv file.","Pixels to be replaced are designated in the pixels_to_replace_file"};
    
   string_default_map["pixels_to_replace_file"] = "pixels_to_replace.csv";
-  help_map["pixels_to_replace_file"] = {  "string","pixels_to_replace.csv","The pixels to be replaced. Needs an X,Y,value column. Header is ignored so it needs to be in this order","Incorrect formatting of file will crash the code."};
+  help_map["pixels_to_replace_file"] = {  "string","pixels_to_replace.csv","The pixels to be replaced. Needs three columns X; Y; value. Header is ignored so it needs to be in this order","Incorrect formatting of file will crash the code."};
 
   float_default_map["elevation_change"] = 0;
   help_map["elevation_change"] = {  "float","0","Adjusts the elevation of the raster by this amount. Does nothing if the elevation change is 0. This prints to a new raster and exits.","For when you need to lift or drop the raster."};
@@ -200,6 +200,15 @@ int main (int nNumberofArgs,char *argv[])
   //========================================================
   bool_default_map["remove_nodes_influenced_by_edge"] = false;
   help_map["remove_nodes_influenced_by_edge"] = {  "bool","false","Runs flow routing and then any node downstream of a node adjacent to a nodata pixel is turned to nodata.","Use this is you want to be sure all you data is in complete basins."};
+
+  bool_default_map["remove_outer_nodes_for_edge_influence"] = false;
+  help_map["remove_outer_nodes_for_edge_influence"] = {  "bool","false","Used in conjunction with remove_nodes_influenced_by_edge. In some cases the fill function causes an edge effect so this makes sure the edges with nodata can be propigated in the flow direction to make sure nodes influenced by the edge are removed","Use this is you want to be sure all you data is in complete basins."};
+
+  bool_default_map["use_spiral_trimmer_for_edge_influence"] = false;
+  help_map["use_spiral_trimmer_for_edge_influence"] = {  "bool","false","Used in conjunction with remove_nodes_influenced_by_edge. Makes sure raster is rectangular before running edge influence routine.","Use this is you want to be sure all you data is in complete basins."};
+
+
+
 
   bool_default_map["isolate_pixels_draining_to_fixed_channel"] = false;
   help_map["isolate_pixels_draining_to_fixed_channel"] = {  "bool","false","Runs flow routing and only take nodes that drain into a list of nodes defined in the fixed_channel_csv_name csv file.","Use this if you want to isolate a main drainage pathway."};
@@ -214,13 +223,13 @@ int main (int nNumberofArgs,char *argv[])
   help_map["print_trimmed_raster"] = {  "bool","false","This is for rasters that have nodata around the edges. Trims away nodata edges and updates the raster georeferencing.","Use if your raster has lots of nodata and you want to shrink it to the area with data."};
 
   int_default_map["trimming_buffer_pixels"] = 0;
-  help_map["trimming_buffer_pixels"] = {  "int","0","Used with the print_trimed_raster Creates a buffer of this many nodata pixels around the edge.","You might want a buffer for use in numerical modelling or other applications."};
+  help_map["trimming_buffer_pixels"] = {  "int","0","Used with the print_trimmed_raster Creates a buffer of this many nodata pixels around the edge.","You might want a buffer for use in numerical modelling or other applications."};
 
   //========================================================
   // Parameters for swath mapping
   //========================================================
   bool_default_map["calculate_swath_profile"] = false;
-  help_map["calculate_swath_profile"] = {  "bool","false","Program sets this itself if you choose one of two options: calculate_swath_along_line or calculate_swath_along_channel. This makes a swath that prints a csv with distance along swath and the statistics.","Don't select this, use the swath_along_channel or swath_along_points flags instead."};
+  help_map["calculate_swath_profile"] = {  "bool","false","Program sets this itself if you choose one of two options: calculate_swath_along_line or calculate_swath_along_channel. This makes a swath that prints a csv with distance along swath and the statistics.","The user should not select this option but instead use the swath_along_channel or swath_along_points flags instead. This flag is used only for completeness in the log file."};
 
   bool_default_map["calculate_swath_along_line"] = false;
   help_map["calculate_swath_along_line"] = {  "bool","false","Swath mapping where you give it a series of points in the csv file and it creates line segments between these points. This serves as the swath baseline.","Only one of this and calculate_swath_along_channel can be true."};
@@ -229,10 +238,10 @@ int main (int nNumberofArgs,char *argv[])
   help_map["calculate_swath_along_channel"] = {  "bool","false","Swath mapping where you give it a starting point and a finish point (the latter is optional) and it will follow a flow path from the starting point and use that as the swath baseline.","Only one of this and calculate_swath_along_points can be true."};
 
   bool_default_map["print_swath_rasters"] = true;
-  help_map["print_swath_rasters"] = {  "bool","true","If this is true and swath mapping is true then rasters showing the distance to the baseling and the cloed node along the baseline file are printed.","These rasters can be used to visualise the pixels that go into the swath."};
+  help_map["print_swath_rasters"] = {  "bool","true","If this is true and swath mapping is true then rasters showing the distance to the baseline and the closest node along the baseline file are printed.","These rasters can be used to visualise the pixels that go into the swath."};
 
   string_default_map["swath_points_csv"] = "swath.csv";
-  help_map["swath_points_csv"] = {  "string","swath.csv","The name of the csv file for swath mapping. It can be the start and (optional) end point of the swath channel, or a series of points that form a polyline that serves as the baseline for the swath.","Filename needs to include the csv extension and have latitude and longitude in the column headers."};
+  help_map["swath_points_csv"] = {  "string","swath.csv","The name of the csv file for swath mapping. It can be the start and (optional) end point of the swath channel or a series of points that form a polyline that serves as the baseline for the swath.","Filename needs to include the csv extension and have latitude and longitude in the column headers."};
 
   float_default_map["swath_point_spacing"] = 500;
   help_map["swath_point_spacing"] = {  "float","500","Only used by calcualte_swath_along_points. How closely spaced the points are (in metres) along the baseline.","If this number is large (many times the DEM resolution) the swath will have an irregular edge so this should be close to the DEM resolution."};
@@ -269,7 +278,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["river_depth"] = {  "float","1","If you are using create_valley_trough this sets the depth of the edges of the river below the minimum bank elevation.","Set to zero if you don't want the river inset into the banks."};
 
   float_default_map["trough_scaling_factor"] = 0.1;
-  help_map["trough_scaling_factor"] = {  "float","0.1","The centreline routine digs a trough (to route flow through the centre of the valley) with a depth that is this factor times the distance from the edge. Increase this number for a deeper trough.","A deeper trough has more sucess at routing flow but you get backwater effects at the bottom of the valley. Play with this number to get the best result."};
+  help_map["trough_scaling_factor"] = {  "float","0.1","The centreline routine digs a trough (to route flow through the centre of the valley) with a depth that is this factor times the distance from the edge. Increase this number for a deeper trough.","A deeper trough has more success at routing flow but you get backwater effects at the bottom of the valley. Play with this number to get the best result."};
   
   bool_default_map["create_valley_trough"] = false;
   help_map["create_valley_trough"] = {  "bool","false","If you have a valley mask this will punch a trough in that valley mask. The new river will have a depth of river_depth and will be sloping toward the middle of the valley based on trough_scaling_factor. Used to condition noisy rasters to have rivers through them.","We use this routine for flood modelling when the data over the river is very noisy."};
@@ -303,7 +312,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["test_bearing_template"] = {  "bool","false","A small debugging routine to test the size of the channel bearing template","Helps to bug check and visualise the direction of the channel where width is measured orthogonal to the bearing."};
    
   int_default_map["channel_bearing_node_spacing"]= 4;
-  help_map["channel_bearing_node_spacing"] = {  "int","4","This sets how frequently the cahnnel is sampled for its bearing.","Helps to bug check and visualise the direction of the channel where width is measured orthogonal to the bearing."};
+  help_map["channel_bearing_node_spacing"] = {  "int","4","This sets how frequently the channel is sampled for its bearing.","Helps to bug check and visualise the direction of the channel where width is measured orthogonal to the bearing."};
   
   bool_default_map["print_channel_bearings"] = true; 
   help_map["print_channel_bearings"] = {  "bool","true","This prints to csv the directional bearings (looking downslope) of channel pixels.","Helps to bug check and visualise the direction of the channel where width is measured orthogonal to the bearing."};
@@ -384,7 +393,7 @@ int main (int nNumberofArgs,char *argv[])
   // Window size estimation
   //========================================================  
   bool_default_map["calculate_window_size"] = false;
-  help_map["calculate_window_size"] = {  "bool","false","This is a routine that computes the optimal surface_fitting_radius for the surafce fitting metrics.","Warning: time consuming."};
+  help_map["calculate_window_size"] = {  "bool","false","This is a routine that computes the optimal surface_fitting_radius for the surface fitting metrics.","Warning: time consuming."};
 
 
   //========================================================
@@ -397,7 +406,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["REI_critical_slope"] = {  "float","1.0","Critical slope value for the REI metric. Above this slope the ground is considered to be rock.","See DiBiase et al 2012 ESPL for details."};
 
   float_default_map["REI_window_radius"] = 10;
-  help_map["REI_window_radius"] = {  "float","10","Radius of window withing which you test for pixels above the REI_critical_slope.","See DiBiase et al 2012 ESPL for details."};
+  help_map["REI_window_radius"] = {  "float","10","Radius of window withig which you test for pixels above the REI_critical_slope.","See DiBiase et al 2012 ESPL for details."};
 
   bool_default_map["print_roughness_rasters"] = false;
   help_map["print_roughness_rasters"] = {  "bool","false","Computes roughness rasters from divergence of surface normals.","See Milidowski et al 2015 ESURF for details."};
@@ -438,7 +447,7 @@ int main (int nNumberofArgs,char *argv[])
 
   // imposing a single channel
   bool_default_map["impose_single_channel"] = false;
-  help_map["impose_single_channel"] = {  "bool","false","This forces the elevations of pixels read from the fixed_channel_csv_name.","Useful for enfocing a main stem flow path."};
+  help_map["impose_single_channel"] = {  "bool","false","This forces the elevations of pixels read from the fixed_channel_csv_name.","Useful for enforcing a main stem flow path."};
 
   string_default_map["fixed_channel_csv_name"] = "NULL";
   help_map["fixed_channel_csv_name"] = {  "string","NULL","The prefix of the csv that holds the fixed channel information. csv much have latitude longitude flowdistance and elevation columns.","Obtain channel using extract_single_channel."};
@@ -502,6 +511,9 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["use_extended_channel_data"] = false;
   help_map["use_extended_channel_data"] = {  "bool","false","If this is true you get more data columns in your channel network csv.","I will tell you what these columns are one day."};
 
+  bool_default_map["print_channel_data_plus_surface_metrics"] = false;
+  help_map["print_channel_data_plus_surface_metrics"] = { "bool", "false", "If this is true you get the channel network with various surface metric data like local slope, relief, and curvature.","This is slow because it needs to run the polyfitting routines."};
+
   bool_default_map["print_junction_index_raster"] = false;
   help_map["print_junction_index_raster"] = {  "bool","false","Prints a raster with junctions and their number.","Makes big files. It is better to use the csv version."};
 
@@ -514,11 +526,20 @@ int main (int nNumberofArgs,char *argv[])
   help_map["find_basins"] = {  "bool","false","If true enters basin finding algorithms.","Used to try to extract basins of similar size. If you use outlets this flag is not required."};
  
   int_default_map["minimum_basin_size_pixels"] = 50000;
-  help_map["minimum_basin_size_pixels"] = {  "int","50000","For basin finding algorithm, the minimum size of a selected basin.","Will reject basins along edge."};
+  help_map["minimum_basin_size_pixels"] = {  "int","50000","For basin finding algorithm this value the minimum size of a selected basin.","Will reject basins along edge."};
   
   int_default_map["maximum_basin_size_pixels"] = 1000000;
-  help_map["maximum_basin_size_pixels"] = {  "int","1000000","For basin finding algorithm, the maximum size of a selected basin.","Will reject basins along edge."};
+  help_map["maximum_basin_size_pixels"] = {  "int","1000000","For basin finding algorithm this value the maximum size of a selected basin.","Will reject basins along edge."};
+
+  bool_default_map["fill_interior_nodata"] = false;
+  help_map["fill_interior_nodata"] = {  "bool","false","For basin finding and other extration methods this removes interior nodata pixels.","Needs a window size that controls how big of an area is searched."};
   
+  int_default_map["window_for_filling_interior_nodata"] = 10;
+  help_map["window_for_filling_interior_nodata"] = {  "int","10","When you need to get rid of interior nodata, this is the size of the window for filling.","Larger numbers fill more holes but slows down the computation"};
+
+
+
+
   bool_default_map["only_take_largest_basin"] = false;
   help_map["only_take_largest_basin"] = {  "bool","false","This only retains the largest complete basin in the raster.","Will reject basins along edge."};
   
@@ -528,21 +549,26 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["get_basins_from_outlets"] = false;
   help_map["get_basins_from_outlets"] = {  "bool","false","Switches on the outlet based basin finding.","See BaselevelJunctions_file for format of outlets csv."};
   
+  bool_default_map["prune_edge_draining_basins"] = true;
+  help_map["prune_edge_draining_basins"] = {  "bool","true","If this is false then the basin finding algorithm will keep basins that drain from the edge meaning that there is a chance your chi coordinate and drainage area will be incorrect.","WARNING switch this off with extreme caution since you might get basins that drain from the edge of the DEM."};  
+
   int_default_map["search_radius_nodes"] = 8;
   help_map["search_radius_nodes"] = {  "int","8","A parameter for snapping to the nearest channel. It will search for the largest channel (by stream order) within the pixel window.","You will want smaller pixel numbers if you have a dense channel network."};
  
   int_default_map["threshold_stream_order_for_snapping"] = 2;
-  help_map["threshold_stream_order_for_snapping"] = {  "int","2","If you are snapping to a channel, it will ignore channel with lower stream order than this number.","Set this to a higher number to avoid snapping to small channels."};
+  help_map["threshold_stream_order_for_snapping"] = {  "int","2","If you are snapping to a channel the routine it will ignore channel with lower stream order than this number.","Set this to a higher number to avoid snapping to small channels."};
   
   string_default_map["basin_outlet_csv"] = "NULL";
   help_map["basin_outlet_csv"] = {  "string","NULL","A csv file with the lat long of basin outlets.","csv should have latitude and longitude columns and rows with basin outlets."};
   
   bool_default_map["extend_channel_to_node_before_receiver_junction"] = true;
-  help_map["extend_channel_to_node_before_receiver_junction"] = {  "bool","true","For various basin extractions the basin snaps to the nearest junction. If this is true then the outlet of the basin is one pixel upstream of the reciever junction of the snapped channel.","If false it will pick the donor junction of the channel rather than one pixel above the reciever."};
+  help_map["extend_channel_to_node_before_receiver_junction"] = {  "bool","true","For various basin extractions the basin snaps to the nearest junction. If this is true then the outlet of the basin is one pixel upstream of the receiver junction of the snapped channel.","If false it will pick the donor junction of the channel rather than one pixel above the receiver."};
     
   bool_default_map["print_basin_raster"] = false;
   help_map["print_basin_raster"] = {  "bool","false","This prints a raster where the values are the basin number.","You can combine this with python tools to get basin shapefiles."};
-    
+
+  bool_default_map["clip_raster_to_basins"] = false;
+  help_map["clip_raster_to_basins"] = {  "bool","false","This the selected basins and then clips the raster to just those basins.","This will change the extent of the raster."};
 
   // finding major drainage divides
   bool_default_map["divide_finder"] = false;
@@ -552,7 +578,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["horizontal_strips"] = {  "bool","true","For use with the divide finder. If true strips are horizontal and vertical if not.","For now you need to hope your mountain is not diagonal across the DEM."};
  
   int_default_map["n_row_or_col_for_strips"] = 10;
-  help_map["n_row_or_col_for_strips"] = {  "int","10","For use with the divide finder. Nuber of rows or columns to tag on the edges.","Make wider strips to ensure you capture all the valleys."};
+  help_map["n_row_or_col_for_strips"] = {  "int","10","For use with the divide finder. Number of rows or columns to tag on the edges.","Make wider strips to ensure you capture all the valleys."};
  
   // Getting all the ridges
   bool_default_map["extract_ridges"] = false;
@@ -561,7 +587,7 @@ int main (int nNumberofArgs,char *argv[])
 
   // Tagging pixels
   bool_default_map["tag_nodes"] = false;
-  help_map["tag_nodes"] = {  "bool","false","A routine for entering a raster with value and then propigating those values down the flow network.","The raster tag values are given by tagged_raster_input_name."};
+  help_map["tag_nodes"] = {  "bool","false","A routine for entering a raster with value and then propagating those values down the flow network.","The raster tag values are given by tagged_raster_input_name."};
     
   string_default_map["tagged_raster_input_name"] = "NULL";
   help_map["tagged_raster_input_name"] = {  "strig","NULL","The name of the raster with which to tag nodes.","The returned raster will have these values tagged in the output raster."};
@@ -581,7 +607,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["A_0"] = {  "float","1.0","The A_0 parameter for chi computation. See https://doi.org/10.1002/esp.3302","Usually set to 1 so that the slope in chi-elevation space is the same as k_sn"};
    
   float_default_map["m_over_n"] = 0.5;
-  help_map["m_over_n"] = {  "float","0.5","The concavity index for chi calculations. Ususally denoted as the greek symbol theta.","Default is 0.5 but possibly 0.45 is better as Kwang and Parker suggest 0.5 leads to unrealistic behaviour in landscape evolution models."};
+  help_map["m_over_n"] = {  "float","0.5","The concavity index for chi calculations. Usually denoted as the Greek symbol theta.","Default is 0.5 but possibly 0.45 is better as Kwang and Parker suggest 0.5 leads to unrealistic behaviour in landscape evolution models."};
 
   bool_default_map["print_chi_data_maps"] = false;
   help_map["print_chi_data_maps"] = {  "bool","false","If true prints the chi network to csv.","csv file has chidatamaps in the filename. Has the locations of the channel pixels with their chi coordinates and other information."};
@@ -612,17 +638,29 @@ int main (int nNumberofArgs,char *argv[])
 
   // This is for junction angles
   bool_default_map["print_junction_angles_to_csv"] = false;
-  help_map["print_junction_angles_to_csv"] = {  "bool","false","Prints a csv with all the locations of the junctions and associated statistics.","csv file contains junction angles; bending angles; areas; gradinets; and other information."};
+  help_map["print_junction_angles_to_csv"] = {  "bool","false","Prints a csv with ALL the locations of the junctions and associated statistics.","csv file contains junction angles; bending angles; areas; gradients; and other information."};
+
+  bool_default_map["print_junction_angles_to_csv_in_basins"] = false;
+  help_map["print_junction_angles_to_csv_in_basins"] = {  "bool","false","Prints a csv with the locations of the junctions within selected basins and associated statistics.","csv file contains junction angles; bending angles; areas; gradients; and other information."};
+
+
 
   float_default_map["SA_vertical_interval"] = 10;
-  help_map["SA_vertical_interval"] = {  "float","10","This is used in both slope-area routines and also junction angle routines. It sets the vertical drop over which the gradient is measured and the junction angle is measured on points between a tributary within the height and the junction.","For S-A analysis, should be greater than the vertical uncertainty of your DEM. For junction angles, if you set this to a large number it will measure angles between the junction the donor junctions and the reciever junction."};
+  help_map["SA_vertical_interval"] = {  "float","10","This is used in both slope-area routines and also junction angle routines. It sets the vertical drop over which the gradient is measured and the junction angle is measured on points between a tributary within the height and the junction.","For S-A analysis the value should be greater than the vertical uncertainty of your DEM. For junction angles if you set this to a large number it will measure angles between the junction the donor junctions and the receiver junction."};
 
 
   // Now for connectivity
   bool_default_map["calculate_connectivity_index"] = false;
-  help_map["calculate_connectivity_index"] = {  "bool","false","Calculatres the connectivity index.","Based on https://doi.org/10.1016/j.cageo.2017.10.009"};
+  help_map["calculate_connectivity_index"] = {  "bool","false","Calculates the connectivity index NOT WORKING YET.","Based on https://doi.org/10.1016/j.cageo.2017.10.009"};
 
+  // calculate the hypsometric integral for the channel network
+  bool_default_map["calculate_hypsometric_integral"] = false;
+  help_map["calculate_hypsometric_integral"] = {  "bool","false","Calculates the hypsometric integral for every part of the channel network.", "Useful for examining the distribution of usptream elevations."};
 
+  float_default_map["HI_bin_width"] = 500;
+  help_map["HI_bin_width"] = {  "float","500","The elevation bins used to calculate the hypsometric integral.","Should be set by examining the elevation range in your DEM to get a reasonable bin width.."};
+  float_default_map["HI_lower_limit"] = 0;
+  float_default_map["HI_upper_limit"] = 8000;
 
   //=========================================================================
   //
@@ -1483,6 +1521,12 @@ int main (int nNumberofArgs,char *argv[])
     raster_selection[8] = 1;
     doing_polyfit = true;
   }
+  if(this_bool_map["print_channel_data_plus_surface_metrics"])
+  {
+    raster_selection[1] = 1;
+    raster_selection[3] = 1;
+    doing_polyfit = true;
+  }
 
   // We place the surface fitting vector outside because we will need this information
   // later for the basin statistics.
@@ -1794,12 +1838,22 @@ int main (int nNumberofArgs,char *argv[])
         || this_bool_map["divide_finder"]
         || this_bool_map["tag_nodes"]
         || this_bool_map["extract_ridges"]
-        || this_bool_map["calculate_connectivity_index"])
+        || this_bool_map["calculate_connectivity_index"]
+        || this_bool_map["calculate_hypsometric_integral"]
+        || this_bool_map["clip_raster_to_basins"])
   {
     cout << "I will need to compute flow information, because you are getting drainage area or channel networks." << endl;
     //==========================================================================
     // Fill the raster
     //==========================================================================
+
+    if(this_bool_map["fill_interior_nodata"])
+    {
+      cout << "I will try to get rid of pixels in the middle of your raster that are nodata." << endl;
+      LSDRaster new_topography = topography_raster.alternating_direction_nodata_fill_irregular_raster(this_int_map["window_for_filling_interior_nodata"]);
+      topography_raster = new_topography;
+    }
+
     LSDRaster filled_topography,carved_topography;
     // now get the flow info object
     if ( this_bool_map["raster_is_filled"] )
@@ -1813,7 +1867,7 @@ int main (int nNumberofArgs,char *argv[])
            << this_float_map["min_slope_for_fill"] << endl;
       if(this_bool_map["carve_before_fill"])
       {
-       carved_topography = topography_raster.Breaching_Lindsay2016();
+        carved_topography = topography_raster.Breaching_Lindsay2016();
         filled_topography = carved_topography.fill(this_float_map["min_slope_for_fill"]);
       }
       else
@@ -1830,6 +1884,23 @@ int main (int nNumberofArgs,char *argv[])
     }
     //==========================================================================
 
+    // This routine makes sure that the outer edges of the DEM
+    // are trimmed to a rectangle and then the edge nodes are replaced
+    // with nodata
+    if (this_bool_map["remove_nodes_influenced_by_edge"])
+    {
+      if (this_bool_map["remove_outer_nodes_for_edge_influence"])
+      {
+        if( this_bool_map["use_spiral_trimmer_for_edge_influence"])
+        {
+          LSDRaster SpiralTrim = filled_topography.RasterTrimmerSpiral();
+          filled_topography = SpiralTrim;
+        }
+        cout << "Warning, I have replaced the edges of your DEM with nodata" << endl;
+        cout << "This usually means I am trying to remove nodes influence by the edge" << endl;
+        filled_topography.replace_edges_with_nodata();
+      }
+    }
 
     cout << "\t Flow routing. Note this is memory intensive. If your DEM is very large you may get a segmentation fault here..." << endl;
     // get a flow info object
@@ -2108,7 +2179,9 @@ int main (int nNumberofArgs,char *argv[])
         || this_bool_map["find_basins"]
         || this_bool_map["print_chi_data_maps"]
         || this_bool_map["print_junction_angles_to_csv"]
-        || this_bool_map["extract_ridges"])
+        || this_bool_map["extract_ridges"]
+        || this_bool_map["calculate_hypsometric_integral"]
+        || this_bool_map["clip_raster_to_basins"])
     {
       // calculate the flow accumulation
       cout << "\t Calculating flow accumulation (in pixels)..." << endl;
@@ -2178,6 +2251,14 @@ int main (int nNumberofArgs,char *argv[])
           cout << "I am going to use the extended channel network data outputs." << endl;
           JunctionNetwork.PrintChannelNetworkToCSV_WithElevation_WithDonorJunction(FlowInfo, channel_csv_name, filled_topography);
         }
+        if ( this_bool_map["print_channel_data_plus_surface_metrics"])
+        {
+          cout << "I am going to print the channel network with some surrounding surface metrics (slope, local relief, and curvature." << endl;
+          int kernel_type = 1;
+          channel_csv_name = OUT_DIR+OUT_ID+"_CN_surface_metrics";
+          LSDRaster Relief = filled_topography.calculate_relief(this_float_map["surface_fitting_radius"], kernel_type);
+          JunctionNetwork.PrintChannelNetworkToCSV_WithSurfaceMetrics(FlowInfo, channel_csv_name, filled_topography, surface_fitting[1], Relief, surface_fitting[3]);
+        }
         else
         {
           JunctionNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
@@ -2224,7 +2305,7 @@ int main (int nNumberofArgs,char *argv[])
 
         if ( this_bool_map["convert_csv_to_geojson"])
         {
-          string gjson_name = OUT_DIR+OUT_ID+"_JAngles.geojson";
+          string gjson_name = OUT_DIR+OUT_ID+"_FULL_JAngles.geojson";
           LSDSpatialCSVReader thiscsv(JAngles_csv_name);
           thiscsv.print_data_to_geojson(gjson_name);
         }
@@ -2250,7 +2331,6 @@ int main (int nNumberofArgs,char *argv[])
       }   // End print sources logic
 
 
-
       //=================================================================================
       //.#####....####....####...######..##..##...####..
       //.##..##..##..##..##........##....###.##..##.....
@@ -2262,7 +2342,8 @@ int main (int nNumberofArgs,char *argv[])
       // Now we check if we are going to deal with basins
       if(this_bool_map["find_basins"] ||
          this_bool_map["print_chi_data_maps"] ||
-         this_bool_map["calculate_basin_statistics"] )
+         this_bool_map["calculate_basin_statistics"] ||
+         this_bool_map["clip_raster_to_basins"])
       {
         cout << "I am now going to extract some basins for you." << endl;
         vector<int> BaseLevelJunctions;
@@ -2314,12 +2395,34 @@ int main (int nNumberofArgs,char *argv[])
           }
           else
           {
-            cout << "I am going to select basins for you using an algorithm. " << endl;
-            cout << "I am going to look for basins in a pixel window that are not influended by nodata." << endl;
-            cout << "I am also going to remove any nested basins." << endl;
-            cout << "The pixel limits are: lower: " << this_int_map["minimum_basin_size_pixels"] << " and upper: " << this_int_map["maximum_basin_size_pixels"] << endl;
-            BaseLevelJunctions = JunctionNetwork.Prune_Junctions_By_Contributing_Pixel_Window_Remove_Nested_And_Nodata(FlowInfo, filled_topography, FlowAcc,
+            if(this_bool_map["prune_edge_draining_basins"])
+            {
+              cout << "I am going to select basins for you using an algorithm. " << endl;
+              cout << "I am going to look for basins in a pixel window that are not influended by nodata." << endl;
+              cout << "I am also going to remove any nested basins." << endl;
+              cout << "The pixel limits are: lower: " << this_int_map["minimum_basin_size_pixels"] << " and upper: " << this_int_map["maximum_basin_size_pixels"] << endl;
+              BaseLevelJunctions = JunctionNetwork.Prune_Junctions_By_Contributing_Pixel_Window_Remove_Nested_And_Nodata(FlowInfo, filled_topography, FlowAcc,
                                                       this_int_map["minimum_basin_size_pixels"],this_int_map["maximum_basin_size_pixels"]);
+            }
+            else
+            {
+              cout << endl << endl;
+              cout << "======================================" << endl;
+              cout << "I am going to select basins for you using an algorithm. " << endl;
+              cout << "I am going to look for basins in a pixel window." << endl;
+              cout << "I am also going to remove any nested basins." << endl;
+              cout << "!!!!WARNING!!!! you are selecting basins" << endl;
+              cout << "but you have chosen not to remove basins with pixels at the edge." << endl;
+              cout << "This could mean your drainage area or chi coordinate will be inaccurate." << endl;
+              cout << "You should only do this if you are very confident you either" << endl;
+              cout << " don't need drainge area or chi, or if you know the " << endl;
+              cout << "effect will be very small." << endl;
+              cout << "The pixel limits are: lower: " << this_int_map["minimum_basin_size_pixels"] << " and upper: " << this_int_map["maximum_basin_size_pixels"] << endl;
+              cout << "======================================" << endl << endl << endl;   
+
+              BaseLevelJunctions = JunctionNetwork.Prune_Junctions_By_Contributing_Pixel_Window_Remove_Nested_Keep_Edge(FlowInfo, filled_topography, FlowAcc,
+                                                      this_int_map["minimum_basin_size_pixels"],this_int_map["maximum_basin_size_pixels"]);
+            }
           }
         }
         else
@@ -2345,10 +2448,25 @@ int main (int nNumberofArgs,char *argv[])
             exit(EXIT_FAILURE);
           }
 
-          // Now make sure none of the basins drain to the edge
-          cout << "I am pruning junctions that are influenced by the edge of the DEM!" << endl;
-          cout << "This is necessary because basins draining to the edge will have incorrect chi values." << endl;
-          BaseLevelJunctions = JunctionNetwork.Prune_Junctions_Edge_Ignore_Outlet_Reach(BaseLevelJunctions_Initial, FlowInfo, filled_topography);
+          if (this_bool_map["prune_edge_draining_basins"])
+          {
+            // Now make sure none of the basins drain to the edge
+            cout << "I am pruning junctions that are influenced by the edge of the DEM!" << endl;
+            cout << "This is necessary because basins draining to the edge will have incorrect chi values." << endl;
+            BaseLevelJunctions = JunctionNetwork.Prune_Junctions_Edge_Ignore_Outlet_Reach(BaseLevelJunctions_Initial, FlowInfo, filled_topography);
+          }
+          else
+          {
+            cout << endl << endl;
+            cout << "======================================" << endl;
+            cout << "WARNING you are selecting basins" << endl;
+            cout << "but you have chosen not to remove basins with pixels at the edge." << endl;
+            cout << "This could mean your drainage area or chi coordinate will be inaccurate." << endl;
+            cout << "You should only do this if you are very confident you either" << endl;
+            cout << " don't need drainge area or chi, or if you know the " << endl;
+            cout << "effect will be very small." << endl;
+            cout << "======================================" << endl << endl << endl;            
+          }
 
           cout << "The remaining baselevel junctions are: " << endl;
           for (int i = 0; i<int(BaseLevelJunctions.size()); i++)
@@ -2361,7 +2479,12 @@ int main (int nNumberofArgs,char *argv[])
         // Now check for largest basin, if that is what you want.
         if (this_bool_map["only_take_largest_basin"])
         {
+          cout << endl << endl << "==========================" << endl;
           cout << "I am only going to take the largest basin." << endl;
+          cout << "WARNING: the basins have already been selected within the pixel window" << endl;
+          cout << "If you want to get largest basin in the DEM you need to " << endl;
+          cout << "Set minimum_basin_size_pixels to a very large number." << endl;
+          cout << "============================" << endl << endl;
           BaseLevelJunctions = JunctionNetwork.Prune_Junctions_Largest(BaseLevelJunctions, FlowInfo, FlowAcc);
         }
 
@@ -2382,6 +2505,67 @@ int main (int nNumberofArgs,char *argv[])
           }
           cout << endl;
         }
+
+
+        // Now for junction angles only within the selected basins
+        if(this_bool_map["print_junction_angles_to_csv_in_basins"])
+        {
+          vector<int> basin_junctions;
+          for(int i = 0; i< N_BaseLevelJuncs; i++)
+          {
+            // get the upslope junctions
+            vector<int> these_junctions = JunctionNetwork.get_upslope_junctions(BaseLevelJunctions[i]);
+
+            // now append these to the master list
+            basin_junctions.insert( basin_junctions.end(), these_junctions.begin(), these_junctions.end() );
+          }
+
+          int N_basin_junctions = int(basin_junctions.size());
+          if (N_basin_junctions == 0)
+          {
+            cout << "I am stopping here since I don't have any junctions over which to measure the junction angle." << endl;
+            exit(EXIT_FAILURE);
+          }
+
+          // now get all the junction angles
+          // Calculate flow distance
+          LSDRaster FlowDistance = FlowInfo.distance_from_outlet();
+
+          cout << "I am getting junction angles in your basins." << endl;
+          string JAngles_csv_name = OUT_DIR+OUT_ID+"_FULL_Basins_JAngles.csv";
+          JunctionNetwork.print_complete_junction_angles_to_csv(basin_junctions, FlowInfo, filled_topography, 
+                                                                FlowDistance, this_float_map["SA_vertical_interval"], 
+                                                                JAngles_csv_name);
+
+          if ( this_bool_map["convert_csv_to_geojson"])
+          {
+            string gjson_name = OUT_DIR+OUT_ID+"_FULL_Basins_JAngles.geojson";
+            LSDSpatialCSVReader thiscsv(JAngles_csv_name);
+            thiscsv.print_data_to_geojson(gjson_name);
+          }          
+        }
+
+
+
+        // Now to clip basins
+        if(this_bool_map["clip_raster_to_basins"])
+        {
+          cout << "I will now clip the raster to your basins" << endl;
+          vector<int> outlet_nodes = JunctionNetwork.get_node_list_from_junction_list(BaseLevelJunctions);
+          float masking_threshold = 0.5;
+          bool belowthresholdisnodata = true;
+
+          LSDRaster BasinMask = FlowInfo.get_upslope_node_mask(outlet_nodes);
+          LSDRaster Masked_raster = filled_topography.mask_to_nodata_using_threshold_using_other_raster_expunge_nodata_in_mask(masking_threshold,belowthresholdisnodata, BasinMask);
+
+          cout << "I've got only the masked raster, now I am going to reduce the size of the DEM " << endl;
+          cout << "So it only includes the basin you selected." << endl;
+          LSDRaster Masked_and_clipped_raster = Masked_raster.RasterTrimmer();   
+
+          string this_raster_name = OUT_DIR+OUT_ID+"_BASINCLIP";
+          Masked_and_clipped_raster.write_raster(this_raster_name,raster_ext);         
+        }
+
 
         // Now for the logic for basin statistics.
         if(this_bool_map["calculate_basin_statistics"])
@@ -2438,121 +2622,140 @@ int main (int nNumberofArgs,char *argv[])
           }
         }
 
-
-        // Now we get the channel segments. This information is used for plotting chi stuff
-        vector<int> source_nodes;
-        vector<int> outlet_nodes;
-        vector<int> baselevel_node_of_each_basin;
-        int n_nodes_to_visit = 10;
-        if (this_bool_map["extend_channel_to_node_before_receiver_junction"])
+        //====================================================================================
+        // Chi data maps    
+        //====================================================================================
+        if ( this_bool_map["print_chi_data_maps"])
         {
-          cout << endl << endl << "=====================================================" << endl;
-          cout << "I am now getting the channels by basin." << endl;
-          cout << "  These channels extend below the junction to the channel that stops" << endl;
-          cout << "  just before the reciever junction. This option is used to remain" << endl;
-          cout << "  consitent with basin ordering, since a 2nd order basin will begin" << endl;
-          cout << "  at the channel one node upslope of the most upstream 3rd order junction." << endl;
-          cout << "  If you simply want the channel starting from the selcted junction, " << endl;
-          cout << "  set the option:" << endl;
-          cout << "    extend_channel_to_node_before_receiver_junction" << endl;
-          cout << "  to false." << endl;
-          cout << "=====================================================" << endl << endl;
-
-          JunctionNetwork.get_overlapping_channels_to_downstream_outlets(FlowInfo, BaseLevelJunctions, FD,
-                                        source_nodes,outlet_nodes,baselevel_node_of_each_basin,n_nodes_to_visit);
-
-        }
-        else
-        {
-          cout << endl << endl << "=====================================================" << endl;
-          cout << "I am now getting the channels by basin." << endl;
-          cout << "  These channels will start from the baselevel junctions selected. " << endl;
-          cout << "  If you want them to extend to below the junction to the channel that stops" << endl;
-          cout << "  just before the reciever junction, then set the option:" << endl;
-          cout << "    extend_channel_to_node_before_receiver_junction" << endl;
-          cout << "  to true." << endl;
-          cout << "=====================================================" << endl << endl;
-
-          JunctionNetwork.get_overlapping_channels(FlowInfo, BaseLevelJunctions, FD,
-                                        source_nodes,outlet_nodes,baselevel_node_of_each_basin,n_nodes_to_visit);
-        }
-
-        cout << "I've got the overlapping channels. The baselevel junctions are now: " << endl;
-        for (int i = 0; i<int(BaseLevelJunctions.size()); i++)
-        {
-          cout << BaseLevelJunctions[i] << endl;
-        }
-        cout << "And the baselevel nodes of each basin are: " << endl;
-        for (int i = 0; i<int(BaseLevelJunctions.size()); i++)
-        {
-          cout << baselevel_node_of_each_basin[i] << endl;
-        }
-
-
-        // Get the chi coordinate if needed
-        LSDRaster chi_coordinate;
-        if ( this_bool_map["print_basin_raster"] ||
-             this_bool_map["print_chi_data_maps"])
-        {
+          LSDRaster chi_coordinate;       
           cout << "I am calculating the chi coordinate." << endl;
           chi_coordinate = FlowInfo.get_upslope_chi_from_all_baselevel_nodes(this_float_map["m_over_n"],this_float_map["A_0"],this_int_map["threshold_contributing_pixels"]);
 
-        }
-
-        //======================================================================
-        // Print a basin raster if you want it.
-        if(this_bool_map["print_basin_raster"])
-        {
-          cout << "I am going to print the basins for you. " << endl;
-          LSDChiTools ChiTool_basins(FlowInfo);
-          LSDRaster DA_for_chi = FlowInfo.write_DrainageArea_to_LSDRaster();
-          ChiTool_basins.chi_map_automator_chi_only(FlowInfo, source_nodes, outlet_nodes, baselevel_node_of_each_basin,
-                                  filled_topography, FD,
-                                  DA_for_chi , chi_coordinate);
-          string basin_raster_prefix = OUT_DIR+OUT_ID;
-          ChiTool_basins.print_basins(FlowInfo, JunctionNetwork, BaseLevelJunctions, basin_raster_prefix);
-        }
-
-
-        //======================================================================
-        // This is for visualisation of the channel data in the basin
-        //======================================================================
-        if(this_bool_map["print_chi_data_maps"])
-        {
-
-          cout << "I am going to print some simple chi data maps for visualisation." << endl;
-          cout << "These data maps are also useful for visualising channel networks and making channel profiles." << endl;
-          LSDChiTools ChiTool_chi_checker(FlowInfo);
-          LSDRaster DA_for_chi = FlowInfo.write_DrainageArea_to_LSDRaster();
-
-          ChiTool_chi_checker.chi_map_automator_chi_only(FlowInfo, source_nodes, outlet_nodes, baselevel_node_of_each_basin,
-                                  filled_topography, FD,
-                                  DA_for_chi, chi_coordinate);
-
-
-          string chi_data_maps_string = OUT_DIR+OUT_ID+"_chi_data_map.csv";
-
-          if(this_bool_map["use_extended_channel_data"])
+          // Now we get the channel segments. This information is used for plotting chi stuff
+          vector<int> source_nodes;
+          vector<int> outlet_nodes;
+          vector<int> baselevel_node_of_each_basin;
+          int n_nodes_to_visit = 10;
+          if (this_bool_map["extend_channel_to_node_before_receiver_junction"])
           {
-            ChiTool_chi_checker.print_chi_data_map_to_csv_with_junction_information(FlowInfo, JunctionNetwork,chi_data_maps_string);  
+            cout << endl << endl << "=====================================================" << endl;
+            cout << "I am now getting the channels by basin." << endl;
+            cout << "  These channels extend below the junction to the channel that stops" << endl;
+            cout << "  just before the receiver junction. This option is used to remain" << endl;
+            cout << "  consitent with basin ordering, since a 2nd order basin will begin" << endl;
+            cout << "  at the channel one node upslope of the most upstream 3rd order junction." << endl;
+            cout << "  If you simply want the channel starting from the selcted junction, " << endl;
+            cout << "  set the option:" << endl;
+            cout << "    extend_channel_to_node_before_receiver_junction" << endl;
+            cout << "  to false." << endl;
+            cout << "=====================================================" << endl << endl;
+
+            JunctionNetwork.get_overlapping_channels_to_downstream_outlets(FlowInfo, BaseLevelJunctions, FD,
+                                          source_nodes,outlet_nodes,baselevel_node_of_each_basin,n_nodes_to_visit);
+
           }
           else
           {
-            ChiTool_chi_checker.print_chi_data_map_to_csv(FlowInfo, chi_data_maps_string);  
+            cout << endl << endl << "=====================================================" << endl;
+            cout << "I am now getting the channels by basin." << endl;
+            cout << "  These channels will start from the baselevel junctions selected. " << endl;
+            cout << "  If you want them to extend to below the junction to the channel that stops" << endl;
+            cout << "  just before the receiver junction, then set the option:" << endl;
+            cout << "    extend_channel_to_node_before_receiver_junction" << endl;
+            cout << "  to true." << endl;
+            cout << "=====================================================" << endl << endl;
+
+            JunctionNetwork.get_overlapping_channels(FlowInfo, BaseLevelJunctions, FD,
+                                          source_nodes,outlet_nodes,baselevel_node_of_each_basin,n_nodes_to_visit);
+          }
+
+          cout << "I've got the overlapping channels. The baselevel junctions are now: " << endl;
+          for (int i = 0; i<int(BaseLevelJunctions.size()); i++)
+          {
+            cout << BaseLevelJunctions[i] << endl;
+          }
+          cout << "And the baselevel nodes of each basin are: " << endl;
+          for (int i = 0; i<int(BaseLevelJunctions.size()); i++)
+          {
+            cout << baselevel_node_of_each_basin[i] << endl;
           }
 
 
-          if ( this_bool_map["convert_csv_to_geojson"])
+          //======================================================================
+          // Print a basin raster if you want it.
+          if(this_bool_map["print_basin_raster"])
           {
-            string gjson_name = OUT_DIR+OUT_ID+"_chi_data_map.geojson";
-            LSDSpatialCSVReader thiscsv(chi_data_maps_string);
-            thiscsv.print_data_to_geojson(gjson_name);
+            cout << "I am going to print the basins for you. " << endl;
+            cout << "This is using the full chi data" << endl;
+            LSDChiTools ChiTool_basins(FlowInfo);
+            LSDRaster DA_for_chi = FlowInfo.write_DrainageArea_to_LSDRaster();
+            ChiTool_basins.chi_map_automator_chi_only(FlowInfo, source_nodes, outlet_nodes, baselevel_node_of_each_basin,
+                                    filled_topography, FD,
+                                    DA_for_chi , chi_coordinate);
+            string basin_raster_prefix = OUT_DIR+OUT_ID;
+            ChiTool_basins.print_basins(FlowInfo, JunctionNetwork, BaseLevelJunctions, basin_raster_prefix);
+          }
+
+
+          //======================================================================
+          // This is for visualisation of the channel data in the basin
+          //======================================================================
+          if(this_bool_map["print_chi_data_maps"])
+          {
+
+            cout << "I am going to print some simple chi data maps for visualisation." << endl;
+            cout << "These data maps are also useful for visualising channel networks and making channel profiles." << endl;
+            LSDChiTools ChiTool_chi_checker(FlowInfo);
+            LSDRaster DA_for_chi = FlowInfo.write_DrainageArea_to_LSDRaster();
+
+            ChiTool_chi_checker.chi_map_automator_chi_only(FlowInfo, source_nodes, outlet_nodes, baselevel_node_of_each_basin,
+                                    filled_topography, FD,
+                                    DA_for_chi, chi_coordinate);
+
+
+            string chi_data_maps_string = OUT_DIR+OUT_ID+"_chi_data_map.csv";
+
+            if(this_bool_map["use_extended_channel_data"])
+            {
+              ChiTool_chi_checker.print_chi_data_map_to_csv_with_junction_information(FlowInfo, JunctionNetwork,chi_data_maps_string);  
+            }
+            else
+            {
+              ChiTool_chi_checker.print_chi_data_map_to_csv(FlowInfo, chi_data_maps_string);  
+            }
+
+
+            if ( this_bool_map["convert_csv_to_geojson"])
+            {
+              string gjson_name = OUT_DIR+OUT_ID+"_chi_data_map.geojson";
+              LSDSpatialCSVReader thiscsv(chi_data_maps_string);
+              thiscsv.print_data_to_geojson(gjson_name);
+            }
           }
         }
-        //======================================================================
-
+        else
+        {
+          if (this_bool_map["print_basin_raster"])
+          {
+            cout << "I am going to print the basins for you. " << endl;
+            cout << "I am not printing the chi data maps." << endl;
+            LSDChiTools ChiTool_basins(FlowInfo);
+            string basin_raster_prefix = OUT_DIR+OUT_ID;
+            ChiTool_basins.print_basins(FlowInfo, JunctionNetwork, BaseLevelJunctions, basin_raster_prefix);          
+          }
+        }
       }   // end logic for basin finding
       cout << "Finished with basins" << endl;
+
+
+      // Calculate hypsometric integral for the channel network
+      if( this_bool_map["calculate_hypsometric_integral"])
+      {
+          cout << "Calculating the hypsometric integral..." << endl;
+          string HI_csv_name = OUT_DIR+OUT_ID+"_HI";
+          //JunctionNetwork.calculate_hypsometric_integral(HI_csv_name, FlowInfo, filled_topography);
+          JunctionNetwork.calculate_upstream_elevations_network(HI_csv_name, FlowInfo, filled_topography, this_float_map["HI_bin_width"], this_float_map["HI_lower_limit"], this_float_map["HI_upper_limit"]);
+      }
 
 
       //================================================================================================

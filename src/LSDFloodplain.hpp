@@ -31,6 +31,11 @@ class LSDFloodplain
   LSDFloodplain(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, float relief_threshold, float slope_threshold, int min_patch_size, int threshold_SO)
 					{ create(ChannelRelief, Slope, ChanNetwork, FlowInfo, relief_threshold, slope_threshold, min_patch_size, threshold_SO); }
 
+	LSDFloodplain(LSDRaster& ExistingRaster)
+					{ create (ExistingRaster); }
+
+  LSDFloodplain()             { create(); }
+
 	/// @return Number of rows as an integer.
   int get_NRows() const        { return NRows; }
   /// @return Number of columns as an integer.
@@ -123,11 +128,10 @@ class LSDFloodplain
 
 
 
- 	/// @brief This function fills holes in the floodplain before running the valley width technique to avoid small holes causing issues.
+ 	/// @brief This function fills holes in the floodplain before running the valley width technique using the OpenCV flood fill algorithm
 	/// @author FJC
-	/// @param window_width The width to search for data for each nodata pixel. A pixel will be changed to data if it has data in all surrounding directions. 
-	/// @date 16/03/21
-  void fill_holes_in_floodplain(int window_width);
+	/// @date 29/10/21
+  void fill_holes_in_floodplain();
 
 
   void fill_holes_in_floodplain_spiral(int window_width);
@@ -258,8 +262,9 @@ class LSDFloodplain
   Array2D<int> BinaryMSArray;
 
   private:
+  void create();
 	void create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, float relief_threshold, float slope_threshold, int min_patch_size, int threshold_SO);
-
+	void create(LSDRaster& ExistingRaster);
 };
 
 #endif

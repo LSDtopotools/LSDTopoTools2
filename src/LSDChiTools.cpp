@@ -12408,12 +12408,19 @@ void LSDChiTools::print_basins(LSDFlowInfo& FlowInfo, LSDJunctionNetwork& Juncti
     int basin_key = -9999;
 
     // need to node index of this junction
-    int node_of_junction =  JunctionNetwork.get_Node_of_Junction( Junctions[BN] );
-    if ( key_to_baselevel_map.find( node_of_junction) != key_to_baselevel_map.end() )
+    if( key_to_baselevel_map.size() == 0)
     {
-      basin_key = key_to_baselevel_map[node_of_junction];
+      basin_key = BN;
     }
-
+    else
+    {
+      int node_of_junction =  JunctionNetwork.get_Node_of_Junction( Junctions[BN] );
+      if ( key_to_baselevel_map.find( node_of_junction) != key_to_baselevel_map.end() )
+      {
+        basin_key = key_to_baselevel_map[node_of_junction];
+      }
+    }
+    
     // get the centroid and outlet locations
     centroid_i = thisBasin.get_Centroid_i();
     centroid_j = thisBasin.get_Centroid_j();
