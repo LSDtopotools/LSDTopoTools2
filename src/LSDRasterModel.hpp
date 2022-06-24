@@ -1012,6 +1012,64 @@ class LSDRasterModel: public LSDRasterSpectral
                                                     float min_slope_for_fill);
 
 
+
+  /// @brief This adds random noise to the topography above a certain chi value
+  /// @param Source_points_data a spatialc csv reader with the appropriate file
+  /// @param carve_before_fill if true, run the carving algorithm before the filling algorithm
+  /// @param column_name the name of the elevation column
+  /// @param min_slope_for_fill the minimum slope for snapping
+  /// @param chi_fraction_for_scramble the fraction of the maximum chi above which you will scramble the data
+  /// @param scramble_amplitude the amplitude of the scrambling
+  /// @author SMM
+  /// @date 10/06/2022
+  void scramble_high_chi(LSDSpatialCSVReader& Source_points_data, 
+                         bool carve_before_fill, string column_name, 
+                         float min_slope_for_fill, float chi_fraction_for_scramble, 
+                          float scramble_amplitude);
+
+  /// @brief This adds random noise to the topography above a certain elevation
+  /// @param Source_points_data a spatialc csv reader with the appropriate file
+  /// @param carve_before_fill if true, run the carving algorithm before the filling algorithm
+  /// @param column_name the name of the elevation column
+  /// @param min_slope_for_fill the minimum slope for snapping
+  /// @param elevation_fraction_for_scramble the fraction of the maximum elevation above which you will scramble the data
+  /// @param scramble_amplitude the amplitude of the scrambling
+  /// @author SMM
+  /// @date 13/06/2022
+  void scramble_high_elevation(LSDSpatialCSVReader& Source_points_data, 
+                         bool carve_before_fill, string column_name, 
+                         float min_slope_for_fill, float elevation_fraction_for_scramble, 
+                          float scramble_amplitude);
+
+
+  /// @brief This gets some points that are used for divide migration tests. 
+  ///  The number of contributing pixels will be determinged from these points
+  ///  and compared between snaps or timesteps
+  /// @param threshold_pixels_for_dm_test Number of accumulated pixels to generate a point
+  /// @param carve_before_fill if true, run the carving algorithm before the filling algorithm
+  /// @param min_slope_for_fill the minimum slope for snapping
+  /// @param test_nodes_rows a vector holding the rows of the test points. Will be updated in the function
+  /// @param test_nodes_cols a vector holding the rows of the test points. Will be updated in the function
+  /// @author SMM
+  /// @date 15/06/2022
+  void get_points_for_divide_migration_test(int threshold_pixels_for_dm_test, bool carve_before_fill,
+                                            float min_slope_for_fill, 
+                                            vector<int>& test_nodes_rows, vector<int>& test_nodes_cols);
+
+
+  /// @brief Gets the contriibuting pixels from a series of points designated by their rows and columns
+  ///  we use rows and columsn since we compare changing DEMs so the node index can change
+  ///  this is used primarily for testing divide stability between model steps
+  ///  and is used with get_points_for_divide_migration_test
+  /// @param carve_before_fill if true, run the carving algorithm before the filling algorithm
+  /// @param min_slope_for_fill the minimum slope for snapping
+  /// @param test_nodes_rows a vector holding the rows of the test points. Will be updated in the function
+  /// @param test_nodes_cols a vector holding the rows of the test points. Will be updated in the function
+  /// @author SMM
+  /// @date 16/06/2022
+  vector<int> get_contributing_areas_from_points(bool carve_before_fill, float min_slope_for_fill, 
+                                          vector<int> test_nodes_rows, vector<int> test_nodes_cols);
+
   /// @brief This is a hybrid model that calculates hillslope diffusion as well as a critical slope
   ///  so the diffused hillslopes cannot exceed a critical slope 
   /// @detail Must be used after the fluvial step

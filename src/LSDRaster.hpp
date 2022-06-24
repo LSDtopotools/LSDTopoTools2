@@ -689,14 +689,30 @@ class LSDRaster
   /// @param bin_width the distance between bins in the (i.e., the distance between points)
   /// @param swath_data_prefix the prefix for the swath filenames
   /// @param print_swath_rasters A boolean that controls if the swath rasters are printed
-  /// @return A vector or rasters. The first is the closest distance to each pixel in the list
-  ///  the second is the value of the pixel in the list, and the third is the index in the list
-  ///  of the closest pixel
   /// @author SMM
   /// @date 15/02/2021
   void make_swath(vector<float> Eastings, vector<float> Northings,
                                               vector<float> values, float swath_width, float bin_width,
                                               string swath_data_prefix, bool print_swath_rasters);
+
+  /// @brief This takes a list of points and makes a swath profile around them. It sorts by categorised values
+  ///  which you give in the form of an integer raster with the same dimensions as the base raster
+  ///  The main purpose of this is the map terraces. 
+  /// @param Eastings a vector of easting locations
+  /// @param Northings a vector of northing locations
+  /// @param values The value of the list of points to map onto the raster.
+  ///  This functions is most commonly used for swath mapping so the value is usually a distance
+  /// @param swath_width the width of the swath in metres
+  /// @param bin_width the distance between bins in the (i.e., the distance between points)
+  /// @param swath_data_prefix the prefix for the swath filenames
+  /// @param print_swath_rasters A boolean that controls if the swath rasters are printed
+  /// @param categories an index raster with the different categories you want to bin
+  /// @author SMM
+  /// @date 23/06/2022
+  void make_swaths_from_categorised(vector<float> Eastings, vector<float> Northings,
+                                              vector<float> values, float swath_width, float bin_width,
+                                              string swath_data_prefix, bool print_swath_rasters,
+                                              LSDIndexRaster& categories);
 
   /// @brief Finds all nodata nodes and gets rasters of the nearest points value and
   ///  its distance

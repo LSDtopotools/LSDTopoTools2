@@ -2,7 +2,7 @@
 //
 // lsdtt-hillslope-channel-coupling.cpp
 //
-// This programme combines the chi analysis of Mudd et al. 2014 and the hillslope analysis
+// This program combines the chi analysis of Mudd et al. 2014 and the hillslope analysis
 // of Hurst et al 2012 and Grieve et al. 2016 to allow combined topographic analysis comparing hillslope and
 // channel metrics for erosion rate in order to explore landscape morphology and transience.
 //
@@ -12,9 +12,11 @@
 // The driver file has a number of options that allow the user to calculate
 // different kinds of chi analysis
 //
+// Call with -h to generate a help file
+//
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //
-// Copyright (C) 2021 Martin D. Hurst and Simon M. Mudd 2021
+// Copyright (C) 2022 Martin D. Hurst and Simon M. Mudd 2022
 //
 // Developers can be contacted:
 //

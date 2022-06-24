@@ -6426,24 +6426,234 @@ void LSDRasterModel::fluvial_snap_to_steady_variable_K_variable_U(LSDRaster& K_v
         break;
       }
 
-
       receiver_elev = zeta[receiver_row][receiver_col];
       area_pow = pow(drainageArea,m_exp);
       parenth_term = U_value/(K_value*area_pow);
       zeta[row][col] = receiver_elev+ dx*( pow(parenth_term,one_over_n));
-
     }
-    
-
-
-
   }
-  //return LSDRasterModel(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta);
   this->RasterData = zeta.copy();
 
-  RasterData = zeta.copy();
 }
 
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// This snaps to steady based on an input file with elevations and node indicies
+// overloaded from the previous function
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDRasterModel::scramble_high_chi(LSDSpatialCSVReader& source_points_data, 
+                                  bool carve_before_fill, string column_name, 
+                                  float min_slope_for_fill, float chi_fraction_for_scramble, 
+                                  float scramble_amplitude)
+{
+
+  // impose the channel before you fill
+  impose_channels(source_points_data, column_name);
+
+
+  Array2D<float> zeta=RasterData.copy();
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
+
+  // need to fill the raster to ensure there are no internal base level nodes
+  //cout << "I am going to carve and fill" << endl;
+  LSDRaster filled_topography,carved_topography;
+  if(carve_before_fill)
+  {
+    //cout << "Carving and filling." << endl;
+    carved_topography = temp.Breaching_Lindsay2016();
+    filled_topography = carved_topography.fill(min_slope_for_fill);
+  }
+  else
+  {
+    //cout << "Filling." << endl;
+    filled_topography = temp.fill(min_slope_for_fill);
+  }
+  //cout << "Getting the flow info. This might take some time." << endl;
+  LSDFlowInfo flow(boundary_conditions, filled_topography);
+  vector<int> baselevel_vec = flow.get_BaseLevelNodeList();
+  //cout << "I have " << baselevel_vec.size() << " baselevel nodes" << endl;
+
+  float area_threshold = 0;
+  float m_over_n = 0.45;
+  float A_0 = 1;
+  LSDRaster chi = flow.get_upslope_chi_from_all_baselevel_nodes(m_over_n, A_0,area_threshold);
+  float max_chi = chi.max_elevation();
+
+
+  cout << "The maximum chi is : " << max_chi << endl;
+  cout << "I am scrambling anything above " << max_chi*chi_fraction_for_scramble << endl;
+  string chi_name = "funkymonkey_test_chi";
+  chi.write_raster(chi_name,"bil");
+
+  // update the raster
+  zeta = filled_topography.get_RasterData();
+
+  // now scramble the high values of chi
+  long SEED = 1;
+  for (int row = 1; row<NRows; row++)
+  {
+    for(int col = 1; col<NCols; col++)
+    {
+      if (chi.get_data_element(row,col) != NoDataValue && zeta[row][col] != NoDataValue)
+      {
+        if (chi.get_data_element(row,col) > max_chi*chi_fraction_for_scramble)
+        {
+          zeta[row][col] = zeta[row][col]+ ran3(&SEED)*scramble_amplitude;
+        }
+      }
+    }
+  }
+
+  this->RasterData = zeta.copy();
+
+  // re-impose the channel just in case
+  impose_channels(source_points_data, column_name);
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// This snaps to steady based on an input file with elevations and node indicies
+// overloaded from the previous function
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDRasterModel::scramble_high_elevation(LSDSpatialCSVReader& source_points_data, 
+                                  bool carve_before_fill, string column_name, 
+                                  float min_slope_for_fill, float elevation_fraction_for_scramble, 
+                                  float scramble_amplitude)
+{
+
+  // impose the channel before you fill
+  impose_channels(source_points_data, column_name);
+
+
+  Array2D<float> zeta=RasterData.copy();
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
+
+  // get the maximum elevation
+  float max_elevation = -10000;
+  for (int row = 1; row<NRows; row++)
+  {
+    for(int col = 1; col<NCols; col++)
+    {  
+      if (zeta[row][col] != NoDataValue)
+      {
+        if (zeta[row][col]> max_elevation);
+        {
+          max_elevation = zeta[row][col];
+        }
+      }
+    }
+  }
+
+
+  // now scramble the high values of chi
+  long SEED = 1;
+  for (int row = 1; row<NRows; row++)
+  {
+    for(int col = 1; col<NCols; col++)
+    {
+      if (zeta[row][col] != NoDataValue)
+      {
+        if (zeta[row][col] > max_elevation*elevation_fraction_for_scramble)
+        {
+          zeta[row][col] = zeta[row][col]+ ran3(&SEED)*scramble_amplitude;
+        }
+      }
+    }
+  }
+
+  this->RasterData = zeta.copy();
+
+  // re-impose the channel just in case
+  impose_channels(source_points_data, column_name);
+}
+
+
+
+void LSDRasterModel::get_points_for_divide_migration_test(int threshold_pixels_for_dm_test, bool carve_before_fill,
+                                                          float min_slope_for_fill, 
+                                                          vector<int>& test_nodes_rows, vector<int>& test_nodes_cols)
+{
+
+  Array2D<float> zeta=RasterData.copy();
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
+
+  // need to fill the raster to ensure there are no internal base level nodes
+  //cout << "I am going to carve and fill" << endl;
+  LSDRaster filled_topography,carved_topography;
+  if(carve_before_fill)
+  {
+    //cout << "Carving and filling." << endl;
+    carved_topography = temp.Breaching_Lindsay2016();
+    filled_topography = carved_topography.fill(min_slope_for_fill);
+  }
+  else
+  {
+    //cout << "Filling." << endl;
+    filled_topography = temp.fill(min_slope_for_fill);
+  }
+  //cout << "Getting the flow info. This might take some time." << endl;
+  LSDFlowInfo flow(boundary_conditions, filled_topography);
+
+  cout << "\t Calculating flow accumulation (in pixels)..." << endl;
+  LSDIndexRaster FlowAcc = flow.write_NContributingNodes_to_LSDIndexRaster();
+
+  //get the sources
+  vector<int> sources;
+  sources = flow.get_sources_index_threshold(FlowAcc, threshold_pixels_for_dm_test);
+
+  vector<int> sources_row;
+  vector<int> sources_col;
+
+  flow.retrieve_rows_and_cols_from_node_list(sources,sources_row,sources_col);
+
+  test_nodes_rows = sources_row;
+  test_nodes_cols = sources_col;
+
+}
+
+
+
+vector<int> LSDRasterModel::get_contributing_areas_from_points(bool carve_before_fill, float min_slope_for_fill, 
+                                          vector<int> test_nodes_rows, vector<int> test_nodes_cols)
+{
+  Array2D<float> zeta=RasterData.copy();
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
+
+  // need to fill the raster to ensure there are no internal base level nodes
+  //cout << "I am going to carve and fill" << endl;
+  LSDRaster filled_topography,carved_topography;
+  if(carve_before_fill)
+  {
+    //cout << "Carving and filling." << endl;
+    carved_topography = temp.Breaching_Lindsay2016();
+    filled_topography = carved_topography.fill(min_slope_for_fill);
+  }
+  else
+  {
+    //cout << "Filling." << endl;
+    filled_topography = temp.fill(min_slope_for_fill);
+  }
+  //cout << "Getting the flow info. This might take some time." << endl;
+  LSDFlowInfo flow(boundary_conditions, filled_topography);  
+
+  int n_points = int(test_nodes_rows.size());
+  int row,col;
+  int this_node;
+  vector<int> n_contrib;
+  for(int i = 0; i<n_points; i++)
+  {
+    row = test_nodes_rows[i];
+    col = test_nodes_cols[i];
+    this_node = flow.get_NodeIndex_from_row_col(row, col);
+
+    n_contrib.push_back(flow.retrieve_contributing_pixels_of_node(this_node));
+  }
+  return n_contrib;
+}
 
 
 void LSDRasterModel::hillslope_hybrid_module(LSDRaster& Sc_values, LSDRaster& Uplift, int threshold_pixels,LSDSpatialCSVReader& source_points_data)

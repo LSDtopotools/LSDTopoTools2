@@ -1,11 +1,21 @@
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-// channel_extraction_pelletier.cpp
-// A driver function for use with the Land Surace Dynamics Topo Toolbox
-// This program calculates channel heads using Pelletier (2013)
+// lsdtt-channel-extraction 
 //
-// Reference: Pelletier, J.D. (2013) A robust, two-parameter method for the extraction of
-// drainage networks from high-resolution digital elevation models (DEMs): Evaluation using
-// synthetic and real-world DEMs, Water Resources Research 49(1): 75-89, doi:10.1029/2012WR012452
+// This programme extractes channel metrics using a variety of methods
+//
+// The different methods are described in this paper:
+// Clubb, F.J., Mudd, S.M., Milodowski, D.T., Hurst, M.D., Slater, L.J., 2014. 
+// Objective extraction of channel heads from high-resolution topographic data. 
+// Water Resources Research 50, 4283–4304. https://doi.org/10.1002/2013WR015167
+//
+//
+// This program takes two arguments, the path name and the driver name
+// The driver file has a number of options that allow the user to calculate
+// different kinds of chi analysis
+//
+// Call with -h to generate a help file
+//
+// Copyright (C) 2022 Fiona J. Clubb Simon M. Mudd 2022
 //
 // Developed by:
 //  Fiona Clubb

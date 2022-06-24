@@ -11,7 +11,7 @@
 // https://lsdtopotools.github.io/LSDTT_documentation/
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
-// Copyright (C) 2021 Simon M. Mudd 2021
+// Copyright (C) 2022 Simon M. Mudd 2022
 //
 // Developer can be contacted by simon.m.mudd _at_ ed.ac.uk
 //
@@ -244,13 +244,20 @@ int main (int nNumberofArgs,char *argv[])
   help_map["swath_points_csv"] = {  "string","swath.csv","The name of the csv file for swath mapping. It can be the start and (optional) end point of the swath channel or a series of points that form a polyline that serves as the baseline for the swath.","Filename needs to include the csv extension and have latitude and longitude in the column headers."};
 
   float_default_map["swath_point_spacing"] = 500;
-  help_map["swath_point_spacing"] = {  "float","500","Only used by calcualte_swath_along_points. How closely spaced the points are (in metres) along the baseline.","If this number is large (many times the DEM resolution) the swath will have an irregular edge so this should be close to the DEM resolution."};
+  help_map["swath_point_spacing"] = {  "float","500","Only used by calcualte_swath_along_line. How closely spaced the points are (in metres) along the baseline.","If this number is large (many times the DEM resolution) the swath will have an irregular edge so this should be close to the DEM resolution."};
 
   float_default_map["swath_bin_spacing"] = 1000;
   help_map["swath_bin_spacing"] = {  "float","1000","The spacing of the bins in metres that are used to calculate statistics along the swath.","Should be at least a few times bigger than swath_point_spacing or the pixel size of the DEM."};
 
   float_default_map["swath_width"] = 1000;
   help_map["swath_width"] = {  "float","1000","The width of the swath in metres.","Up to you. Don't let me tell you how wide your swath should be."};
+
+  bool_default_map["make_categorised_swath"] = false;
+  help_map["make_categorised_swath"] = {  "bool","false","Creates a swath that has binned values sorted and separated by a category. This is most often (or always) used with terrace data.","Categories are defined by a raster with prefix swath_category_raster_prefix. If you want terraces you should use the lsdtt-valley-metrics tool"};
+
+  string_default_map["swath_category_raster_prefix"] = "terraces";
+  help_map["swath_category_raster_prefix"] = {  "string","terraces","The prefix of the integer rasterthat will be used to categorise the swaths. This is usually the terrace file.","The terrace file is generated used lsdt-valley-metrics."};
+
 
   //========================================================
   // some tools for punching out polygons and then getting distance to nearest nodata
@@ -341,7 +348,10 @@ int main (int nNumberofArgs,char *argv[])
   help_map["write_hillshade"] = {  "bool","false","Write the hillshade raster.","You need this for a lot of our plotting routines. Filename includes _HS"};
 
   bool_default_map["print_raster_without_seas"] = false;
-  help_map["print_raster_without_seas"] = {  "bool","false","Overwrites the raster without seas.","DANGER this will replace your existing raster with the high and low points replaced by nodata. See the remove_seas flag"};
+  help_map["print_raster_without_seas"] = {  "bool","false","Writes the raster without seas. Default is to overwrite the raster","DANGER this will replace your existing raster with the high and low points replaced by nodata. See the remove_seas flag"};
+
+  bool_default_map["overwrite_raster_without_seas"] = true;
+  help_map["overwrite_raster_without_seas"] = {  "bool","true","Overwrites the raster without seas.","DANGER if true this will replace your existing raster with the high and low points replaced by nodata. See the remove_seas flag"};
 
   bool_default_map["print_distance_from_outlet"] = false;
   help_map["print_distance_from_outlet"] = {  "bool","false","Prints a raster of the distance from the outlet.","Filename includes _FD"};
@@ -512,7 +522,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["use_extended_channel_data"] = {  "bool","false","If this is true you get more data columns in your channel network csv.","I will tell you what these columns are one day."};
 
   bool_default_map["print_channel_data_plus_surface_metrics"] = false;
-  help_map["print_channel_data_plus_surface_metrics"] = { "bool", "false", "If this is true you get the channel network with various surface metric data like local slope, relief, and curvature.","This is slow because it needs to run the polyfitting routines."};
+  help_map["print_channel_data_plus_surface_metrics"] = { "bool", "false", "If this is true you get the channel network with various surface metric data like local slope relief and curvature.","This is slow because it needs to run the polyfitting routines."};
 
   bool_default_map["print_junction_index_raster"] = false;
   help_map["print_junction_index_raster"] = {  "bool","false","Prints a raster with junctions and their number.","Makes big files. It is better to use the csv version."};
@@ -535,7 +545,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["fill_interior_nodata"] = {  "bool","false","For basin finding and other extration methods this removes interior nodata pixels.","Needs a window size that controls how big of an area is searched."};
   
   int_default_map["window_for_filling_interior_nodata"] = 10;
-  help_map["window_for_filling_interior_nodata"] = {  "int","10","When you need to get rid of interior nodata, this is the size of the window for filling.","Larger numbers fill more holes but slows down the computation"};
+  help_map["window_for_filling_interior_nodata"] = {  "int","10","When you need to get rid of interior nodata this is the size of the window for filling.","Larger numbers fill more holes but slows down the computation"};
 
 
 
@@ -643,8 +653,6 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["print_junction_angles_to_csv_in_basins"] = false;
   help_map["print_junction_angles_to_csv_in_basins"] = {  "bool","false","Prints a csv with the locations of the junctions within selected basins and associated statistics.","csv file contains junction angles; bending angles; areas; gradients; and other information."};
 
-
-
   float_default_map["SA_vertical_interval"] = 10;
   help_map["SA_vertical_interval"] = {  "float","10","This is used in both slope-area routines and also junction angle routines. It sets the vertical drop over which the gradient is measured and the junction angle is measured on points between a tributary within the height and the junction.","For S-A analysis the value should be greater than the vertical uncertainty of your DEM. For junction angles if you set this to a large number it will measure angles between the junction the donor junctions and the receiver junction."};
 
@@ -658,9 +666,14 @@ int main (int nNumberofArgs,char *argv[])
   help_map["calculate_hypsometric_integral"] = {  "bool","false","Calculates the hypsometric integral for every part of the channel network.", "Useful for examining the distribution of usptream elevations."};
 
   float_default_map["HI_bin_width"] = 500;
-  help_map["HI_bin_width"] = {  "float","500","The elevation bins used to calculate the hypsometric integral.","Should be set by examining the elevation range in your DEM to get a reasonable bin width.."};
+  help_map["HI_bin_width"] = {  "float","500","The elevation bins used to calculate the hypsometric integral.","Should be set by examining the elevation range in your DEM to get a reasonable bin width."};
+ 
   float_default_map["HI_lower_limit"] = 0;
+  help_map["HI_lower_limit"] = {  "float","0","The lowest elevation in the hypsometric integral.","Should be set by examining the elevation range in your DEM to get a reasonable bin width."};
+ 
   float_default_map["HI_upper_limit"] = 8000;
+  help_map["HI_upper_limit"] = {  "float","0","The highest elevation in the hypsometric integral.","Should be set by examining the elevation range in your DEM to get a reasonable bin width."};
+ 
 
   //=========================================================================
   //
@@ -751,9 +764,18 @@ int main (int nNumberofArgs,char *argv[])
 
     if (this_bool_map["print_raster_without_seas"])
     {
-      cout << "I'm replacing your raster with a raster without seas." << endl;
-      string this_raster_name = OUT_DIR+OUT_ID;
-      topography_raster.write_raster(this_raster_name,raster_ext);
+      if (this_bool_map["overwrite_raster_without_seas"])
+      {
+        cout << "I'm replacing your raster with a raster without seas." << endl;
+        string this_raster_name = OUT_DIR+OUT_ID;
+        topography_raster.write_raster(this_raster_name,raster_ext);
+      }
+      else
+      {
+        cout << "I'm writing a remove seas raster with the suffix RSEAS" << endl;
+        string this_raster_name = OUT_DIR+OUT_ID+"_RSEAS";
+        topography_raster.write_raster(this_raster_name,raster_ext);
+      }
     }
   }
   else
@@ -1049,9 +1071,26 @@ int main (int nNumberofArgs,char *argv[])
 
 
     // Now for the swath!
-    string swath_data_prefix = OUT_DIR+OUT_ID;
-    topography_raster.make_swath(spaced_eastings, spaced_northings,spaced_distances, this_float_map["swath_width"],
+    // The categorised swath is mainly used with terraces. 
+    // See lsdtt-valley-metrics to get the terraces
+    if (this_bool_map["make_categorised_swath"])
+    {
+      // first we need to open the categorised raster
+      string category_infile_prefix = DATA_DIR+this_string_map["swath_category_raster_prefix"];
+      LSDIndexRaster categories(category_infile_prefix,raster_ext);
+
+      string swath_data_prefix = OUT_DIR+OUT_ID+"_categorised";
+      topography_raster.make_swaths_from_categorised(spaced_eastings, spaced_northings,spaced_distances, this_float_map["swath_width"],
+                                 this_float_map["swath_bin_spacing"], swath_data_prefix, this_bool_map["print_swath_rasters"],
+                                 categories);
+
+    }
+    else
+    {
+      string swath_data_prefix = OUT_DIR+OUT_ID;
+      topography_raster.make_swath(spaced_eastings, spaced_northings,spaced_distances, this_float_map["swath_width"],
                                  this_float_map["swath_bin_spacing"], swath_data_prefix, this_bool_map["print_swath_rasters"]);
+    }
 
 
 

@@ -850,6 +850,12 @@ void LSDFlowInfo::retrieve_receiver_information(int current_node,
                      int& receiver_node, int& receiver_row,
                      int& receiver_col)
 {
+  if (current_node >= NDataNodes)
+  {
+    cout << "Fatal error, you are looking for a flowinfo node that doesn't exist" << endl;
+    exit(0);
+  }
+  
   int rn, rr, rc;
   rn = ReceiverVector[current_node];
   rr = RowIndex[rn];
@@ -870,6 +876,12 @@ void LSDFlowInfo::retrieve_receiver_information(int current_node,
 void LSDFlowInfo::retrieve_receiver_information(int current_node,
                      int& receiver_node)
 {
+  if (current_node >= NDataNodes)
+  {
+    cout << "Fatal error, you are looking for a flowinfo node that doesn't exist" << endl;
+    exit(0);
+  }
+
   int rn;
   rn = ReceiverVector[current_node];
   receiver_node = rn;
@@ -887,6 +899,12 @@ void LSDFlowInfo::retrieve_receiver_information(int current_node,
 void LSDFlowInfo::retrieve_current_row_and_col(int current_node,int& curr_row,
                                                int& curr_col)
 {
+  if (current_node >= NDataNodes)
+  {
+    cout << "Fatal error, you are looking for a flowinfo node that doesn't exist" << endl;
+    exit(0);
+  }
+
   int cr, cc;
   cr = RowIndex[current_node];
   cc = ColIndex[current_node];
@@ -900,6 +918,63 @@ int LSDFlowInfo::get_NodeIndex_from_row_col(int row, int col)
   return NodeIndex[row][col];
 }
 
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// algorithms for searching the vectors
+// This gets the rows and columns of a vector of node
+//
+// SMM 15/06/2022
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDFlowInfo::retrieve_rows_and_cols_from_node_list(vector<int> current_nodes,vector<int>& curr_rows,
+                                               vector<int>& curr_cols)
+{
+  
+  int n_nodes = int(current_nodes.size());
+  int cr, cc;
+  vector<int> crs;
+  vector<int> ccs;
+  int current_node;
+  for(int i = 0; i< n_nodes; i++)
+  {
+    current_node = current_nodes[i];
+    if (current_node >= NDataNodes)
+    {
+      cout << "Fatal error, you are looking for a flowinfo node that doesn't exist" << endl;
+      exit(0);
+    }
+
+    crs.push_back(RowIndex[current_node]);
+    ccs.push_back(ColIndex[current_node]);
+  }
+  
+  curr_rows = crs;
+  curr_cols = ccs;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+
+
+vector<int> LSDFlowInfo::retrieve_contributing_pixels_from_node_list(vector<int> current_nodes)
+{
+  vector<int> NContrib;
+  int current_node;
+  int n_nodes = int(current_nodes.size());
+  for (int i = 0; i<n_nodes; i++)
+  {
+    current_node = current_nodes[i];
+    if (current_node >= NDataNodes)
+    {
+      cout << "Fatal error, you are looking for a flowinfo node that doesn't exist" << endl;
+      exit(0);
+    } 
+    NContrib.push_back( NContributingNodes[current_node] );   
+  }  
+  return NContrib;
+}
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // algorithms for searching the vectors
@@ -910,6 +985,12 @@ int LSDFlowInfo::get_NodeIndex_from_row_col(int row, int col)
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDFlowInfo::get_x_and_y_from_current_node(int current_node, float& current_X, float& current_Y)
 {
+  if (current_node >= NDataNodes)
+  {
+    cout << "Fatal error, you are looking for a flowinfo node that doesn't exist" << endl;
+    exit(0);
+  }
+
   int cr,cc;
   retrieve_current_row_and_col(current_node, cr,cc);
   get_x_and_y_locations(cr, cc, current_X, current_Y);
@@ -925,6 +1006,12 @@ void LSDFlowInfo::get_x_and_y_from_current_node(int current_node, float& current
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDFlowInfo::get_lat_and_long_from_current_node(int current_node, double& current_lat, double& current_long, LSDCoordinateConverterLLandUTM Converter)
 {
+  if (current_node >= NDataNodes)
+  {
+    cout << "Fatal error, you are looking for a flowinfo node that doesn't exist" << endl;
+    exit(0);
+  }
+
   int cr,cc;
   retrieve_current_row_and_col(current_node, cr,cc);
   double latitude;

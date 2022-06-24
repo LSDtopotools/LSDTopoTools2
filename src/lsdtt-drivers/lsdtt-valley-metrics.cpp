@@ -6,9 +6,13 @@
 // These include the floodplain and terrace algorithms developed for the paper:
 // https://www.earth-surf-dynam.net/5/369/2017/
 //
-// and valley extraction algorithms in a forthcoming publication
+// This also includes valley width algorithms developed for this paper:
+// https://doi.org/10.5194/esurf-10-437-2022 
+//
+// Call with -h to generate a help file
+//
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-// Copyright (C) 2021 Fiona J. Clubb and Simon M. Mudd 2021
+// Copyright (C) 2021 Fiona J. Clubb and Simon M. Mudd 2022
 //
 // Developers can be contacted:
 //
@@ -165,7 +169,7 @@ int main (int nNumberofArgs,char *argv[])
 
   // valley centreline
   bool_default_map["get_valley_centreline"] = false;
-  help_map["get_valley_centreline"] = {  "bool","false","This gets a valley centreline.","."};
+  help_map["get_valley_centreline"] = {  "bool","false","This gets a valley centreline.","Will print the centreline to a file with an obvious name."};
 
   int_default_map["centreline_loops"] = 5;
   help_map["centreline_loops"] = {  "int","5","The centreline routine iteratively digs and fills the trough and this sets the number of iterations.","We find 5 is about right but if the results are looking bad then try increasing this number. Warning: that might make things worse."};
@@ -257,7 +261,7 @@ int main (int nNumberofArgs,char *argv[])
  
   // option to read in an existing floodplain raster
   string_default_map["floodplain_raster"] = "NULL";
-  help_map["floodplain_raster"] = { "string","NULL", "If this isn't NULL it will load in an existing floodplain raster for valley width calculation."};
+  help_map["floodplain_raster"] = { "string","NULL", "If this isn't NULL it will load in an existing floodplain raster for valley width calculation.","Use when you already have a floodplain raster"};
 
   int_default_map["minimum_basin_size_pixels"] = 5000;
   help_map["minimum_basin_size_pixels"] = {  "int","5000","For basin finding algorithm, the minimum size of a selected basin.","Will reject basins along edge."};
@@ -268,7 +272,10 @@ int main (int nNumberofArgs,char *argv[])
   // terraces
   bool_default_map["get_terraces"] = false;
   help_map["get_terraces"] = {  "bool","false","Finds terraces","Refer to Clubb et al 2017 ESURF"};
- 
+
+  bool_default_map["use_valley_csv_for_terraces"] = false;
+  help_map["use_valley_csv_for_terraces"] = {  "bool","false","If this is true the code reads the valley_csv to calculate relief","The csv doesn't have to be a valley csv it can just be any channel network with latitude and longitude"};
+
   float_default_map["minimum_terrace_height"] = -10;
   help_map["minimum_terrace_height"] = {  "float","-10","The minimum height above the channel for detecting a terrace","Default is low to get all terraces."};
 
@@ -1220,6 +1227,12 @@ int main (int nNumberofArgs,char *argv[])
       cout << "I am assuming you want to use that channel so I am overriding" << endl;
       cout << "Your valley_points_csv filename." << endl;
       this_string_map["valley_points_csv"] = OUT_DIR+OUT_ID+"_swath_channel_nodes.csv";
+    }
+    else if (this_bool_map["use_valley_csv_for_terraces"])
+    {
+      cout << "I am going to use the file designated by valley_points_csv" << endl;
+      cout << "to calculate relief. " << endl;
+      cout << "This could just be a channel network." << endl;
     }
     else
     {

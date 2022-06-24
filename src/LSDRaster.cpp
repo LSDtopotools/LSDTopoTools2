@@ -2508,6 +2508,7 @@ float LSDRaster::difference_rasters(LSDRaster& compare_raster)
 int LSDRaster::find_n_different_pixels(LSDRaster& compare_raster)
 {
   int n = 0;
+  int tot_pix = 0;
   float raster_val1, raster_val2;
 
   float average_difference;
@@ -2520,8 +2521,11 @@ int LSDRaster::find_n_different_pixels(LSDRaster& compare_raster)
       {
         raster_val1 = RasterData[i][j];
         raster_val2 = compare_raster.get_data_element(i, j);
+
+
         if (raster_val1 != NoDataValue && raster_val2 != NoDataValue)
         {
+          tot_pix++;
           if (raster_val1 != raster_val2)
           {
             n++;
@@ -2530,7 +2534,7 @@ int LSDRaster::find_n_different_pixels(LSDRaster& compare_raster)
       }
     }
   }
-
+  cout << "The n different pixels are: " << n << " out of " << tot_pix << endl;
   return n;
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -11011,9 +11015,6 @@ void LSDRaster::make_swath(vector<float> Eastings, vector<float> Northings,
   }
 
 
-
-
-
   // the million data vectors that go into the binning
   vector<float> midpoints_output;
   vector<float>  MeanX_output;
@@ -11053,6 +11054,145 @@ void LSDRaster::make_swath(vector<float> Eastings, vector<float> Northings,
   bin_data_out.close();
 
 }
+
+
+
+void LSDRaster::make_swaths_from_categorised(vector<float> Eastings, vector<float> Northings,
+                                              vector<float> values, float swath_width, float bin_width,
+                                              string swath_data_prefix, bool print_swath_rasters,
+                                              LSDIndexRaster& categories)
+{
+  // first we get the swath rasters
+  vector< LSDRaster > swath_rasther_vec = find_nearest_point_from_list_of_points(Eastings, Northings,values, swath_width);
+
+  string swath_data_name = swath_data_prefix+"_swath.csv";
+  if (print_swath_rasters)
+  {
+    cout << "I am now going to print your swath rasters." << endl;
+    string dist_fname = swath_data_prefix+"_swathdist";
+    string val_fname = swath_data_prefix+"_swathval";
+    string node_fname = swath_data_prefix+"_swathnode";
+
+    swath_rasther_vec[0].write_raster(dist_fname,"bil");
+    swath_rasther_vec[1].write_raster(val_fname,"bil");
+    swath_rasther_vec[2].write_raster(node_fname,"bil");
+  }
+
+  // now we need to vectorize the data
+  map< int,vector<float> > distance_vectors;
+  map< int,vector<float> > elevation_vectors;
+  vector<float> empty_vec;
+  vector<float> this_distance_vec;
+  vector<float> this_elevation_vec;
+  float this_distance;
+  float this_elevation;
+  int this_category;
+
+
+  for(int row = 0; row<NRows; row++)
+  {
+    for(int col = 0; col< NCols; col++)
+    {
+      this_distance = swath_rasther_vec[1].get_data_element(row,col);
+      this_category = categories.get_data_element(row,col);
+      if(this_distance != NoDataValue && this_category != NoDataValue)
+      {
+        //cout << "Found a valid pixel, cat: " << this_category << endl;
+        
+        // get the elevation
+        this_elevation = RasterData[row][col];
+        
+        // Check if the key exists
+        if (distance_vectors.find(this_category) == distance_vectors.end()) 
+        {
+
+          //cout << "Got a new category, it is: " << this_category << endl;
+          // If the key is not in the map, we need to initiate the two map elements with empty vectors
+          // and then add the distance and elevation categories 
+          this_distance_vec = empty_vec;
+          this_distance_vec.push_back(this_distance);
+          distance_vectors[this_category] = this_distance_vec;
+          
+          this_elevation_vec = empty_vec;
+          this_elevation_vec.push_back(this_elevation);
+          elevation_vectors[this_category] = this_elevation_vec;          
+        } 
+        else 
+        {
+          // If the key is in the map, we then just append the values 
+          this_distance_vec = distance_vectors[this_category];
+          this_distance_vec.push_back(this_distance);
+          distance_vectors[this_category] = this_distance_vec;
+          
+          this_elevation_vec = elevation_vectors[this_category];
+          this_elevation_vec.push_back(this_elevation);
+          elevation_vectors[this_category] = this_elevation_vec;     
+
+        }
+      }
+    }
+  }
+
+  // Right, we now have a data map with all the categories. 
+  // We now need to loop through each category, getting the swath data
+  // This all goes into one csv file. 
+  // it will have the category as one of the data columns. 
+  // only bins with nonzero data points will be recorded. 
+  ofstream bin_data_out(swath_data_name);
+  bin_data_out << "distance,mean_elevation,minimum_z,first_quartile_z,median_z,third_quartile_z,max_z,n_samples,category"<< endl;
+
+  int this_key;
+
+  map<int, vector<float> >::iterator it;
+  for(it = distance_vectors.begin(); it != distance_vectors.end(); ++it)
+  {
+    this_key = it->first;
+    
+    // the million data vectors that go into the binning
+    vector<float> midpoints_output;
+    vector<float>  MeanX_output;
+    vector<float>  MedianX_output;
+    vector<float> StandardDeviationX_output;
+    vector<float> StandardErrorX_output;
+    vector<float> MADX_output;
+    vector<float> MeanY_output;
+    vector<float> MinimumY_output;
+    vector<float> FirstQuartileY_output;
+    vector<float> MedianY_output;
+    vector<float> ThirdQuartileY_output;
+    vector<float> MaximumY_output;
+    vector<float> StandardDeviationY_output;
+    vector<float> StandardErrorY_output;
+    vector<float> MADY_output;
+    vector<int> number_observations_output;
+
+    vector<float> distance_vector = distance_vectors[this_key];
+    vector<float> elevation_vector = elevation_vectors[this_key];
+
+    bin_data(distance_vector, elevation_vector, bin_width, midpoints_output, MeanX_output,
+            MedianX_output, StandardDeviationX_output, StandardErrorX_output, MADX_output,
+            MeanY_output, MinimumY_output, FirstQuartileY_output, MedianY_output,
+            ThirdQuartileY_output, MaximumY_output, StandardDeviationY_output, StandardErrorY_output,
+            MADY_output, number_observations_output, NoDataValue);
+
+    int n_bins = (midpoints_output.size());   
+    // For some reason the last bin is always empty so I just don't print it
+    for(int i = 0; i<n_bins-1; i++)
+    {
+      if(number_observations_output[i] > 0)
+      {
+        bin_data_out << midpoints_output[i] << "," << MeanY_output[i] << "," << MinimumY_output[i] <<","
+                    << FirstQuartileY_output[i] << "," <<  MedianY_output[i] << "," << ThirdQuartileY_output[i]
+                    << "," << MaximumY_output[i] << "," << number_observations_output[i] << "," 
+                    << this_key << endl;
+      }
+    }
+
+  }
+  bin_data_out.close();
+}
+
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This pads a smaller index raster to the same extent as a bigger raster by adding

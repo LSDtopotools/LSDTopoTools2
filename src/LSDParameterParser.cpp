@@ -74,7 +74,8 @@ vector<string> DriverIngestor(int nNumberofArgs,char *argv[])
   cout << "=========================================================" << endl;
   cout << "|| You have called an LSDTopoTools program.            ||" << endl;
   cout << "|| Prepare to explore topographic data!                ||" << endl;
-  cout << "|| You can read the documentation at:                  ||" << endl;
+  cout << "|| You can find some examples of usage here:           ||" << endl;
+  cout << "|| https://github.com/LSDtopotools/lsdtt_notebooks     ||" << endl;
   cout << "=========================================================" << endl;
 
   string path_name = ".";
@@ -381,7 +382,7 @@ void LSDParameterParser::LSDPP_parse_file_into_parameter_map(string FullName)
     //  lower[i] = tolower(parameter[i]);
     //}
 
-    cout << "parameter is: " << lower << " and value is: " << value << endl;
+    //cout << "parameter is: " << lower << " and value is: " << value << endl;
 
     // get rid of control characters
     value = RemoveControlCharactersFromEndOfString(value);
@@ -656,6 +657,10 @@ void LSDParameterParser::print_help(map< string, vector<string> > help_map, stri
   help_ofs_html << "If your parameter file is called <code>my_parameter_file.driver</code> then the call to the program would look like this: </p>" << endl;
   help_ofs_html << "<p><code># "<< program_name << " my_parameter_file.driver</code></p>" << endl;
   help_ofs_html << "<p>The file extension of the parameter file can be anything (we commonly use the extension <code>driver</code> but you can add any extension you want).</p>" << endl; 
+
+  help_ofs_html << "<h2>Example analyses in an interactive environment</h2>" << endl;
+  help_ofs_html << "<p>You can also test these routines in an interactive python environment." << endl;
+  help_ofs_html << "The example notebooks (some of which that work on a popular free notebook service) can be found at <a href=\"https://github.com/LSDtopotools/lsdtt_notebooks/tree/master/lsdtopotools\">our github repository</a>.</p>" << endl;
 
   help_ofs_html << "<h2>Data input format</h2>" << endl;
   help_ofs_html << "<p>This program reads <strong>ENVI bil</strong> format rasters projected into UTM (the WGS84 version). <strong>You must convert and project your DEM before using these tools. ENVI bil and ESRI bil are two different file formats so make sure you use ENVI bil.</strong>" << endl; 

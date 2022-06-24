@@ -17,9 +17,11 @@
 // rates from cosmogenic nuclide concentrations, Earth Surf. Dynam., 
 // 4, 655–674, https://doi.org/10.5194/esurf-4-655-2016, 2016.
 //
+// Call with -h to generate a help file
+//
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
-// Copyright (C) 2021 Simon M. Mudd 2021
+// Copyright (C) 2022 Simon M. Mudd 2022
 //
 // Developer can be contacted by simon.m.mudd _at_ ed.ac.uk
 //
@@ -215,7 +217,7 @@ int main (int nNumberofArgs,char *argv[])
 
   // These are parameters for the cosmogenic data
   string_default_map["cosmo_parameter_prefix"] = "NULL";  
-  help_map["cosmo_parameter_prefix"] = {  "string","MULL","The prefix of the cosmogenic parameter files.","You will need three files with this prefix and extensions .CRNParam ._CRNData.csv and ._CRNRasters.csv."};
+  help_map["cosmo_parameter_prefix"] = {  "string","NULL","The prefix of the cosmogenic parameter files.","You will need three files with this prefix and extensions .CRNParam ._CRNData.csv and ._CRNRasters.csv."};
 
   bool_default_map["check_cosmo_basins"] = false;
   help_map["check_cosmo_basins"] = {  "bool","false","This checks if the cosmo data are in the dem and prints a basin raster.","Used to check input data locations."};
@@ -377,7 +379,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["cosmo_accumulated_concentration_points_fname"] = {  "string","accumulated_conc.csv", "The filename of the accumulated cosmo points.","You will need to be a bit careful with the filenames. You probably should include the nuclide in the filename."};
 
   string_default_map["cosmo_concentration_raster_prefix"] = "NULL";
-  help_map["production_raster_suffix"] = {  "string","NULL", "The prefix of the cosmogenic concentration raster.","You will need to be a bit careful with the filenames"};
+  help_map["cosmo_concentration_raster_prefix"] = {  "string","NULL", "The prefix of the cosmogenic concentration raster.","You will need to be a bit careful with the filenames"};
 
   string_default_map["cosmo_accumulated_concentration_raster_prefix"] = "NULL";
   help_map["cosmo_accumulated_concentration_raster_prefix"] = {  "string","NULL", "The prefix of the cosmogenic accumulated concentration raster.","You will need to be a bit careful with the filenames"};
@@ -467,10 +469,10 @@ int main (int nNumberofArgs,char *argv[])
   help_map["step_change_uplift_age"] = {  "float","100000", "The number of years ago the step change at the outlet happened","We assume all changes propigate upstream"};
 
   float_default_map["step_change_Sc_old"] = 0.25;
-  help_map["step_change_uplift_old"] = {  "float","0.25", "Critical slope value in step change simulations. This is in the old erosion rate area","Dimensionless gradient on hillslopes"};
+  help_map["step_change_Sc_old"] = {  "float","0.25", "Critical slope value in step change simulations. This is in the old erosion rate area","Dimensionless gradient on hillslopes"};
 
   float_default_map["step_change_Sc_new"] = 0.4;
-  help_map["step_change_uplift_new"] = {  "float","0.4", "Critical slope value in step change simulations. This is in the new erosion rate area","Dimensionless gradient on hillslopes"};
+  help_map["step_change_Sc_new"] = {  "float","0.4", "Critical slope value in step change simulations. This is in the new erosion rate area","Dimensionless gradient on hillslopes"};
 
   int_default_map["step_change_contributing_pixels"] = 500;
   help_map["step_change_contributing_pixels"] = {  "int","500", "For step change simulations this is the minimum conributing pixels for a channel","Anything with fewer than these contributing pixels will be calculated as a hillslope"};

@@ -6035,7 +6035,7 @@ void convert_pairs_to_x_and_y_vecs(vector< pair<float,float> > pairs, vector<flo
     new_x.push_back(pairs[i].first);
     new_y.push_back(pairs[i].second);
 
-    cout << "Pushing back " << pairs[i].first << ", " << pairs[i].second << endl;
+    //cout << "Pushing back " << pairs[i].first << ", " << pairs[i].second << endl;
   }
 
   x_vec = new_x;

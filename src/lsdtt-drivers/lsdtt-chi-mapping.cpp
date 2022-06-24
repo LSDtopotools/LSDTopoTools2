@@ -10,11 +10,21 @@
 // with the chi coordinate, determining the best for concavity for landscapes, 
 // and a number of other features. 
 //
+// The papers in which these routines are described are here:
+// 
+// https://doi.org/10.1029/2020JF006060
+// https://doi.org/10.5194/esurf-7-211-2019
+// https://doi.org/10.1002/2013JF002981
+// https://doi.org/10.5194/esurf-6-505-2018
+//
 // The documentation is here:
 // https://lsdtopotools.github.io/LSDTT_documentation/LSDTT_chi_analysis.html
+//
+// Call with -h to generate a help file
+//
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
-// Copyright (C) 2021 Simon M. Mudd 2021
+// Copyright (C) 2022 Simon M. Mudd 2022
 //
 // Developer can be contacted by simon.m.mudd _at_ ed.ac.uk
 //

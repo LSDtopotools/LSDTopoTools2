@@ -82,7 +82,8 @@ using namespace TNT;
 // FJC 18/10/16
 //
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDTerrace::create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, float relief_thresh, float slope_thresh, int min_patch_size, int threshold_SO, float RemoveChannelThreshold)
+void LSDTerrace::create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, 
+                        float relief_thresh, float slope_thresh, int min_patch_size, int threshold_SO, float RemoveChannelThreshold)
 {
 
   /// set the protected variables
@@ -121,9 +122,9 @@ void LSDTerrace::create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionN
       {
         float slope = Slope.get_data_element(i,j);
         float relief = ChannelRelief.get_data_element(i,j);
-				//terraces must fall within the relief and slope thresholds
-				// if (relief < relief_threshold && relief > RemoveChannelThreshold && slope < slope_threshold && StreamOrderArray[i][j] < 3)
-				if (relief < relief_threshold && relief > RemoveChannelThreshold && slope < slope_threshold)
+		//terraces must fall within the relief and slope thresholds
+		// if (relief < relief_threshold && relief > RemoveChannelThreshold && slope < slope_threshold && StreamOrderArray[i][j] < 3)
+		if (relief < relief_threshold && relief > RemoveChannelThreshold && slope < slope_threshold)
         {
           BinaryArray[i][j] = 1;
           TempReliefArray[i][j] = relief;
@@ -192,7 +193,8 @@ void LSDTerrace::create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJunctionN
 // Floodplains - just finds elevation of the nearest channel > threshold SO
 // FJC 21/10/16
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDTerrace::Get_Relief_of_Nearest_Channel(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, LSDRaster& ElevationRaster, LSDRaster& DistFromOutlet, int threshold_SO, int search_distance)
+void LSDTerrace::Get_Relief_of_Nearest_Channel(LSDJunctionNetwork& ChanNetwork, LSDFlowInfo& FlowInfo, LSDRaster& ElevationRaster, 
+                                               LSDRaster& DistFromOutlet, int threshold_SO, int search_distance)
 {
 	//set up the arrays
 	Array2D<int> TempIntArray(NRows,NCols,NoDataValue);
