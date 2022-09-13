@@ -80,7 +80,7 @@
 int main (int nNumberofArgs,char *argv[])
 {
 
-  string version_number = "0.7d";
+  string version_number = "0.7";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -557,6 +557,14 @@ int main (int nNumberofArgs,char *argv[])
   string_default_map["litho_raster"] = "NULL";
   help_map["litho_raster"] = {  "string","NULL","Raster prefix of the lithology raster you will use. It adds lithology information to the chi data maps. Do not include extension","This is used when print_litho_info is true."};
 
+
+  // network routines
+  bool_default_map["create_network"] = false;
+  help_map["create_network"] = {  "bool","false"," This will sample the channel network to get nodes with a target spacing. Can be used to create networks e.g. for use with Landlab NST.","Set parameter link_length to define target spacing. Nodes will always be assigned at channel heads and trib junctions."};
+
+
+  int_default_map["link_length"] = 100;
+  help_map["link_length"] = { "int", "100","Length of the links","This defines the target node spacing for the network using the create_network function."};
 
   //=========================================================================
   //
@@ -1097,6 +1105,20 @@ int main (int nNumberofArgs,char *argv[])
     }
   }
 
+  if(this_bool_map["create_network"])
+  {
+    string node_fname = OUT_DIR+OUT_ID+"_network_nodes";
+    cout << "LINK LENGTH: " << this_int_map["link_length"] << endl; 
+    //int ll = 100;
+    vector<int> junctions = JunctionNetwork.get_JunctionVector();
+    JunctionNetwork.CreateNetwork(FlowInfo, this_int_map["link_length"], filled_topography, DistanceFromOutlet, DrainageArea, node_fname);
+    if ( this_bool_map["convert_csv_to_geojson"])
+    {
+      string gjson_name = OUT_DIR+OUT_ID+"_network_nodes.geojson";
+      LSDSpatialCSVReader thiscsv(node_fname+".csv");
+      thiscsv.print_data_to_geojson(gjson_name);
+    }
+  }
   // print junctions
   if( this_bool_map["print_junctions_to_csv"])
   {

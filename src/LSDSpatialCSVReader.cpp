@@ -790,18 +790,18 @@ void LSDSpatialCSVReader::enforce_slope(string fd_column_name, string elevation_
     dist = flow_distance[i]-flow_distance[i+1];
 
     min_elev = dist*min_slope+new_elevation[i+1];
-    cout << "dist: " << dist << " z[i+1]: " << new_elevation[i+1] << " z[i]: " << elevation[i] << " min_elev: " << min_elev << endl;
+    //cout << "dist: " << dist << " z[i+1]: " << new_elevation[i+1] << " z[i]: " << elevation[i] << " min_elev: " << min_elev << endl;
     if (dist < 0 || fabs(dist) >128)
     {
-      cout << "There seems to be a big changes in flow distance (greater than a diagonal pixel at 90m resolution" << endl;
-      cout << "I am considering this a new channel and resetting the elevation values to this pixel" << endl;
+      //cout << "There seems to be a big changes in flow distance (greater than a diagonal pixel at 90m resolution" << endl;
+      //cout << "I am considering this a new channel and resetting the elevation values to this pixel" << endl;
       new_elevation[i] = elevation[i];
     }
     else
     {
       if (elevation[i] < min_elev)
       {
-        cout << "Found something where I need to increase slope!" << endl;
+        //cout << "Found something where I need to increase slope!" << endl;
         new_elevation[i] = min_elev;
       }
       else
@@ -1089,7 +1089,7 @@ void LSDSpatialCSVReader::burn_raster_data_to_csv(LSDRaster& ThisRaster,string c
   float this_value;
 
   vector<string> new_column_data;
-  cout << "yoyoyoyoyoyo burning to the column " << column_name << endl;
+  //cout << "yoyoyoyoyoyo burning to the column " << column_name << endl;
 
   // The csv file needs to have lat-long data
   if (check_if_latitude_and_longitude_exist() == false)
@@ -1099,9 +1099,9 @@ void LSDSpatialCSVReader::burn_raster_data_to_csv(LSDRaster& ThisRaster,string c
   }
   else
   {
-    cout << "Let me get the x and y data." << endl;
+    //cout << "Let me get the x and y data." << endl;
     get_x_and_y_from_latlong(UTME,UTMN);
-    cout << "Got the x and y" << endl;
+    //cout << "Got the x and y" << endl;
 
     int n_nodes = int(UTME.size());
     for(int i = 0; i<n_nodes; i++)
@@ -1112,7 +1112,7 @@ void LSDSpatialCSVReader::burn_raster_data_to_csv(LSDRaster& ThisRaster,string c
       this_UTMN = UTMN[i];
 
       this_value = ThisRaster.get_value_of_point(this_UTME, this_UTMN);
-      cout << "Node is: " << i << " and value is: " << this_value << endl;
+      //cout << "Node is: " << i << " and value is: " << this_value << endl;
       s << this_value;
       new_column_data.push_back(s.str());
     }

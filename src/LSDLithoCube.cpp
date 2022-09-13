@@ -929,15 +929,19 @@ LSDRaster LSDLithoCube::index_to_K(LSDIndexRaster& index_raster, float default_K
   Array2D<float> data_K(index_raster.get_NRows(),index_raster.get_NCols(), default_K);
 
   for(int row=0;row<index_raster.get_NRows();row++)
-  for(int col=0;col<index_raster.get_NCols();col++)
   {
-    if(StratiToK.count(index_raster.get_data_element(row,col))>0)
+    for(int col=0;col<index_raster.get_NCols();col++)
     {
-      //std:: cout << "this is happening and not default :: " << index_raster.get_data_element(row,col);
-      data_K[row][col] = StratiToK[index_raster.get_data_element(row,col)];
+      if(StratiToK.count(index_raster.get_data_element(row,col))>0)
+      {
+        //std:: cout << "this is happening and not default :: " << index_raster.get_data_element(row,col);
+        data_K[row][col] = StratiToK[index_raster.get_data_element(row,col)];
+      }
+      else
+      {
+        data_K[row][col] = default_K;
+      }
     }
-    else
-      data_K[row][col] = default_K;
   }
 
   LSDRaster K_raster(index_raster.get_NRows(), index_raster.get_NCols(), index_raster.get_XMinimum(), index_raster.get_YMinimum(),
@@ -951,15 +955,26 @@ LSDRaster LSDLithoCube::index_to_Sc(LSDIndexRaster& index_raster, float default_
   Array2D<float> data_Sc(index_raster.get_NRows(),index_raster.get_NCols(), default_Sc);
 
   for(int row=0;row<index_raster.get_NRows();row++)
-  for(int col=0;col<index_raster.get_NCols();col++)
   {
-    if(StratiToSc.count(index_raster.get_data_element(row,col))>0)
+    for(int col=0;col<index_raster.get_NCols();col++)
     {
-      //std:: cout << "this is happening and not default :: " << index_raster.get_data_element(row,col);
-      data_Sc[row][col] = StratiToSc[index_raster.get_data_element(row,col)];
+      if(StratiToSc.count(index_raster.get_data_element(row,col))>0)
+      {
+        //std:: cout << "this is happening and not default :: " << index_raster.get_data_element(row,col);
+        data_Sc[row][col] = StratiToSc[index_raster.get_data_element(row,col)];
+      }
+      else
+      {
+        data_Sc[row][col] = default_Sc;
+      }
+
+      // This is only for bug checking:
+      //if( data_Sc[row][col] != default_Sc)
+      //{
+      //  cout << "Found a non-default Sc, which is at " << row <<","<< col << ": " << data_Sc[row][col] << endl;
+      //}
+
     }
-    else
-      data_Sc[row][col] = default_Sc;
   }
 
   LSDRaster Sc_raster(index_raster.get_NRows(), index_raster.get_NCols(), index_raster.get_XMinimum(), index_raster.get_YMinimum(),

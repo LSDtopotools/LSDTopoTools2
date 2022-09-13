@@ -1409,6 +1409,9 @@ vector<int> GetChannelHeadsChiMethodFromValleys(vector<int> ValleyNodes,
   /// @date 23/10/2013
   LSDIndexRaster SplitChannel(LSDFlowInfo& FlowInfo, vector<int> Sources, int TargetSegmentLength);
 
+  ///
+  void CreateNetwork(LSDFlowInfo& FlowInfo, int TargetSegmentLength, LSDRaster& ElevationRaster, LSDRaster&DistanceFromOutlet, LSDRaster& DrainageArea, string filename);
+
 
   /// TypologyModel
   /// @details This function splits the channel into a series of segments,
@@ -2254,6 +2257,17 @@ void calculate_hypsometric_integral(string fname_prefix, LSDFlowInfo& FlowInfo, 
 
 void calculate_upstream_elevations_network(string fname_prefix, LSDFlowInfo& FlowInfo, LSDRaster& Elevation, float bin_width, float lower_limit, float upper_limit);
 
+/// @brief Filter a map of nodes by distance to nearest channel. Look through the map and remove any nodes 
+/// that are closer to the channel than the threshold distance.
+/// @param nodes map of nodes to filter
+/// @param threshold_dist threshold distance, any nodes closer to a channel than this will be removed
+/// @param FlowInfo LSDFlowInfo object
+/// @param FlowDistance LSDRaster flow distance object
+/// @param threshold_SO threshold stream order for the channel.
+/// @author FJC
+/// @date 22/08/22
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+map<int,int> filter_nodes_by_distance_to_channel(map<int,int> nodes, float threshold_dist, LSDFlowInfo& FlowInfo, LSDRaster& FlowDistance, int threshold_SO);
 
 
   protected:

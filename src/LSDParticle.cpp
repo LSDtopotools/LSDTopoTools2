@@ -736,7 +736,7 @@ void LSDCRNParticle::update_10Be_SSfull(double erosion_rate, LSDCRNParameters& C
 // This is for a step change in the erosion rate
 // assuming previously there was a steady state
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDCRNParticle::update_10Be_step_change(double erosion_old, 
+void LSDCRNParticle::update_10Be_step_change_surface(double erosion_old, 
                                              double erosion_new, 
                                              double time_since_change, 
                                              LSDCRNParameters& CRNp)
@@ -777,6 +777,56 @@ void LSDCRNParticle::update_10Be_step_change(double erosion_old,
 
   Conc_10Be = erosion_old_SS_conc+erosion_new_conc;
 }
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This is for a step change in the erosion rate
+// assuming previously there was a steady state
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDCRNParticle::update_10Be_step_change(double erosion_old, 
+                                             double erosion_new, 
+                                             double time_since_change, 
+                                             LSDCRNParameters& CRNp)
+{
+  
+  double this_term;
+  double sum_term1 = 0;
+  double sum_term2 = 0;
+  //double prefactor_term, exp_term;
+
+  // First get the original steady state 
+  for (int i = 0; i<4; i++)
+  {
+    this_term = (exp(-(effective_dLoc+time_since_change*erosion_new)/CRNp.Gamma[i])*CRNp.F_10Be[i]*CRNp.Gamma[i])/
+                 (erosion_old+CRNp.Gamma[i]*CRNp.lambda_10Be);
+    sum_term1 += this_term;
+  }
+
+  for (int i = 0; i<4; i++)
+  {
+    //prefactor_term = CRNp.Gamma[i]*CRNp.F_10Be[i]/(erosion_new+CRNp.Gamma[i]*CRNp.lambda_10Be);
+    //exp_term = exp(  -(time_since_change*(erosion_new+CRNp.Gamma[i]*CRNp.lambda_10Be))/CRNp.Gamma[i]  );
+    this_term = ( exp(-(effective_dLoc+time_since_change*erosion_new)/CRNp.Gamma[i])*
+                  (exp( (time_since_change*erosion_new)/CRNp.Gamma[i])  
+                    -  exp(  -(time_since_change*CRNp.lambda_10Be) ) )
+                   *CRNp.F_10Be[i]*CRNp.Gamma[i] )  /
+                 (erosion_new+CRNp.Gamma[i]*CRNp.lambda_10Be);
+    sum_term2 += this_term;
+    //cout << "i: " << i << " prefactor: " << prefactor_term << " exp_term: " << exp_term << endl;
+  }
+
+  double erosion_old_SS_conc = CRNp.S_t*CRNp.P0_10Be*sum_term1*exp(-time_since_change*CRNp.lambda_10Be);
+  double erosion_new_conc = CRNp.S_t*CRNp.P0_10Be*sum_term2;
+
+  // Now the next component
+  //cout << "sum_term from old steady state is: " << erosion_old_SS_conc << endl;
+  //cout << "sum_term from new steady state is: " << erosion_new_conc << endl;
+
+  Conc_10Be = erosion_old_SS_conc+erosion_new_conc;
+}
+
+
 
 
 
@@ -850,6 +900,74 @@ void LSDCRNParticle::update_10Be_SSfull_depth_integrated(double erosion_rate,
   cosmo_flags[0] = true;
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+
+
+void LSDCRNParticle::update_10Be_step_change_depth_integrated(double erosion_old, double erosion_new, 
+                               double time_since_change, LSDCRNParameters& CRNp,
+                                  double top_eff_depth, double bottom_eff_depth)
+{
+
+  // first, check if the inputs are working properly
+  if (top_eff_depth > bottom_eff_depth)
+  {
+    cout << "LSDParticle line 917, your effective depths for integration are reversed" << endl;
+    cout << "Reversing the two depths. Check your inputs!" << endl;
+    double temp_eff_depth = bottom_eff_depth;
+    bottom_eff_depth = top_eff_depth;
+    top_eff_depth = temp_eff_depth;
+  }
+
+  // If the top effective depth and the bottom effective depth are the same, then run the standard
+  // concentration for particles eroding from the top of this pixel
+  if (top_eff_depth == bottom_eff_depth)
+  {
+    effective_dLoc = top_eff_depth;
+    update_10Be_step_change(erosion_old,erosion_new,time_since_change,CRNp);
+  }
+  else  // If they arent the same, this calculates the depth average concentrations of particles between the top and bottom effective depths.  
+  {
+
+    double this_term;
+    double term1,term2,term3,term4;
+    double exp_t1,exp_t2,exp_t3,exp_t4;
+    double bt_term1, bt_term2;
+    double FG2_term;
+
+    double sum_term1 = 0;
+    double sum_term2 = 0;
+
+    // First get the original steady state 
+    for (int i = 0; i<4; i++)
+    {
+      FG2_term = CRNp.F_10Be[i]*CRNp.Gamma[i]*CRNp.Gamma[i];
+      bt_term1 = erosion_new+CRNp.Gamma[i]*CRNp.lambda_10Be;
+      bt_term2 = erosion_old+CRNp.Gamma[i]*CRNp.lambda_10Be;
+
+      exp_t1 = exp(-bottom_eff_depth/CRNp.Gamma[i]);
+      exp_t2 = exp(-top_eff_depth/CRNp.Gamma[i]);
+      exp_t3 = exp(- (bottom_eff_depth+time_since_change*erosion_new+time_since_change*CRNp.Gamma[i]*CRNp.lambda_10Be)/CRNp.Gamma[i]);
+      exp_t4 = exp(- (top_eff_depth+time_since_change*erosion_new+time_since_change*CRNp.Gamma[i]*CRNp.lambda_10Be)/CRNp.Gamma[i]);
+
+      term1 = -(exp_t1*FG2_term/bt_term1);
+      term2 = (exp_t2*FG2_term/bt_term1);
+      term3 = (exp_t3*FG2_term*(erosion_old-erosion_new))/(bt_term1*bt_term2);
+      term4 = (exp_t4*FG2_term*(erosion_new-erosion_old))/(bt_term1*bt_term2);
+      sum_term1 += term1+term2+term3+term4;
+    }
+
+    Conc_10Be = (1/(bottom_eff_depth-top_eff_depth))*CRNp.S_t*CRNp.P0_10Be*sum_term1;
+
+  }
+
+}
+
+
+
+
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This function uses newton iteration to get an apparent erosion rate
@@ -1223,7 +1341,7 @@ void LSDCRNParticle::update_26Al_SSfull(double erosion_rate, LSDCRNParameters& C
 // This is for a step change in the erosion rate
 // assuming previously there was a steady state
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDCRNParticle::update_26Al_step_change(double erosion_old, 
+void LSDCRNParticle::update_26Al_step_change_surface(double erosion_old, 
                                              double erosion_new, 
                                              double time_since_change, 
                                              LSDCRNParameters& CRNp)
@@ -1249,6 +1367,53 @@ void LSDCRNParticle::update_26Al_step_change(double erosion_old,
                    *CRNp.F_26Al[i]*CRNp.Gamma[i] )/
                  (erosion_new+CRNp.Gamma[i]*CRNp.lambda_10Be);
     sum_term2 += this_term;
+  }
+
+  double erosion_old_SS_conc = CRNp.S_t*CRNp.P0_26Al*sum_term1*exp(-time_since_change*CRNp.lambda_26Al);
+  double erosion_new_conc = CRNp.S_t*CRNp.P0_26Al*sum_term2;
+
+  // Now the next component
+  //cout << "sum_term from old steady state is: " << erosion_old_SS_conc << endl;
+  //cout << "sum_term from new steady state is: " << erosion_new_conc << endl;
+
+  Conc_26Al = erosion_old_SS_conc+erosion_new_conc;
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This is for a step change in the erosion rate
+// assuming previously there was a steady state
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDCRNParticle::update_26Al_step_change(double erosion_old, 
+                                             double erosion_new, 
+                                             double time_since_change, 
+                                             LSDCRNParameters& CRNp)
+{
+  
+  double this_term;
+  double sum_term1 = 0;
+  double sum_term2 = 0;
+  //double prefactor_term, exp_term;
+
+  // First get the original steady state 
+  for (int i = 0; i<4; i++)
+  {
+    this_term = (exp(-(effective_dLoc+time_since_change*erosion_new)/CRNp.Gamma[i])*CRNp.F_26Al[i]*CRNp.Gamma[i])/
+                 (erosion_old+CRNp.Gamma[i]*CRNp.lambda_26Al);
+    sum_term1 += this_term;
+  }
+
+  for (int i = 0; i<4; i++)
+  {
+    //prefactor_term = CRNp.Gamma[i]*CRNp.F_26Al[i]/(erosion_new+CRNp.Gamma[i]*CRNp.lambda_26Al);
+    //exp_term = exp(  -(time_since_change*(erosion_new+CRNp.Gamma[i]*CRNp.lambda_26Al))/CRNp.Gamma[i]  );
+    this_term = ( exp(-(effective_dLoc+time_since_change*erosion_new)/CRNp.Gamma[i])*
+                  (exp( (time_since_change*erosion_new)/CRNp.Gamma[i])  
+                    -  exp(  -(time_since_change*CRNp.lambda_26Al) ) )
+                   *CRNp.F_26Al[i]*CRNp.Gamma[i] )  /
+                 (erosion_new+CRNp.Gamma[i]*CRNp.lambda_26Al);
+    sum_term2 += this_term;
+    //cout << "i: " << i << " prefactor: " << prefactor_term << " exp_term: " << exp_term << endl;
   }
 
   double erosion_old_SS_conc = CRNp.S_t*CRNp.P0_26Al*sum_term1*exp(-time_since_change*CRNp.lambda_26Al);
@@ -1324,6 +1489,74 @@ void LSDCRNParticle::update_26Al_SSfull_depth_integrated(double erosion_rate,
   }
 
 }
+
+
+
+
+
+
+void LSDCRNParticle::update_26Al_step_change_depth_integrated(double erosion_old, double erosion_new, 
+                               double time_since_change, LSDCRNParameters& CRNp,
+                                  double top_eff_depth, double bottom_eff_depth)
+{
+
+  // first, check if the inputs are working properly
+  if (top_eff_depth > bottom_eff_depth)
+  {
+    cout << "LSDParticle line 917, your effective depths for integration are reversed" << endl;
+    cout << "Reversing the two depths. Check your inputs!" << endl;
+    double temp_eff_depth = bottom_eff_depth;
+    bottom_eff_depth = top_eff_depth;
+    top_eff_depth = temp_eff_depth;
+  }
+
+  // If the top effective depth and the bottom effective depth are the same, then run the standard
+  // concentration for particles eroding from the top of this pixel
+  if (top_eff_depth == bottom_eff_depth)
+  {
+    effective_dLoc = top_eff_depth;
+    update_26Al_step_change(erosion_old,erosion_new,time_since_change,CRNp);
+  }
+  else  // If they arent the same, this calculates the depth average concentrations of particles between the top and bottom effective depths.  
+  {
+
+    double this_term;
+    double term1,term2,term3,term4;
+    double exp_t1,exp_t2,exp_t3,exp_t4;
+    double bt_term1, bt_term2;
+    double FG2_term;
+
+    double sum_term1 = 0;
+    double sum_term2 = 0;
+
+    // First get the original steady state 
+    for (int i = 0; i<4; i++)
+    {
+      FG2_term = CRNp.F_26Al[i]*CRNp.Gamma[i]*CRNp.Gamma[i];
+      bt_term1 = erosion_new+CRNp.Gamma[i]*CRNp.lambda_26Al;
+      bt_term2 = erosion_old+CRNp.Gamma[i]*CRNp.lambda_26Al;
+
+      exp_t1 = exp(-bottom_eff_depth/CRNp.Gamma[i]);
+      exp_t2 = exp(-top_eff_depth/CRNp.Gamma[i]);
+      exp_t3 = exp(- (bottom_eff_depth+time_since_change*erosion_new+time_since_change*CRNp.Gamma[i]*CRNp.lambda_26Al)/CRNp.Gamma[i]);
+      exp_t4 = exp(- (top_eff_depth+time_since_change*erosion_new+time_since_change*CRNp.Gamma[i]*CRNp.lambda_26Al)/CRNp.Gamma[i]);
+
+      term1 = -(exp_t1*FG2_term/bt_term1);
+      term2 = (exp_t2*FG2_term/bt_term1);
+      term3 = (exp_t3*FG2_term*(erosion_old-erosion_new))/(bt_term1*bt_term2);
+      term4 = (exp_t4*FG2_term*(erosion_new-erosion_old))/(bt_term1*bt_term2);
+      sum_term1 += term1+term2+term3+term4;
+    }
+
+    Conc_26Al = (1/(bottom_eff_depth-top_eff_depth))*CRNp.S_t*CRNp.P0_26Al*sum_term1;
+  }
+}
+
+
+
+
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 
@@ -1413,7 +1646,7 @@ void LSDCRNParticle::update_14C_SSfull(double erosion_rate, LSDCRNParameters& CR
 // This is for a step change in the erosion rate
 // assuming previously there was a steady state
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDCRNParticle::update_14C_step_change(double erosion_old, 
+void LSDCRNParticle::update_14C_step_change_surface(double erosion_old, 
                                              double erosion_new, 
                                              double time_since_change, 
                                              LSDCRNParameters& CRNp)
@@ -1449,6 +1682,57 @@ void LSDCRNParticle::update_14C_step_change(double erosion_old,
 
   Conc_14C = erosion_old_SS_conc+erosion_new_conc;
 }
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This is for a step change in the erosion rate
+// assuming previously there was a steady state
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDCRNParticle::update_14C_step_change(double erosion_old, 
+                                             double erosion_new, 
+                                             double time_since_change, 
+                                             LSDCRNParameters& CRNp)
+{
+  
+  double this_term;
+  double sum_term1 = 0;
+  double sum_term2 = 0;
+  //double prefactor_term, exp_term;
+
+  // First get the original steady state 
+  for (int i = 0; i<4; i++)
+  {
+    this_term = (exp(-(effective_dLoc+time_since_change*erosion_new)/CRNp.Gamma[i])*CRNp.F_14C[i]*CRNp.Gamma[i])/
+                 (erosion_old+CRNp.Gamma[i]*CRNp.lambda_14C);
+    sum_term1 += this_term;
+  }
+
+  for (int i = 0; i<4; i++)
+  {
+    //prefactor_term = CRNp.Gamma[i]*CRNp.F_14C[i]/(erosion_new+CRNp.Gamma[i]*CRNp.lambda_14C);
+    //exp_term = exp(  -(time_since_change*(erosion_new+CRNp.Gamma[i]*CRNp.lambda_14C))/CRNp.Gamma[i]  );
+    this_term = ( exp(-(effective_dLoc+time_since_change*erosion_new)/CRNp.Gamma[i])*
+                  (exp( (time_since_change*erosion_new)/CRNp.Gamma[i])  
+                    -  exp(  -(time_since_change*CRNp.lambda_14C) ) )
+                   *CRNp.F_14C[i]*CRNp.Gamma[i] )  /
+                 (erosion_new+CRNp.Gamma[i]*CRNp.lambda_14C);
+    sum_term2 += this_term;
+    //cout << "i: " << i << " prefactor: " << prefactor_term << " exp_term: " << exp_term << endl;
+  }
+
+  double erosion_old_SS_conc = CRNp.S_t*CRNp.P0_14C*sum_term1*exp(-time_since_change*CRNp.lambda_14C);
+  double erosion_new_conc = CRNp.S_t*CRNp.P0_14C*sum_term2;
+
+  // Now the next component
+  //cout << "sum_term from old steady state is: " << erosion_old_SS_conc << endl;
+  //cout << "sum_term from new steady state is: " << erosion_new_conc << endl;
+
+  Conc_14C = erosion_old_SS_conc+erosion_new_conc;
+}
+
+
+
 
 
 
@@ -1521,6 +1805,72 @@ void LSDCRNParticle::update_14C_SSfull_depth_integrated(double erosion_rate,
   vector<bool> cosmo_flags(4,false);
   cosmo_flags[0] = true;
 }
+
+
+
+
+
+void LSDCRNParticle::update_14C_step_change_depth_integrated(double erosion_old, double erosion_new, 
+                               double time_since_change, LSDCRNParameters& CRNp,
+                                  double top_eff_depth, double bottom_eff_depth)
+{
+
+  // first, check if the inputs are working properly
+  if (top_eff_depth > bottom_eff_depth)
+  {
+    cout << "LSDParticle line 917, your effective depths for integration are reversed" << endl;
+    cout << "Reversing the two depths. Check your inputs!" << endl;
+    double temp_eff_depth = bottom_eff_depth;
+    bottom_eff_depth = top_eff_depth;
+    top_eff_depth = temp_eff_depth;
+  }
+
+  // If the top effective depth and the bottom effective depth are the same, then run the standard
+  // concentration for particles eroding from the top of this pixel
+  if (top_eff_depth == bottom_eff_depth)
+  {
+    effective_dLoc = top_eff_depth;
+    update_14C_step_change(erosion_old,erosion_new,time_since_change,CRNp);
+  }
+  else  // If they arent the same, this calculates the depth average concentrations of particles between the top and bottom effective depths.  
+  {
+
+    double this_term;
+    double term1,term2,term3,term4;
+    double exp_t1,exp_t2,exp_t3,exp_t4;
+    double bt_term1, bt_term2;
+    double FG2_term;
+
+    double sum_term1 = 0;
+    double sum_term2 = 0;
+
+    // First get the original steady state 
+    for (int i = 0; i<4; i++)
+    {
+      FG2_term = CRNp.F_14C[i]*CRNp.Gamma[i]*CRNp.Gamma[i];
+      bt_term1 = erosion_new+CRNp.Gamma[i]*CRNp.lambda_14C;
+      bt_term2 = erosion_old+CRNp.Gamma[i]*CRNp.lambda_14C;
+
+      exp_t1 = exp(-bottom_eff_depth/CRNp.Gamma[i]);
+      exp_t2 = exp(-top_eff_depth/CRNp.Gamma[i]);
+      exp_t3 = exp(- (bottom_eff_depth+time_since_change*erosion_new+time_since_change*CRNp.Gamma[i]*CRNp.lambda_14C)/CRNp.Gamma[i]);
+      exp_t4 = exp(- (top_eff_depth+time_since_change*erosion_new+time_since_change*CRNp.Gamma[i]*CRNp.lambda_14C)/CRNp.Gamma[i]);
+
+      term1 = -(exp_t1*FG2_term/bt_term1);
+      term2 = (exp_t2*FG2_term/bt_term1);
+      term3 = (exp_t3*FG2_term*(erosion_old-erosion_new))/(bt_term1*bt_term2);
+      term4 = (exp_t4*FG2_term*(erosion_new-erosion_old))/(bt_term1*bt_term2);
+      sum_term1 += term1+term2+term3+term4;
+    }
+
+    Conc_14C = (1/(bottom_eff_depth-top_eff_depth))*CRNp.S_t*CRNp.P0_10Be*sum_term1;
+  }
+}
+
+
+
+
+
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-

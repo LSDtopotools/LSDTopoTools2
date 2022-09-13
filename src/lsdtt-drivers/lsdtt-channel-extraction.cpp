@@ -85,7 +85,7 @@ int main (int nNumberofArgs,char *argv[])
   //start the clock
   clock_t begin = clock();
 
-  string version_number = "0.7d";
+  string version_number = "0.7";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -197,6 +197,11 @@ int main (int nNumberofArgs,char *argv[])
   help_map["CHeads_file"] = {  "string","NULL","The name of a channel heads file.","You can output this csv file with the channel extraction algorithms. It contains latitude and longitude values of the channel heads."};
  
 
+  bool_default_map["use_spiral_trimmer_for_edge_influence"] = false;
+  help_map["use_spiral_trimmer_for_edge_influence"] = {  "bool","false","Makes sure raster is rectangular before running drainage extraction.","Use this if you want to avoid edge effects of your flow routing that can cause seg faults."};
+
+
+
   // set default float parameters
   int_default_map["threshold_contributing_pixels"] = 1000;
   help_map["threshold_contributing_pixels"] = {  "int","1000","The number of contributing pixels needed to start a channel using the threshold method.","This is in pixels not drainage area. More options are in the lsdtt-channel-extraction tool."};
@@ -240,6 +245,9 @@ int main (int nNumberofArgs,char *argv[])
 
   bool_default_map["print_wiener_channels"] = false;
   help_map["print_wiener_channels"] = {  "bool","false","Prints the channel network determined by the Wiener method which is a mashup of Passalacqua and Pelletier methods first reported by grieve et al 2016.","Output is a csv file."};
+
+  bool_default_map["print_perona_malik_channels"] = false;
+  help_map["print_perona_malik_channels"] = {  "bool","false","Prints the channel network using the GeoNet method proposed by Passalacqua et al. 2010.","Output is a csv file."};
 
   bool_default_map["print_stream_order_raster"] = false;
   help_map["print_stream_order_raster"] = {  "bool","false","Prints a raster with _SO in filename with stream orders of channel in the appropriate pixel.","Generates a big file so we suggest printing the network to csv."};
@@ -292,8 +300,6 @@ int main (int nNumberofArgs,char *argv[])
 
   bool_default_map["print_MD_drainage_area_raster"] = false;
   help_map["print_MD_drainage_area_raster"] = {  "bool","false","Prints multidirection (fully divergent flow) drainage area raster.","Raster extension is MD."};
-
-
 
 
 
@@ -405,7 +411,17 @@ int main (int nNumberofArgs,char *argv[])
     filled_topography = topography_raster.fill(this_float_map["min_slope_for_fill"]);
   }
 
-
+  // This routine makes sure that the outer edges of the DEM
+  // are trimmed to a rectangle and then the edge nodes are replaced
+  // with nodata
+  if( this_bool_map["use_spiral_trimmer_for_edge_influence"])
+  {
+    LSDRaster SpiralTrim = filled_topography.RasterTrimmerSpiral();
+    filled_topography = SpiralTrim;
+    cout << "Warning, I have replaced the edges of your DEM with nodata" << endl;
+    cout << "This usually means I am trying to remove nodes influence by the edge" << endl;
+    filled_topography.replace_edges_with_nodata();
+  }
 
   if (this_bool_map["print_fill_raster"])
   {
@@ -640,7 +656,7 @@ int main (int nNumberofArgs,char *argv[])
     // get some relevant rasters
     LSDRaster DistanceFromOutlet = FlowInfo.distance_from_outlet();
 
-    LSDRasterSpectral raster(topography_raster);
+    LSDRasterSpectral raster(filled_topography);
     string QQ_fname = OUT_DIR+OUT_ID+"__qq.txt";
 
     cout << "I am am getting the connected components using a weiner QQ filter." << endl;
@@ -776,7 +792,7 @@ int main (int nNumberofArgs,char *argv[])
     cout << "On a 3 Gb vagrant box a 100 Mb DEM is likeley to crash the machine." << endl;
     cout << "If you have this problem try reducing DEM resolution (3-5 m is okay, see Grieve et al 2016 ESURF)" << endl;
     cout << "or tile your DEM and run this multiple times. Or get a linux workstation." << endl << endl;
-    LSDRasterSpectral SpectralRaster(topography_raster);
+    LSDRasterSpectral SpectralRaster(filled_topography);
 
     cout << "I am running a Wiener filter" << endl;
     LSDRaster topo_test_wiener = SpectralRaster.fftw2D_wiener();
@@ -945,7 +961,7 @@ int main (int nNumberofArgs,char *argv[])
     cout << " doi:10.1029/2012WR012452 and doi:10.1029/2009JF001254" << endl;
 
     // initiate the spectral raster
-    LSDRasterSpectral Spec_raster(topography_raster);
+    LSDRasterSpectral Spec_raster(filled_topography);
 
     string QQ_fname = OUT_DIR+OUT_ID+"__qq.txt";
 
@@ -1056,7 +1072,126 @@ int main (int nNumberofArgs,char *argv[])
 
   }
 
+    //===============================================================
+  // WIENER
+  //===============================================================
+  if (this_bool_map["print_perona_malik_channels"])
+  {
+    cout << "I am calculating channels using a QQ threshold algorithm (doi:10.1029/2012WR012452)." << endl;
+    cout << "and a Perona-Malik filter similar to GeoNet (Passalacqua et al, 2010): " << endl;
+    cout << "doi:10.1029/2009JF001254" << endl;
 
+    // initiate the spectral raster
+    LSDRasterSpectral Spec_raster(filled_topography);
+
+    string QQ_fname = OUT_DIR+OUT_ID+"__qq.txt";
+
+    cout << "I am am getting the connected components using a weiner QQ filter." << endl;
+    cout << "Area threshold is: " << this_float_map["pruning_drainage_area"] << " window is: " <<  this_float_map["surface_fitting_radius"] << endl;
+
+    LSDIndexRaster connected_components = Spec_raster.IsolateChannelsPeronaMalikQQ(this_float_map["pruning_drainage_area"],
+                                                       this_float_map["surface_fitting_radius"], QQ_fname);
+
+    cout << "I am filtering by connected components" << endl;
+    LSDIndexRaster connected_components_filtered = connected_components.filter_by_connected_components(this_int_map["connected_components_threshold"]);
+    LSDIndexRaster CC_raster = connected_components_filtered.ConnectedComponents();
+
+    cout << "I am thinning the network to a skeleton." << endl;
+    LSDIndexRaster skeleton_raster = connected_components_filtered.thin_to_skeleton();
+
+    cout << "I am finding the finding end points" << endl;
+    LSDIndexRaster Ends = skeleton_raster.find_end_points();
+    Ends.remove_downstream_endpoints(CC_raster, Spec_raster);
+
+    //this processes the end points to only keep the upper extent of the channel network
+    cout << "getting channel heads" << endl;
+    vector<int> tmpsources = FlowInfo.ProcessEndPointsToChannelHeads(Ends);
+
+    cout << "got all the end points" << endl;
+
+    // we need a temp junction network to search for single pixel channels
+    LSDJunctionNetwork tmpJunctionNetwork(tmpsources, FlowInfo);
+    LSDIndexRaster tmpStreamNetwork = tmpJunctionNetwork.StreamOrderArray_to_LSDIndexRaster();
+
+    cout << "removing single px channels" << endl;
+    vector<int> FinalSources = FlowInfo.RemoveSinglePxChannels(tmpStreamNetwork, tmpsources);
+
+    //Now we have the final channel heads, so we can generate a channel network from them
+    LSDJunctionNetwork ChanNetwork(FinalSources, FlowInfo);
+
+    // Print sources
+    if( this_bool_map["print_sources_to_csv"])
+    {
+      string sources_csv_name = OUT_DIR+OUT_ID+"_PMsources.csv";
+
+      //write channel_heads to a csv file
+      FlowInfo.print_vector_of_nodeindices_to_csv_file_with_latlong(FinalSources, sources_csv_name);
+
+      if ( this_bool_map["convert_csv_to_geojson"])
+      {
+        string gjson_name = OUT_DIR+OUT_ID+"_PMsources.geojson";
+        LSDSpatialCSVReader thiscsv(OUT_DIR+OUT_ID+"_PMsources.csv");
+        thiscsv.print_data_to_geojson(gjson_name);
+      }
+
+    }
+
+    if( this_bool_map["print_sources_to_raster"])
+    {
+      string sources_raster_name = OUT_DIR+OUT_ID+"_PMsources";
+
+      //write channel heads to a raster
+      LSDIndexRaster Channel_heads_raster = FlowInfo.write_NodeIndexVector_to_LSDIndexRaster(FinalSources);
+      Channel_heads_raster.write_raster(sources_raster_name,raster_ext);
+    }
+
+    if( this_bool_map["print_stream_order_raster"])
+    {
+      string SO_raster_name = OUT_DIR+OUT_ID+"_PM_SO";
+
+      //write stream order array to a raster
+      LSDIndexRaster SOArray = ChanNetwork.StreamOrderArray_to_LSDIndexRaster();
+      SOArray.write_raster(SO_raster_name,raster_ext);
+    }
+
+    if( this_bool_map["print_channels_to_csv"])
+    {
+      string channel_csv_name = OUT_DIR+OUT_ID+"_PM_CN";
+      if ( this_bool_map["use_extended_channel_data"])
+      {
+        cout << "I am going to use the extended channel network data outputs." << endl;
+        ChanNetwork.PrintChannelNetworkToCSV_WithElevation_WithDonorJunction(FlowInfo, channel_csv_name, topography_raster);
+      }
+      else
+      {
+        ChanNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
+      }
+
+
+      if ( this_bool_map["convert_csv_to_geojson"])
+      {
+        string gjson_name = OUT_DIR+OUT_ID+"_PM_CN.geojson";
+        LSDSpatialCSVReader thiscsv(OUT_DIR+OUT_ID+"_PM_CN.csv");
+        thiscsv.print_data_to_geojson(gjson_name);
+      }
+    }
+
+    // print junctions
+    if( this_bool_map["print_junctions_to_csv"])
+    {
+      cout << "I am writing the junctions to csv." << endl;
+      string channel_csv_name = OUT_DIR+OUT_ID+"_PM_JN.csv";
+      ChanNetwork.print_junctions_to_csv(FlowInfo, channel_csv_name);
+
+      if ( this_bool_map["convert_csv_to_geojson"])
+      {
+        string gjson_name = OUT_DIR+OUT_ID+"_PM_JN.geojson";
+        LSDSpatialCSVReader thiscsv(channel_csv_name);
+        thiscsv.print_data_to_geojson(gjson_name);
+      }
+    }
+
+  }
 
   //============================================================================
   // Write some rasters. THis is inefficient because it could duplicate

@@ -10692,7 +10692,9 @@ vector<int> LSDFlowInfo::ProcessEndPointsToChannelHeads(LSDIndexRaster Ends){
 
   for (int q = 0; q < int(EndNodes.size());++q){
     if (EndStatus[EndNodes[q]] == true){
-      Sources.push_back(EndNodes[q]);
+      if (EndNodes[q] != NoDataValue){
+        Sources.push_back(EndNodes[q]);
+      }
     }
   }
 

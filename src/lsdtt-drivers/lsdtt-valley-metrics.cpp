@@ -74,7 +74,7 @@ int main (int nNumberofArgs,char *argv[])
   //start the clock
   clock_t begin = clock();
 
-  string version_number = "0.7d";
+  string version_number = "0.7";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -88,7 +88,8 @@ int main (int nNumberofArgs,char *argv[])
   cout << "|| Citation for this code is:                          ||" << endl;
   cout << "|| " << citation << endl;
   cout << "|| And                                                 ||" << endl;
-  cout << "|| https://www.earth-surf-dynam.net/5/369/2017/        ||" << endl;
+  cout << "|| https://doi.org/10.5194/esurf-5-369-2017            ||" << endl;
+  cout << "|| https://doi.org/10.5194/esurf-10-437-2022           ||" << endl;
   cout << "=========================================================" << endl;
   cout << "|| Documentation can be found at:                      ||" << endl;
   cout << "|| https://lsdtopotools.github.io/LSDTT_documentation/ ||" << endl;

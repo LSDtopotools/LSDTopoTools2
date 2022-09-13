@@ -3263,6 +3263,7 @@ vector<int> LSDJunctionNetwork::get_node_list_of_penultimate_node_from_junction_
     if (this_junc >= 0 && this_junc < int(JunctionVector.size()))
     {
       int outlet_node = get_penultimate_node_from_stream_link(this_junc,FlowInfo);
+      //cout << "outlet node: " << outlet_node << endl;
       node_list.push_back(outlet_node);
     }
   }
@@ -5537,24 +5538,27 @@ map<int,int> LSDJunctionNetwork::ExtractAllRidges(LSDFlowInfo& FlowInfo)
     // for debugging
     //cout << "O: " << StreamOrderVector[ SVector[i] ] << endl;
 
-
-    upslope_junc_nodes = FlowInfo.get_upslope_nodes(pen_nodes[i]);
-
-    // now get the nodes that are internal
-    vector<bool> is_internal = FlowInfo.internal_nodes(upslope_junc_nodes);
-
-    // now remove all interior nodes
-    vector<int> external_nodes;
-    for (int usn = 0; usn < int(upslope_junc_nodes.size()); usn++)
+    if(pen_nodes[i] != NoDataValue)
     {
-      if(is_internal[usn] == false)
-      {
-        // These are from an old version that made a raster and kept here for reference if you
-        // want to replicate the code elsewhere
-        //FlowInfo.retrieve_current_row_and_col(upslope_junc_nodes[usn],row,col);
-        //RidgeNetwork[row][col] = StreamOrderVector[ SVector[i] ];
+      upslope_junc_nodes = FlowInfo.get_upslope_nodes(pen_nodes[i]);
+      cout << "Number of upslope nodes: " << int(upslope_junc_nodes.size()) << endl;
 
-        node_map[upslope_junc_nodes[usn]] = StreamOrderVector[ SVector[i] ];
+      // now get the nodes that are internal
+      vector<bool> is_internal = FlowInfo.internal_nodes(upslope_junc_nodes);
+
+      // now remove all interior nodes
+      vector<int> external_nodes;
+      for (int usn = 0; usn < int(upslope_junc_nodes.size()); usn++)
+      {
+        if(is_internal[usn] == false)
+        {
+          // These are from an old version that made a raster and kept here for reference if you
+          // want to replicate the code elsewhere
+          //FlowInfo.retrieve_current_row_and_col(upslope_junc_nodes[usn],row,col);
+          //RidgeNetwork[row][col] = StreamOrderVector[ SVector[i] ];
+
+          node_map[upslope_junc_nodes[usn]] = StreamOrderVector[ SVector[i] ];
+        }
       }
     }
   }
@@ -5591,7 +5595,7 @@ map<int,int> LSDJunctionNetwork::ExtractAllRidges(LSDFlowInfo& FlowInfo, string 
     so_stack.push_back(StreamOrderVector[ SVector[i] ]);
 
     // for debugging
-    //cout << "O: " << StreamOrderVector[ SVector[i] ] << endl;
+    cout << "O: " << StreamOrderVector[ SVector[i] ] << endl;
 
 
     upslope_junc_nodes = FlowInfo.get_upslope_nodes(pen_nodes[i]);
@@ -6012,6 +6016,116 @@ LSDIndexRaster LSDJunctionNetwork::SplitChannel(LSDFlowInfo& FlowInfo, vector<in
   }
   LSDIndexRaster ChannelSegmentsRaster(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, ChannelSegments,GeoReferencingStrings);
   return ChannelSegmentsRaster;
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-= 
+//CreateNetwork 
+//This function takes the channel network and uses the junctions to divide the network up
+//into a series of "nodes" and "links" (links are the pathways between nodes). 
+//Each juction has to be a node. In between junctions we add nodes at a specified distance
+// 
+//
+// FJC 02/08/22
+//// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=//
+void LSDJunctionNetwork::CreateNetwork(LSDFlowInfo& FlowInfo, int TargetSegmentLength, LSDRaster& ElevationRaster, LSDRaster& DistanceFromOutlet, LSDRaster&DrainageArea, string filename)
+{
+  cout << "The target link length is: " << TargetSegmentLength << endl;
+  // set up the csv files
+  string fname = filename+".csv";
+  ofstream nodes; 
+  nodes.open(fname.c_str()); 
+  nodes << "this_node_id,latitude,longitude,elevation,drainage_area,receiver_node_id,segment_id,link_length" << endl;
+
+  // get list of all source junction IDs and all receiver junction node IDs
+  vector<int> source_nodes = JunctionVector;
+  vector<int> outlet_nodes = get_node_list_from_junction_list(ReceiverVector);
+
+  // loop through each source and divide each channel segment according to the target segment length
+  int SegmentID = 0;
+  int row, col, receiver_node;
+  double latitude, longitude;
+  float link_length, this_elev;
+  LSDCoordinateConverterLLandUTM Converter;
+  for (int i = 0; i < int(source_nodes.size()); i++)
+  {
+    // get these channel nodes
+    LSDIndexChannel ThisChannel(source_nodes[i], outlet_nodes[i], FlowInfo);
+    vector<int> node_list = ThisChannel.get_NodeSequence();
+    int n_nodes = int(node_list.size());
+
+    // work out the length of the channel segment
+    float chan_length = FlowInfo.get_flow_length_between_nodes(source_nodes[i], outlet_nodes[i]);
+    // work out how many nodes we need to take from this channel length. We will filter the channel node list to this node spacing.
+    int target_n_segments = round(chan_length/TargetSegmentLength);
+    cout << "Target number of segments: " << target_n_segments << ", channel length: " << chan_length << endl;
+    // logic for if we have less than 1 target segment (target segment length is less than the channel length).
+    // In this case we only write the source node.
+    if (target_n_segments < 1)
+    {
+      // get the elevation of this node
+      FlowInfo.retrieve_current_row_and_col(source_nodes[i],row,col);
+      this_elev = ElevationRaster.get_data_element(row,col);
+
+      // get the latitude and longitude of this node
+      FlowInfo.get_lat_and_long_from_current_node(source_nodes[i], latitude, longitude, Converter);
+
+      float da = DrainageArea.get_data_element(row,col);
+
+      // write the source node to the csv file
+      nodes << source_nodes[i] << "," << latitude << "," << longitude << "," << this_elev << "," << da << "," << outlet_nodes[i] << "," << SegmentID << endl;
+    }
+    
+    // if target number of nodes is greater or equal to 1, then work out the spacing based on the total number of nodes in the channel and the target number
+    else
+    {
+      int base_spacing = int(n_nodes/target_n_segments);
+      int leftover_nodes = n_nodes % target_n_segments;
+      // we cannot have spacings less than 1 node!
+      if(base_spacing < 1) { base_spacing = 1; }
+      // now loop through the channel list and take nodes defined by the spacing.
+      int used_nodes = 0;
+      for (int n = 0; n < n_nodes; n+=(base_spacing))
+      {
+        int start_node = node_list[n];
+        // get the elevation of this node
+        FlowInfo.retrieve_current_row_and_col(node_list[n],row,col);
+        this_elev = ElevationRaster.get_data_element(row,col);
+
+        // get the latitude and longitude of this node
+        FlowInfo.get_lat_and_long_from_current_node(node_list[n], latitude, longitude, Converter);
+
+        float da = DrainageArea.get_data_element(row,col);
+
+        // find the receiver node (+1 spacing). This logic is for any node except the last in the channel segment
+        if (n < (n_nodes - base_spacing))
+        {
+          // add on the remainder of the nodes divided evenly by segments
+          if (used_nodes < leftover_nodes)
+          {
+            n=n+1;
+          }
+          ++used_nodes;
+          receiver_node = node_list[n+base_spacing];
+          link_length = FlowInfo.get_flow_length_between_nodes(node_list[n], receiver_node);
+          // write the source node to the csv file
+          nodes << start_node << "," << latitude << "," << longitude << "," << this_elev << "," << da << "," << receiver_node << "," << SegmentID << "," << link_length << endl;
+        }
+        // if we are at the second to last node, then we need to make the outlet node the receiver.
+        else
+        {
+          receiver_node = outlet_nodes[i];
+          link_length = FlowInfo.get_flow_length_between_nodes(node_list[n], receiver_node);
+          // write the source node to the csv file
+          nodes << node_list[n] << "," << latitude << "," << longitude << "," << this_elev << "," << da << "," << receiver_node << "," << SegmentID << "," << link_length << endl;
+        }
+      }
+    }
+    ++SegmentID;
+  }
+
+  // close the csv files
+  nodes.close();
+
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
@@ -11309,5 +11423,36 @@ void LSDJunctionNetwork::calculate_upstream_elevations_network(string fname_pref
   WriteData.close();
 
 }
+
+//-----------------------------------------------------------//
+// Filter a map of nodes by distance to nearest channel
+// Look through the map and remove any nodes that are closer to
+// the channel than the threshold distance
+// FJC 22/08/22
+//-----------------------------------------------------------//
+map<int,int> LSDJunctionNetwork::filter_nodes_by_distance_to_channel(map<int,int> nodes, float threshold_dist, LSDFlowInfo& FlowInfo, LSDRaster& FlowDistance, int threshold_SO)
+{
+  map<int,int> filtered_nodes;
+  int this_node, this_SO;
+
+  map<int, int>::iterator it;
+  for (it = nodes.begin(); it != nodes.end(); it++) 
+  {
+    this_node = it->first;
+    this_SO = it->second;
+    int chan_node = find_nearest_downslope_channel(this_node, threshold_SO, FlowInfo);
+    cout << "this node: " << this_node << " chan node: " << chan_node <<endl;
+    float this_dist = FlowInfo.get_Euclidian_distance(this_node, chan_node);
+    cout << "this dist: " << this_dist << " threshold dist: " << threshold_dist << endl;
+    if (this_dist > threshold_dist)
+    {
+      // this node is farther away than the threshold distance, so we keep it
+      //filtered_nodes.insert(pair<int,int>(j, nodes[i]));
+      filtered_nodes[this_node] = this_SO;
+    }
+  }
+  return filtered_nodes;
+}
+
 
 #endif

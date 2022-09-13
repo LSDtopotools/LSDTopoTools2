@@ -733,15 +733,17 @@ void LSDRasterSpectral::detrend2D(Array2D<float>& zeta, Array2D<float>& zeta_det
   Array2D<float> A(3,3,0.0);
   Array1D<float> bb(3,0.0);
   Array1D<float> coeffs(3);
+  cout << "LRS Line 736" << endl;
   
   for (int i=0; i<NRows; ++i)
   {      
     for (int j=0; j<NCols; ++j)
     {
-      if(zeta[i][j] != NoDataValue)
+      if(zeta[i][j] != NoDataValue && zeta[i][j] > 0)
       {
         float x = j;
         float y = i;
+        //cout << "x " << x << " y " << y << "this zeta" << zeta[i][j] << endl;
         // Generate matrix A
         A[0][0] += pow(x,2);
         A[0][1] += x*y;
@@ -760,14 +762,17 @@ void LSDRasterSpectral::detrend2D(Array2D<float>& zeta, Array2D<float>& zeta_det
       }
     }
   }
+  cout << "LRS Line 764" << endl;
 
   // Solve matrix equations using LU decomposition using the TNT JAMA package:
   // A.coefs = b, where coefs is the coefficients vector.
   LU<float> sol_A(A);  // Create LU object
+  cout << "LRS Line 770" << endl;
   coeffs = sol_A.solve(bb);
   float a_plane = coeffs[0];
   float b_plane = coeffs[1];
   float c_plane = coeffs[2];
+  cout << "LRS Line 773" << endl;
 
   // Create detrended surface
   for (int i=0; i<NRows; ++i)
@@ -2009,6 +2014,7 @@ LSDRaster LSDRasterSpectral::fftw2D_wiener()
   Array2D<float> trend_plane(NRows,NCols);
   detrend2D(RasterData, zeta_detrend, trend_plane);
   WSS = 1; // dataset is not windowed
+  cout << "LRS Line 2012" << endl;
 
   //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   // 2D DISCRETE FAST FOURIER TRANSFORM
@@ -2032,6 +2038,7 @@ LSDRaster LSDRasterSpectral::fftw2D_wiener()
       }
     }
   }
+  cout << "LRS Line 2036" << endl;
   //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   // DO 2D FORWARD FAST FOURIER TRANSFORM
   int transform_direction = -1;
@@ -2039,11 +2046,14 @@ LSDRaster LSDRasterSpectral::fftw2D_wiener()
   Array2D<float> spectrum_imaginary(Ly,Lx);
   dfftw2D_fwd(zeta_padded, spectrum_real, spectrum_imaginary, transform_direction);
 
+  cout << "LRS Line 2044" << endl;
+
   //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   // REARRANGE SPECTRUM SO THAT ORIGIN IS AT THE CENTRE
   Array2D<float> spectrum_real_shift(Ly,Lx);
   Array2D<float> spectrum_imaginary_shift(Ly,Lx);
   shift_spectrum(spectrum_real, spectrum_imaginary, spectrum_real_shift, spectrum_imaginary_shift);
+  cout << "LRS Line 2051" << endl;
 
   //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   // INVERSE TRANSFORM
@@ -2056,6 +2066,7 @@ LSDRaster LSDRasterSpectral::fftw2D_wiener()
   Array2D<float> FilteredSpectrumImaginary(Ly,Lx,0.0);
   // SET FILTER PARAMETERS
   wiener_filter(spectrum_real_shift, spectrum_imaginary_shift, FilteredSpectrumReal, FilteredSpectrumImaginary);
+  cout << "LRS Line 2064" << endl;
 
   //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   // DE-SHIFT ORIGIN OF SPECTRUM
@@ -2063,7 +2074,7 @@ LSDRaster LSDRasterSpectral::fftw2D_wiener()
   Array2D<float> FilteredSpectrumReal_deshift(Ly,Lx);
   Array2D<float> FilteredSpectrumImaginary_deshift(Ly,Lx);
   shift_spectrum_inv(FilteredSpectrumReal, FilteredSpectrumImaginary, FilteredSpectrumReal_deshift, FilteredSpectrumImaginary_deshift);
-
+  cout << "LRS Line 2072" << endl;
   //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   // DO 2D INVERSE FAST FOURIER TRANSFORM
   transform_direction = 1;
@@ -2640,6 +2651,49 @@ LSDIndexRaster LSDRasterSpectral::IsolateChannelsWienerQQ(float area_threshold, 
   LSDIndexRaster channels(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,binary_array,GeoReferencingStrings);
   return channels;
 }
+
+// Same as Wiener technique above but use Perona Malik Filter
+LSDIndexRaster LSDRasterSpectral::IsolateChannelsPeronaMalikQQ(float area_threshold, float window_radius, string q_q_filename)
+{
+  cout << "\t Isolation of channelised pixels using curvature" << endl;   
+  // filter
+  cout << "\t\t Perona-Malik filter" << endl;
+  float slope_percentile = 90;
+  float dt = 0.1;
+  int timesteps = 20;
+  LSDRaster FilteredTopo = PeronaMalikFilter(timesteps, slope_percentile, dt);
+  // calculate curvature
+  vector<LSDRaster> output_rasters;
+//  float window_radius = 1;
+  vector<int> raster_selection(8,0.0);
+  raster_selection[6]=1;
+  cout << "\t\t Calculate tangential curvature" << endl;
+  output_rasters = FilteredTopo.calculate_polyfit_surface_metrics(window_radius, raster_selection);
+  LSDRaster curvature = output_rasters[6];
+  // use q-q plot to isolate the channels
+  cout << "\t\t Finding threshold using q-q plot" << endl;
+  //int half_width = 100;
+  LSDIndexRaster channels_init = curvature.IsolateChannelsQuantileQuantile(q_q_filename);
+  // Calculate D_inf
+  cout << "\t\t D_inf flow routing" << endl;
+  LSDRaster Area = FilteredTopo.D_inf();
+  // Reclassification of channel mask based on imposed threshold
+  Array2D<int> binary_array = channels_init.get_RasterData();
+  for(int i = 0; i<NRows; ++i)
+  {
+    for(int j = 0; j < NCols; ++j)
+    {
+      if(channels_init.get_data_element(i,j)!=channels_init.get_NoDataValue())
+      {
+        if(Area.get_data_element(i,j)<=area_threshold) binary_array[i][j] = 0;
+      }
+    }
+  }
+  
+  LSDIndexRaster channels(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,binary_array,GeoReferencingStrings);
+  return channels;
+}
+
 LSDIndexRaster LSDRasterSpectral::IsolateChannelsWienerQQAdaptive(float area_threshold, float window_radius, string q_q_filename)
 {
   cout << "\t Isolation of channelised pixels using curvature" << endl;   

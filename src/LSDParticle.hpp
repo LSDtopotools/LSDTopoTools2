@@ -637,7 +637,8 @@ class LSDCRNParticle: public LSDParticle
   void update_10Be_SSfull_depth_integrated(double erosion_rate, LSDCRNParameters& CRNp,
                                   double top_eff_depth, double bottom_eff_depth);
 
-  /// @brief A trainsient concentration of 10Be based on a step change in the erosion rate
+  /// @brief A transient concentration of 10Be based on a step change in the erosion rate
+  ///  this version sets the depth to zero
   /// @details This function solves for the updated concentration assuming
   /// particles eroded from the surface (in g/cm^2/yr). It is an analytical
   /// solution
@@ -648,8 +649,48 @@ class LSDCRNParticle: public LSDParticle
   /// to approximate production from the different production mechanisms
   /// @author SMM
   /// @date 25/05/2022
+  void update_10Be_step_change_surface(double erosion_old, double erosion_new, 
+                               double time_since_change, LSDCRNParameters& CRNp);
+
+
+  /// @brief A transient concentration of 10Be based on a step change in the erosion rate
+  /// @details This function solves for the updated concentration assuming
+  /// particles eroded from the surface (in g/cm^2/yr). It is an analytical
+  /// solution
+  /// @param erosion_old the old (steady state) erosion rate in g/cm^2/yr   POSITIVE FOR EROSION
+  /// @param erosion_old the new erosion rate in g/cm^2/yr   POSITIVE FOR EROSION  
+  /// @param time_since_change the time in years since the change happened. 
+  /// @param CRNp a CRN parameters object that stores the coefficients
+  /// to approximate production from the different production mechanisms
+  /// @author SMM
+  /// @date 04/07/2022
   void update_10Be_step_change(double erosion_old, double erosion_new, 
                                double time_since_change, LSDCRNParameters& CRNp);
+
+
+  /// @brief Bring the 10Be concentration to the concentration after a step change
+  ///  on a constant erosion rate using full muogenic production. This version
+  ///  is for a DEPTH INTEGRATED concentration and as such should only be used
+  ///  for basinwide calculations 
+  /// @details This function solves for the updated concentration assuming
+  /// a step change (in g/cm^2/yr). It is an analytical
+  /// solution
+  /// @param erosion_old the old (steady state) erosion rate in g/cm^2/yr   POSITIVE FOR EROSION
+  /// @param erosion_old the new erosion rate in g/cm^2/yr   POSITIVE FOR EROSION  
+  /// @param time_since_change the time in years since the change happened. 
+  /// @param CRNp a CRN parameters object that stores the coefficients
+  /// to approximate production from the different production mechanisms
+  /// @param top_eff_depth the effective depth g/cm^2 at the top of the
+  ///  section being depth-integrated
+  /// @param bottom_eff_depth the effective depth g/cm^2 at the bottom of the
+  ///  section being depth-integrated
+  /// @author SMM
+  /// @date 04/07/2022
+  void update_10Be_step_change_depth_integrated(double erosion_old, double erosion_new, 
+                               double time_since_change, LSDCRNParameters& CRNp,
+                                  double top_eff_depth, double bottom_eff_depth);
+
+
 
   /// @brief Bring the 26Al concentration to steady state based
   /// on a constant erosion rate using full muogenic production.  
@@ -683,7 +724,32 @@ class LSDCRNParticle: public LSDParticle
                                   double top_eff_depth, double bottom_eff_depth);
 
 
+
+  /// @brief Bring the 26Al concentration to the concentration after a step change
+  ///  on a constant erosion rate using full muogenic production. This version
+  ///  is for a DEPTH INTEGRATED concentration and as such should only be used
+  ///  for basinwide calculations 
+  /// @details This function solves for the updated concentration assuming
+  /// a step change (in g/cm^2/yr). It is an analytical
+  /// solution
+  /// @param erosion_old the old (steady state) erosion rate in g/cm^2/yr   POSITIVE FOR EROSION
+  /// @param erosion_old the new erosion rate in g/cm^2/yr   POSITIVE FOR EROSION  
+  /// @param time_since_change the time in years since the change happened. 
+  /// @param CRNp a CRN parameters object that stores the coefficients
+  /// to approximate production from the different production mechanisms
+  /// @param top_eff_depth the effective depth g/cm^2 at the top of the
+  ///  section being depth-integrated
+  /// @param bottom_eff_depth the effective depth g/cm^2 at the bottom of the
+  ///  section being depth-integrated
+  /// @author SMM
+  /// @date 04/07/2022
+  void update_26Al_step_change_depth_integrated(double erosion_old, double erosion_new, 
+                               double time_since_change, LSDCRNParameters& CRNp,
+                                  double top_eff_depth, double bottom_eff_depth);
+
+
   /// @brief A trainsient concentration of 26Al based on a step change in the erosion rate
+  ///  this version assumes particel has an effective depth of zero
   /// @details This function solves for the updated concentration assuming
   /// particles eroded from the surface (in g/cm^2/yr). It is an analytical
   /// solution
@@ -694,8 +760,24 @@ class LSDCRNParticle: public LSDParticle
   /// to approximate production from the different production mechanisms
   /// @author SMM
   /// @date 25/05/2022
+  void update_26Al_step_change_surface(double erosion_old, double erosion_new, 
+                               double time_since_change, LSDCRNParameters& CRNp);
+
+  /// @brief A trainsient concentration of 26Al based on a step change in the erosion rate
+  ///  this version assumes particel has an effective depth of zero
+  /// @details This function solves for the updated concentration assuming
+  /// particles eroded from the surface (in g/cm^2/yr). It is an analytical
+  /// solution
+  /// @param erosion_old the old (steady state) erosion rate in g/cm^2/yr   POSITIVE FOR EROSION
+  /// @param erosion_old the new erosion rate in g/cm^2/yr   POSITIVE FOR EROSION  
+  /// @param time_since_change the time in years since the change happened. 
+  /// @param CRNp a CRN parameters object that stores the coefficients
+  /// to approximate production from the different production mechanisms
+  /// @author SMM
+  /// @date 04/07/2022
   void update_26Al_step_change(double erosion_old, double erosion_new, 
                                double time_since_change, LSDCRNParameters& CRNp);
+
 
   /// @brief Bring the 14C concentration to steady state based
   /// on a constant erosion rate using full muogenic production.  
@@ -728,6 +810,48 @@ class LSDCRNParticle: public LSDParticle
   void update_14C_SSfull_depth_integrated(double erosion_rate, 
                                   LSDCRNParameters& CRNp,
                                   double top_eff_depth, double bottom_eff_depth);
+
+
+  /// @brief Bring the 14C concentration to the concentration after a step change
+  ///  on a constant erosion rate using full muogenic production. This version
+  ///  is for a DEPTH INTEGRATED concentration and as such should only be used
+  ///  for basinwide calculations 
+  /// @details This function solves for the updated concentration assuming
+  /// a step change (in g/cm^2/yr). It is an analytical
+  /// solution
+  /// @param erosion_old the old (steady state) erosion rate in g/cm^2/yr   POSITIVE FOR EROSION
+  /// @param erosion_old the new erosion rate in g/cm^2/yr   POSITIVE FOR EROSION  
+  /// @param time_since_change the time in years since the change happened. 
+  /// @param CRNp a CRN parameters object that stores the coefficients
+  /// to approximate production from the different production mechanisms
+  /// @param top_eff_depth the effective depth g/cm^2 at the top of the
+  ///  section being depth-integrated
+  /// @param bottom_eff_depth the effective depth g/cm^2 at the bottom of the
+  ///  section being depth-integrated
+  /// @author SMM
+  /// @date 04/07/2022
+  void update_14C_step_change_depth_integrated(double erosion_old, double erosion_new, 
+                               double time_since_change, LSDCRNParameters& CRNp,
+                                  double top_eff_depth, double bottom_eff_depth);
+
+
+
+
+
+  /// @brief A trainsient concentration of 14C based on a step change in the erosion rate
+  ///  this version assumes effective depth is zero
+  /// @details This function solves for the updated concentration assuming
+  /// particles eroded from the surface (in g/cm^2/yr). It is an analytical
+  /// solution
+  /// @param erosion_old the old (steady state) erosion rate in g/cm^2/yr   POSITIVE FOR EROSION
+  /// @param erosion_old the new erosion rate in g/cm^2/yr   POSITIVE FOR EROSION  
+  /// @param time_since_change the time in years since the change happened. 
+  /// @param CRNp a CRN parameters object that stores the coefficients
+  /// to approximate production from the different production mechanisms
+  /// @author SMM
+  /// @date 25/05/2022
+  void update_14C_step_change_surface(double erosion_old, double erosion_new, 
+                              double time_since_change, LSDCRNParameters& CRNp);
 
   /// @brief A trainsient concentration of 14C based on a step change in the erosion rate
   /// @details This function solves for the updated concentration assuming

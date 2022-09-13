@@ -86,7 +86,7 @@
 int main (int nNumberofArgs,char *argv[])
 {
 
-  string version_number = "0.7d";
+  string version_number = "0.7";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -269,7 +269,12 @@ int main (int nNumberofArgs,char *argv[])
   help_map["snow_MaximumSlope"] = {  "float","0.05", "A parameter for the Richards snowpack method","You need to fit all the snowpack parameters using some python code and then adjust the parameters for the snowpack in the parameter file"};
 
 
-
+  //..####....####...######..#####...##..##...........####...##...##..######..######...####...##..##..######...####..
+  //.##..##..##..##....##....##..##..###.##..........##......##...##....##......##....##..##..##..##..##......##.....
+  //.##......######....##....#####...##.###...........####...##.#.##....##......##....##......######..####.....####..
+  //.##..##..##..##....##....##..##..##..##..............##..#######....##......##....##..##..##..##..##..........##.
+  //..####...##..##..######..##..##..##..##...........####....##.##...######....##.....####...##..##..######...####..
+  //
   // These are for the erosion rate calculations
   bool_default_map["calculate_erosion_rates"] = false;
   help_map["calculate_erosion_rates"] = {  "bool","false", "The basic CAIRN routine that just gets the erosion rate for each CRN point","See Mudd et al 2016 ESURF for details"};
@@ -296,7 +301,12 @@ int main (int nNumberofArgs,char *argv[])
   help_map["print_scaling_and_shielding_rasters"] = {  "bool","false", "Prints scaling and shielding rasters.","You can recycle the production raster in other analyses such as forward modelling of 10Be concentrations under different erosion scenarios"};
 
 
-  
+  // ..####....####...##......##..##..##...##..##..##..........######..######...####...######.
+  // .##..##..##..##..##......##..##..###.###..###.##............##....##......##........##...
+  // .##......##..##..##......##..##..##.#.##..##.###............##....####.....####.....##...
+  // .##..##..##..##..##......##..##..##...##..##..##............##....##..........##....##...
+  // ..####....####...######...####...##...##..##..##............##....######...####.....##...
+  //     
   // The stuff below here is for testing columns of particles
   bool_default_map["transient_column_calculator"] = false;
   help_map["transient_column_calculator"] = {  "bool","false", "A tool that allows calculation of multiple nuclides in a column of rock.","Used for testing some of the transient concentration scenarios."};
@@ -312,6 +322,15 @@ int main (int nNumberofArgs,char *argv[])
  
   float_default_map["total_shielding_test"] = 1;
   help_map["total_shielding_test"] = {  "float","1", "The total shielding value for testing the CRN concentrations of particles.","This is used so you don't have to test shielding."};
+
+  float_default_map["transient_effective_depth_test_top"] = 0;
+  help_map["transient_effective_depth_test_top"] = {  "float","0", "For testing particle concentrations. This is the top depth for depth integrated calculations.","In g/cm^2."};
+
+  float_default_map["transient_effective_depth_test_bottom"] = 0;
+  help_map["transient_effective_depth_test_bottom"] = {  "float","0", "For testing particle concentrations. This is the bottom depth for depth integrated calculations.","In g/cm^2."};
+
+  float_default_map["transient_effective_depth_test"] = 0;
+  help_map["transient_effective_depth_test"] = {  "float","0", "For testing the particle concentrations. This is the effective depth for the test.","In g/cm^2."};
 
 
   // Some names for shielding and production rasters
@@ -338,6 +357,13 @@ int main (int nNumberofArgs,char *argv[])
   help_map["nuclide_for_prediction"] = {  "string","Be10", "The nuclide to be used for prediction","Options are Be10:C14:Al26:Cl36"};
    
 
+
+  //.######...####...#####...##...##...####...#####...#####...........#####....####...#####....####...##...##...####..
+  //.##......##..##..##..##..##...##..##..##..##..##..##..##..........##..##..##..##..##..##..##..##..###.###..##.....
+  //.####....##..##..#####...##.#.##..######..#####...##..##..........#####...######..#####...######..##.#.##...####..
+  //.##......##..##..##..##..#######..##..##..##..##..##..##..........##......##..##..##..##..##..##..##...##......##.
+  //.##.......####...##..##...##.##...##..##..##..##..#####...........##......##..##..##..##..##..##..##...##...####..
+  //
   // The stuff below here is all for creating rasters for forward prediction of 
   // erosion rates.
   // Note the effective erosion rate is in g/cm^2/yr
@@ -932,13 +958,16 @@ int main (int nNumberofArgs,char *argv[])
     // the total shielding. A product of snow, topographic and production scaling
     double total_shielding = this_float_map["total_shielding_test"];
 
+    double test_top_effective_depth = double(this_float_map["transient_effective_depth_test_top"]);
+    double test_bottom_effective_depth = double(this_float_map["transient_effective_depth_test_bottom"]);
+
     // initiate a particle. We'll just repeatedly call this particle
     // for the sample.
     int startType = 0;
     double Xloc = 0;
     double Yloc = 0;
     double  startdLoc = 0.0;
-    double  start_effdloc = 0.0;
+    double  start_effdloc = double(this_float_map["transient_effective_depth_test"]);
     double startzLoc = 0.0;
 
     // create a particle at zero depth
@@ -1012,6 +1041,7 @@ int main (int nNumberofArgs,char *argv[])
 
     if(this_string_map["column_mode"] == "step_change")
     { 
+      cout << "I am now going to simulate a step change in erosion rate" << endl;
       // get the nuclide concentration from this node
       if (Nuclide == "Be10")
       {
@@ -1052,7 +1082,57 @@ int main (int nNumberofArgs,char *argv[])
       }  
       cout << "Okay, I got particle with a step change." << endl;
       cout << "The nuclide is "<< Nuclide << endl;
-      cout << "The initial ersion rate is: " << this_float_map["effective_erosion_rate"] << " and the new erosion rate is: " << this_float_map["effective_erosion_rate_new"] << endl;
+      cout << "The depth of the particle, in effective depth units (g/cm^2) is: " << this_float_map["transient_effective_depth_test"] << endl;
+      cout << "The initial erosion rate is: " << this_float_map["effective_erosion_rate"] << " and the new erosion rate is: " << this_float_map["effective_erosion_rate_new"] << endl;
+      cout << "The time since the step is: " << this_float_map["time_since_step"] << endl;
+      cout << " The concentration is: " << this_conc << " atoms/g"<< endl;  
+    }
+    else if(this_string_map["column_mode"] == "step_change_depth_integrated")
+    { 
+      cout << "I am now going to simulate a step change in erosion rate with depth integration" << endl;
+
+      // get the nuclide concentration from this node
+      if (Nuclide == "Be10")
+      {
+        //cout << "LInE 2271, 10Be" << endl;
+        eroded_particle.update_10Be_step_change_depth_integrated(this_float_map["effective_erosion_rate"], 
+                                               this_float_map["effective_erosion_rate_new"], 
+                                               this_float_map["time_since_step"],
+                                               LSDCRNP, test_top_effective_depth, test_bottom_effective_depth);
+        this_conc=eroded_particle.getConc_10Be();
+      }
+      else if (Nuclide == "Al26")
+      {
+        eroded_particle.update_26Al_step_change_depth_integrated(this_float_map["effective_erosion_rate"], 
+                                               this_float_map["effective_erosion_rate_new"], 
+                                               this_float_map["time_since_step"],
+                                               LSDCRNP, test_top_effective_depth, test_bottom_effective_depth);
+        this_conc=eroded_particle.getConc_26Al();
+      }
+      else if (Nuclide == "C14")
+      {
+        
+        eroded_particle.update_14C_step_change_depth_integrated(this_float_map["effective_erosion_rate"], 
+                                               this_float_map["effective_erosion_rate_new"], 
+                                               this_float_map["time_since_step"],
+                                               LSDCRNP, test_top_effective_depth, test_bottom_effective_depth);
+        this_conc=eroded_particle.getConc_14C();
+      }
+      else
+      {
+        cout << "You didn't give a valid nuclide. You chose: " << Nuclide << endl;
+        cout << "Choices are Be10, Al26 or C14.  Note these case sensitive and cannot" << endl;
+        cout << "contain spaces or control characters. Defaulting to Be10." << endl;
+        eroded_particle.update_10Be_step_change_depth_integrated(this_float_map["effective_erosion_rate"], 
+                                               this_float_map["effective_erosion_rate_new"], 
+                                               this_float_map["time_since_step"],
+                                               LSDCRNP, test_top_effective_depth, test_bottom_effective_depth);
+        this_conc=eroded_particle.getConc_10Be();
+      }  
+      cout << "Okay, I got particle with a step change. This is DEPTH INTEGRATED" << endl;
+      cout << "The nuclide is "<< Nuclide << endl;
+      cout << "The top and  bottom effective depths are: " << test_top_effective_depth << ", " <<  test_bottom_effective_depth << endl;
+      cout << "The initial erosion rate is: " << this_float_map["effective_erosion_rate"] << " and the new erosion rate is: " << this_float_map["effective_erosion_rate_new"] << endl;
       cout << "The time since the step is: " << this_float_map["time_since_step"] << endl;
       cout << " The concentration is: " << this_conc << " atoms/g"<< endl;  
     }

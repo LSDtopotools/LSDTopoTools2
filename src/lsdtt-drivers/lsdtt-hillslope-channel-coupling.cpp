@@ -1,4 +1,4 @@
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+ //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //
 // lsdtt-hillslope-channel-coupling.cpp
 //
@@ -81,7 +81,7 @@
 int main (int nNumberofArgs,char *argv[])
 {
 
-  string version_number = "0.7d";
+  string version_number = "0.7";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -198,6 +198,9 @@ int main (int nNumberofArgs,char *argv[])
   float_default_map["surface_fitting_radius"] = 12;
   help_map["surface_fitting_radius"] = {  "float","12","Our surface fitting routines fit a polynomial over the points with in a radius defined by surface_fitting_radius and then differentiate this surface to get the surface metrics like gradient and curvature","If not bigger than the pixel_size*sqrt(2) then will increase to that number."};
 
+  bool_default_map["use_spiral_trimmer_for_edge_influence"] = false;
+  help_map["use_spiral_trimmer_for_edge_influence"] = {  "bool","false","Makes sure raster is rectangular before running drainage extraction.","Use this if you want to avoid edge effects of your flow routing that can cause seg faults."};
+
 
   // Channel extraction
   bool_default_map["print_wiener_channels"] = false;
@@ -229,7 +232,13 @@ int main (int nNumberofArgs,char *argv[])
   int_default_map["Threshold_Hilltop_Contributing_Pixels"] = 1;
   help_map["Threshold_Hilltop_Contributing_Pixels"] = {  "int","1","Hilltops with greater than this number of contributing pixels are removed from the analysis.","Used to remove ridgetops that are getting sediment from adjacent hilltop pixels."};
 
+  int_default_map["Threshold_Distance_From_Channel"] = 0;
+  help_map["Threshold_Distance_From_Channel"] = { "int","0","Hilltops closer to the channel than this distance (in metres) will be removed from the ridge extraction.","Used to filter network to remove pixels close to channel. You can set the threshold stream order that will be used using the Threshold_Stream_Order parameter."};
 	 
+  int_default_map["Threshold_Stream_Order"] = 1;
+  help_map["Threshold_Stream_Order"] = { "int","1","Used to determine which channels will be used to filter the ridge network to remove hilltops close to the channel network.","Default is 1 which means all channels will be considered."};
+
+
   // This is all for legacy HFR
   bool_default_map["complete_hilltop_masking"] = true;
   help_map["complete_hilltop_masking"] = {  "bool","false","Legacy hilltop flow routing. Runs all the masking routines.","Legacy code only. Use run_HFR_analysis now."};
@@ -487,7 +496,7 @@ int main (int nNumberofArgs,char *argv[])
   string CHeads_file = LSDPP.get_CHeads_file();
   string BaselevelJunctions_file = LSDPP.get_BaselevelJunctions_file();
   string ChannelSegments_file = LSDPP.get_ChannelSegments_file();
-  string Floodplain_file = LSDPP.get_Floodplain_file();
+  string Floodplain_file = this_string_map["Floodplain_file"];
 
   if(f_name == "cry_for_help.txt")
   {
@@ -706,6 +715,15 @@ int main (int nNumberofArgs,char *argv[])
     filled_topography = topography_raster.fill(this_float_map["min_slope_for_fill"]);
   }
 
+  if( this_bool_map["use_spiral_trimmer_for_edge_influence"])
+  {
+    LSDRaster SpiralTrim = filled_topography.RasterTrimmerSpiral();
+    filled_topography = SpiralTrim;
+    cout << "Warning, I have replaced the edges of your DEM with nodata" << endl;
+    cout << "This usually means I am trying to remove nodes influence by the edge" << endl;
+    filled_topography.replace_edges_with_nodata();
+  }
+
   if (this_bool_map["print_fill_raster"])
   {
     string filled_raster_name = OUT_DIR+OUT_ID+"_Fill";
@@ -729,6 +747,14 @@ int main (int nNumberofArgs,char *argv[])
     cout << "I'm reading in a pre-calculated curvature raster." << endl;
     cout << "NOTE: This will overwrite the curvature calculated through polynomial surface fitting" << endl;
     LSDRaster curvature_raster((DATA_DIR+this_string_map["curvature_fname"]),raster_ext);
+    if( this_bool_map["use_spiral_trimmer_for_edge_influence"])
+    {
+      LSDRaster SpiralTrim = curvature_raster.RasterTrimmerSpiral();
+      curvature_raster = SpiralTrim;
+      cout << "Warning, I have replaced the edges of your DEM with nodata" << endl;
+      cout << "This usually means I am trying to remove nodes influence by the edge" << endl;
+      curvature_raster.replace_edges_with_nodata();
+    }
     Surfaces[3] = curvature_raster;
   }
 
@@ -856,6 +882,15 @@ int main (int nNumberofArgs,char *argv[])
     exit(0);
   }
 
+  //=============================================================================================
+  //  
+  //.######..........##..##..######..######..##...##...####...#####...##..##.
+  //.....##..........###.##..##........##....##...##..##..##..##..##..##.##..
+  //.....##..........##.###..####......##....##.#.##..##..##..#####...####...
+  //.##..##..........##..##..##........##....#######..##..##..##..##..##.##..
+  //..####...........##..##..######....##.....##.##....####...##..##..##..##.
+  //
+  //=============================================================================================
   // now get the junction network
   cout << "\t I am now getting the junction network..." << endl;
   LSDJunctionNetwork JunctionNetwork(sources, FlowInfo);
@@ -932,6 +967,15 @@ int main (int nNumberofArgs,char *argv[])
     JIArray.write_raster(JI_raster_name,raster_ext);
   }
 
+  //=================================================================================================================== 
+  //
+  //..####...######..#####...######...####...##...##..........##..##..######..######..##...##...####...#####...##..##.
+  //.##........##....##..##..##......##..##..###.###..........###.##..##........##....##...##..##..##..##..##..##.##..
+  //..####.....##....#####...####....######..##.#.##..........##.###..####......##....##.#.##..##..##..#####...####...
+  //.....##....##....##..##..##......##..##..##...##..........##..##..##........##....#######..##..##..##..##..##.##..
+  //..####.....##....##..##..######..##..##..##...##..........##..##..######....##.....##.##....####...##..##..##..##.
+  //
+  //=================================================================================================================== 
   //set up the stream network to get index raster for channel mapping
 	LSDIndexRaster StreamNetwork;
 	if (ChannelSegments_file == "NULL" || ChannelSegments_file == "Null" || ChannelSegments_file == "null")
@@ -957,11 +1001,22 @@ int main (int nNumberofArgs,char *argv[])
   if (Floodplain_file == "NULL" || Floodplain_file == "Null" || Floodplain_file == "null") {}
   else
   {
+    cout << endl << endl << endl << "=============================" << endl;
     cout << "\tCombining the channelnetwork and floodplain masks..." << endl;
 		LSDIndexRaster Floodplains((Floodplain_file), raster_ext);
 		StreamNetwork.MergeIndexRasters(Floodplains);
 	}
 
+
+
+  //=================================================================================
+  //.#####....####....####...######..##..##...####..
+  //.##..##..##..##..##........##....###.##..##.....
+  //.#####...######...####.....##....##.###...####..
+  //.##..##..##..##......##....##....##..##......##.
+  //.#####...##..##...####...######..##..##...####..
+  //................................................ 
+  //=================================================================================   
   //Check to see if a list of junctions for extraction exists
   // need to get base-level nodes , otherwise these catchments will be missed!
   vector< int > BaseLevelJunctions;
@@ -1378,6 +1433,14 @@ int main (int nNumberofArgs,char *argv[])
     cout << "\tExtracting hilltop network the new way" << endl;
     map<int,int> hilltop_nodes = JunctionNetwork.ExtractAllRidges(FlowInfo);
 
+    map<int,int> filtered_hilltop_nodes;
+    // remove hilltops near to the channel
+    if (this_int_map["Threshold_Distance_From_Channel"] > 0)
+    {
+      filtered_hilltop_nodes = JunctionNetwork.filter_nodes_by_distance_to_channel(hilltop_nodes, this_int_map["Threshold_Distance_From_Channel"], FlowInfo, DistanceFromOutlet, this_int_map["Threshold_Stream_Order"]);
+    }
+    else { filtered_hilltop_nodes = hilltop_nodes; }
+
     map<int, vector<int> > full_hilltop_int_map;
     map<int, vector<float> > full_hilltop_float_map;
     map<int, vector<double> > full_hilltop_latlong_map;
@@ -1401,7 +1464,7 @@ int main (int nNumberofArgs,char *argv[])
     vector<int> hilltop_int_vec(5,0);
     vector<float> hilltop_float_vec(2,0);
     vector<double> hilltop_latlong_vec(2,0);
-    for (it = hilltop_nodes.begin(); it != hilltop_nodes.end(); it++)  
+    for (it = filtered_hilltop_nodes.begin(); it != filtered_hilltop_nodes.end(); it++)  
     {
       this_node = it->first;
       this_SO = it->second;
@@ -1524,7 +1587,7 @@ int main (int nNumberofArgs,char *argv[])
       }
 
       vector<int> Target_Basin_Vector;   // this doesn't actually do anything
-      cout << "I am using the legacy hilltop flow routing." << endl << "Note I cannot select basins this way" << endl;
+      cout << "NOTE I am using the legacy hilltop flow routing." << endl;
       auto t1 = std::chrono::high_resolution_clock::now();
       vector< Array2D<float> >HFR_Arrays = FlowInfo.HilltopFlowRouting_Refactored(filled_topography, Hilltops, 
                                                             Surfaces[1], Surfaces[2], Surfaces[3], Surfaces[4], 
@@ -1678,11 +1741,9 @@ int main (int nNumberofArgs,char *argv[])
     int n_ht = int( ht_row_vec.size());
     for (int htn = 0; htn < n_ht; htn++)
     {
-
-       
-      
       // get the nodeindex, then search for the key
-      this_chan_ni = FlowInfo.get_NodeIndex_from_row_col(chan_row_vec[htn],chan_col_vec[htn]);
+      this_chan_ni = FlowInfo.retrieve_node_from_row_and_column(chan_row_vec[htn],chan_col_vec[htn]);
+      //cout << "This channel node: " << this_chan_ni << endl;
 
       if ( segment_data_map.find(this_chan_ni) == segment_data_map.end() )
       {
