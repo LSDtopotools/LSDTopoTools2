@@ -68,7 +68,7 @@
 int main (int nNumberofArgs,char *argv[])
 {
 
-  string version_number = "0.7";
+  string version_number = "0.8";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -212,9 +212,6 @@ int main (int nNumberofArgs,char *argv[])
 
   bool_default_map["isolate_pixels_draining_to_fixed_channel"] = false;
   help_map["isolate_pixels_draining_to_fixed_channel"] = {  "bool","false","Runs flow routing and only take nodes that drain into a list of nodes defined in the fixed_channel_csv_name csv file.","Use this if you want to isolate a main drainage pathway."};
-
-  string_default_map["fixed_channel_csv_name"] = "single_channel_nodes";
-  help_map["fixed_channel_csv_name"] = {  "string","single_channel_nodes","A list of nodes in csv where each row has lititude and longitude that is used to define a fixed channel in the DEM. Filename does not include the csv extension.","The csv file must have latitude and longitude in the column headers."};
 
   //========================================================
   // raster trimming, to take care of rasters that have a bunch of nodata at the edges
@@ -492,7 +489,7 @@ int main (int nNumberofArgs,char *argv[])
 
   // centre channel nodes and interpolate across gaps
   bool_default_map["centre_and_interpolate_channel_coordinates"] = false;
-  help_map["centre_and_interpolate_channel_coordinates"] = {  "bool","true","This takes channel nodes that might not be exactly in the centre of pixels (possibly because they came from a different projection) and snaps them to pixel centres","Used for mapping channels from different projections onto a raster"};
+  help_map["centre_and_interpolate_channel_coordinates"] = {  "bool","false","This takes channel nodes that might not be exactly in the centre of pixels (possibly because they came from a different projection) and snaps them to pixel centres","Used for mapping channels from different projections onto a raster"};
 
   string_default_map["X_column_name"] = "X";
   help_map["X_column_name"] = {  "string","X","For channels that use projected data this is the X column name (sometimes called Easting)","Some csv files will have this of easting or some variant thereof"};
@@ -503,6 +500,11 @@ int main (int nNumberofArgs,char *argv[])
   // for reading in a channel csv file
   bool_default_map["use_xy_for_node_index"] = false;
   help_map["use_xy_for_node_index"] = {  "bool","true","For routine from centre_and_interpolate_channel_coordinates this uses easting and northing instead of lat long","Preferred method is lat-long coordinates this is a legacy option"};
+
+  // this converts from files that are sent by nagra to a working single channel
+  bool_default_map["prepare_single_channel_from_xy"] = false;
+  help_map["prepare_single_channel_from_xy"] = {  "bool","false","This is a wrapper function that takes pixel x,y locations and attempts to create a single channel file with lat-long, area, flow distance, etc","Used to impose a channel from a different source onto a raster. This is designed for nagra work but might have future applications."};
+
 
 
   // Basic channel network
@@ -530,6 +532,12 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["print_junctions_to_csv"] = false;
   help_map["print_junctions_to_csv"] = {  "bool","false","Prints a csv with the locations and numbers of the junctions.","This is better to use than the raster version."};
  
+  bool_default_map["print_channel_tips_raster"] = false;
+  help_map["print_channel_tips_raster"] = {  "bool","false","This prints a raster with only the channel tips. It follows from the source down a number of pixels defined by channel_tips_pixel_distance","Extracts only the tips of the channel network. We use this when comparing topographically extracted channels with channels found using optical and radar satellite data."};
+ 
+  int_default_map["channel_tips_pixel_distance"] = 10;
+  help_map["channel_tips_pixel_distance"] = {  "int","10","The number of contributing pixels needed to start a channel using the threshold method.","This is in pixels not drainage area. More options are in the lsdtt-channel-extraction tool."};
+
 
   // Basin-based channel extraction
   bool_default_map["find_basins"] = false;
@@ -611,6 +619,18 @@ int main (int nNumberofArgs,char *argv[])
   float_default_map["upslope_tagging_distance"] = 100;
   help_map["upslope_tagging_distance"] = {  "float","100","The distance through the flow network in metres cells will be tagged.","Make this number big if you want to follow through the entire drainage network."};
  
+  bool_default_map["tag_nodes_from_categorised_channel"] = false;
+  help_map["tag_nodes_from_categorised_channel"] = {  "bool","false","This will read the channel file single_channel_csv and then take a column and categories it based on the boundary values in category_boundaries.","The data to be categorised is given by column_to_categorise. Most useful to get at drainage divides"};
+    
+  string_default_map["category_boundaries"] = "0";
+  help_map["category_boundaries"] = { "string","0","This is a comma separated string into which you place category boundaries.","This will be automatically sorted to the order of the values does not matter. Used with tag_nodes_from_categorised_channel"};
+
+  string_default_map["column_to_categorise"] = "flow_distance";
+  help_map["column_to_categorise"] = {  "string","flow_distance","If you are categorising nodes in a channel this is the column that is categorised.","Used with tag_nodes_from_categorised_channel and the boundaries are set by category_boundaries"};
+
+  string_default_map["random_seed_for_categorisation_test"] = 10;
+  help_map["random_seed_for_categorisation_test"] = {  "int","10","Allows you to input a seed for the categorisation test only","This seed only works on the categorisation test and nowhere else"};
+
 
   // Some chi coordinate settings
   float_default_map["A_0"] = 1.0;
@@ -625,7 +645,7 @@ int main (int nNumberofArgs,char *argv[])
   if (bool_default_map["print_chi_data_maps"] == true)
   {
     cout << "You want the chi data maps, so I am setting the basin finding to true." << endl;
-    bool_default_map["print_chi_data_maps"] = true;
+    bool_default_map["find_basins"] = true;
   }
 
   // The wiener filter
@@ -658,8 +678,8 @@ int main (int nNumberofArgs,char *argv[])
 
 
   // Now for connectivity
-  bool_default_map["calculate_connectivity_index"] = false;
-  help_map["calculate_connectivity_index"] = {  "bool","false","Calculates the connectivity index NOT WORKING YET.","Based on https://doi.org/10.1016/j.cageo.2017.10.009"};
+  //bool_default_map["calculate_connectivity_index"] = false;
+  //help_map["calculate_connectivity_index"] = {  "bool","false","Calculates the connectivity index NOT WORKING YET.","Based on https://doi.org/10.1016/j.cageo.2017.10.009"};
 
   // calculate the hypsometric integral for the channel network
   bool_default_map["calculate_hypsometric_integral"] = false;
@@ -674,6 +694,50 @@ int main (int nNumberofArgs,char *argv[])
   float_default_map["HI_upper_limit"] = 8000;
   help_map["HI_upper_limit"] = {  "float","0","The highest elevation in the hypsometric integral.","Should be set by examining the elevation range in your DEM to get a reasonable bin width."};
  
+
+  // Steady state parameters
+  bool_default_map["create_a_steady_landscape"] = false;
+  help_map["create_a_steady_landscape"] = {  "bool","false","Turn on to create a steady state landscape initiated by the diamond square algorithm.","Used to quickly spin up steady landscapes."};
+
+  float_default_map["steady_state_resolution"] = 30.0;
+  help_map["steady_state_resolution"] = {  "float","30.0","Grid spacing in a synthetic steady state landscape.","Used to quickly spin up steady landscapes."};
+
+  int_default_map["steady_state_nrows"] = 200;
+  help_map["steady_state_nrows"] = {  "int","200","Number of rows in a synthetic steady state landscape.","Used to quickly spin up steady landscapes."};
+
+  int_default_map["steady_state_ncols"] = 400;
+  help_map["steady_state_ncols"] = {  "int","400","Number of column in a synthetic steady state landscape.","Used to quickly spin up steady landscapes."};
+
+  int_default_map["steady_state_n_cycles"] = 20;
+  help_map["steady_state_n_cycles"] = {  "int","20","The number of cycles to use in the steady state landscape.","Increased cycles ensure landscape is fully dissected."};
+
+  int_default_map["steady_state_ds_feature_order"] = 3;
+  help_map["steady_state_ds_feature_order"] = {  "int","3","For the steady state landscape this is the diamond square feature order which contols how repetituve the landscape is.","Values between 3 and 6 are usually fine."};
+
+  float_default_map["random_seed"] = 1.0;
+  help_map["random_seed"] = {  "float","1.0","The seed you use for random values","For routines that have randomness this sets the seed. Values will be random but you will get the same numbers if you use the same seed. Only implemented for the steady state landscape at the moment."};
+
+  int_default_map["snap_print_rate"] = 10;     // how frequently the snapping is printed in terms of snap cycles
+  help_map["snap_print_rate"] = {  "int","10","This prints the DEM evey n cycles set by this parameters.","Used to just get the last few snaps for an animation."};
+
+  float_default_map["steady_state_n"] = 1.0;
+  help_map["steady_state_n"] = {  "float","1.0","The n value for the steady state simulation.","Used only in steady state computations."};
+
+  float_default_map["steady_state_m"] = 0.45;
+  help_map["steady_state_m"] = {  "float","0.45","The m value for the steady state simulation.","Used only in steady state computations."};
+
+  float_default_map["steady_state_threshold_hillslope_area"] = 100000.0;
+  help_map["steady_state_threshold_hillslope_area"] = {  "float","100000.0","Threshold drainage area for a hillslope pixel in m^2 for steady state simulations.","Used only in steady state computations."};  
+
+  float_default_map["steady_state_threshold_hillslope_gradient"] = 0.4;
+  help_map["steady_state_threshold_hillslope_gradient"] = {  "float","0.4","Threshold gradient hillslope pixel in m^2 for steady state simulations.","Used only in steady state computations."};  
+
+  float_default_map["steady_state_U"] = 0.0004;
+  help_map["steady_state_U"] = {  "float","0.0004","Uplift rate in m/yr for steady state simulations.","Used only in steady state computations."};  
+
+  float_default_map["steady_state_target_fluvial_relief"] = 200.0;
+  help_map["steady_state_target_fluvial_relief"] = {  "float","200.0","Target relief in metres for steady state simulations.","Used only in steady state computations."};  
+
 
   //=========================================================================
   //
@@ -724,21 +788,105 @@ int main (int nNumberofArgs,char *argv[])
   cout << "Read filename is: " <<  DATA_DIR+DEM_ID << endl;
   cout << "Write filename is: " << OUT_DIR+OUT_ID << endl;
 
-    // check to see if the raster exists
-  LSDRasterInfo RI((DATA_DIR+DEM_ID), raster_ext);
-
   // A little switch to find basins if you supply an outlet file
   if( this_bool_map["get_basins_from_outlets"] )
   {
     this_bool_map["find_basins"] = true;
   }
 
-
   // Some switches to turn on the connectivity index
   if ( this_bool_map["calculate_connectivity_index"])
   {
     this_bool_map["print_dinf_drainage_area_raster"] = true;    
   }
+
+  //============================================================================
+  //
+  //..####...######..######...####...#####...##..##...........####...######...####...######..######.........
+  //.##........##....##......##..##..##..##...####...........##........##....##..##....##....##.............
+  //..####.....##....####....######..##..##....##.............####.....##....######....##....####...........
+  //.....##....##....##......##..##..##..##....##................##....##....##..##....##....##.............
+  //..####.....##....######..##..##..#####.....##.............####.....##....##..##....##....######.........
+  //
+  //============================================================================
+  if (this_bool_map["create_a_steady_landscape"])
+  {
+    cout << endl << endl << endl << endl << "<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]" << endl;
+    cout << "Hello, I am going to create a steady state landscape for you." << endl;
+    cout << "I will use this steady landscape for all further analyses you requested." << endl;
+    cout << "<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]" << endl;    
+
+    // Initiate the DEM
+    LSDRasterMaker RM;
+    float placeholder_elevation = 1.0;
+    RM.resize_and_reset(this_int_map["steady_state_nrows"],this_int_map["steady_state_ncols"],
+                         this_float_map["steady_state_resolution"],placeholder_elevation);
+
+
+    long this_seed = long(this_float_map["random_seed"]);
+    float noise_relief = 0.25; // set the noise to something small;
+    float ds_relief = 10;
+    float parabola_relief = 10;
+
+    // Now run the diamond square 
+    RM.create_diamond_square_surface(this_int_map["steady_state_ds_feature_order"], ds_relief, 
+                    noise_relief, parabola_relief, this_float_map["min_slope_for_fill"], &this_seed);
+
+    // Add a parabolic surface (this forces the basins to drain to the )
+
+    // Print the DS surface with hillshade
+    
+    string DS_initial_fname = DATA_DIR+DEM_ID+"_ds_initial";
+    LSDRaster DS_initial = RM.return_as_raster();
+    DS_initial.write_raster(DS_initial_fname,"bil");
+
+    float hs_azimuth = 315;
+    float hs_altitude = 45;
+    float hs_z_factor = 1;
+    LSDRaster hs_raster = DS_initial.hillshade(hs_altitude,hs_azimuth,hs_z_factor);
+
+    string hs_fname = DATA_DIR+DEM_ID+"_ds_initial_hs";
+    hs_raster.write_raster(hs_fname,raster_ext);
+
+    // Tune the K value for the desired relief
+    float target_K = RM.tune_K_for_relief(this_float_map["steady_state_U"], 
+                         this_float_map["steady_state_target_fluvial_relief"],
+                         this_float_map["steady_state_m"],
+                         this_float_map["steady_state_n"],
+                         this_bool_map["carve_before_fill"], 
+                         this_float_map["min_slope_for_fill"],
+                         this_float_map["steady_state_threshold_hillslope_area"]);
+    cout << "The value of K for your desired relief of " << this_float_map["steady_state_target_fluvial_relief"] << " is: " << target_K << endl;
+
+    // now enter snapping snapping cycle
+    for(int i = 1; i<= this_int_map["steady_state_n_cycles"]; i++)
+    {
+      cout << "\rSnap number " << i << " of "  << this_int_map["steady_state_n_cycles"] << flush;
+      RM.snap_to_steady(target_K, this_float_map["steady_state_U"], 
+                        this_float_map["steady_state_threshold_hillslope_gradient"],
+                        this_float_map["steady_state_m"],
+                        this_float_map["steady_state_n"],
+                        this_bool_map["carve_before_fill"], 
+                        this_float_map["min_slope_for_fill"],
+                        this_float_map["steady_state_threshold_hillslope_area"]);
+    }
+
+    // Now print the final state
+    // We use DATA_DIR and DEM_ID because if this switch is on it uses
+    string DS_snapped_fname = OUT_DIR+OUT_ID+"_ds_snapped";
+    LSDRaster DS_snapped = RM.return_as_raster();
+    DS_snapped.write_raster(DS_snapped_fname,"bil");
+
+    cout << "Updating the DEM prefix so we use the Diamond square raster as the base DEM" << endl;
+    DEM_ID = OUT_ID+"_ds_snapped";
+    OUT_ID = DEM_ID;
+    DATA_DIR = OUT_DIR;
+  }
+
+
+
+  // check to see if the raster exists
+  LSDRasterInfo RI((DATA_DIR+DEM_ID), raster_ext);
 
   //========================================================================
   //
@@ -1840,6 +1988,85 @@ int main (int nNumberofArgs,char *argv[])
 
   }
 
+  if(this_bool_map["prepare_single_channel_from_xy"])
+  {
+    cout << "I am preparing a fixed channel based only on xy data and elevation." << endl;
+    // In this instance we only have xy data without flow distance or lat long. 
+    // This is the kind of data supplied by Andreas from Nagra. 
+    // These pixels have elevations, so use this to order them
+    // I need to 1) centre the pixels.
+    // 2) get the lat-long
+    // 3) burn the channel in
+    // 4) get the flow distance
+    // 5) then print this new file out
+    LSDRasterInfo RI(topography_raster);
+
+    // load the channel nodes csv file, this will also print all the column names to screen
+    LSDSpatialCSVReader channel_nodes(RI, (this_string_map["fixed_channel_csv_name"]));
+
+    // Add dummy latitude and longitude columns
+    channel_nodes.add_placeholder_latitude_and_longitude();
+
+    // assign directory and name of output files
+    string centred_csv_name = OUT_DIR+"centred_"+this_string_map["fixed_channel_csv_name"];
+    string interpolated_csv_name = OUT_DIR+"interpolated_"+this_string_map["fixed_channel_csv_name"];
+
+    string X_column_name = this_string_map["X_column_name"];
+    string Y_column_name = this_string_map["Y_column_name"];
+    string fd_column_name = this_string_map["single_channel_fd_string"];
+
+    // this gets the x,y, centres them on the nodes, and then recalculates latitude and longitude
+    channel_nodes.centre_XY_by_row_col(topography_raster, X_column_name, Y_column_name);
+
+    // now we find the minimum elevation of the topography raster and drop the channel below this
+    //float minimum_elevation = topography_raster.min_elevation();
+    
+    cout << "Subtracting " << this_float_map["single_channel_drop"] << " m elevation from the single channel" << endl;
+    channel_nodes.data_column_add_float(this_string_map["single_channel_elev_string"], -this_float_map["single_channel_drop"]);
+
+    // now impose these pixels
+    LSDRasterMaker RM(topography_raster);
+    RM.impose_channels(channel_nodes, this_string_map["single_channel_elev_string"]);
+    LSDRaster imposed_topography = RM.return_as_raster();
+
+    // Now get flow routing
+    LSDRaster carved = imposed_topography.Breaching_Lindsay2016();
+    LSDRaster filled_topography = carved.fill(this_float_map["min_slope_for_fill"]);
+
+    // Get the flow routing and and flow distance
+    LSDFlowInfo FlowInfo(boundary_conditions,filled_topography);
+    LSDRaster FD = FlowInfo.distance_from_outlet();
+    string header_for_fd = this_string_map["single_channel_fd_string"];
+
+    // burn the flow distance to csv
+    channel_nodes.burn_raster_data_to_csv(FD,header_for_fd);
+
+    // put the channel back up
+    channel_nodes.data_column_add_float(this_string_map["single_channel_elev_string"], this_float_map["single_channel_drop"]);
+
+    // print the centred csv that now includes flow distance
+    channel_nodes.print_data_to_csv(centred_csv_name);    
+
+    // now interpolate
+    channel_nodes.interpolate_across_gap(topography_raster, X_column_name, Y_column_name, fd_column_name);
+
+    cout << "I have interpolated, let's centre the coordinates again." << endl;
+    channel_nodes.centre_XY_by_row_col(topography_raster, X_column_name, Y_column_name);
+
+    // now print the data with the gaps filled in
+    channel_nodes.print_data_to_csv(interpolated_csv_name);
+
+    cout << "I am all finished prepping some x,y data to serve as a baselevel channel." << endl;
+    cout << "I now need to exit because I did some raster manipulation that would mess up any other analysis." << endl;
+    cout << "This is a tough computation and I think you should treat yourself to some chocolate." << endl;
+    
+    exit(0);
+
+  }
+
+
+
+
   //============================================================================
   //
   //.######..##.......####...##...##..........#####....####...##..##..######..######..##..##...####..
@@ -1868,6 +2095,7 @@ int main (int nNumberofArgs,char *argv[])
         || this_bool_map["print_junction_index_raster"]
         || this_bool_map["print_junctions_to_csv"]
         || this_bool_map["find_basins"]
+        || this_bool_map["print_channel_tips_raster"]
         || this_bool_map["print_chi_data_maps"]
         || this_bool_map["print_junction_angles_to_csv"]
         || this_bool_map["extract_single_channel"]
@@ -1876,6 +2104,7 @@ int main (int nNumberofArgs,char *argv[])
         || this_bool_map["calculate_basin_statistics"]
         || this_bool_map["divide_finder"]
         || this_bool_map["tag_nodes"]
+        || this_bool_map["tag_nodes_from_categorised_channel"]
         || this_bool_map["extract_ridges"]
         || this_bool_map["calculate_connectivity_index"]
         || this_bool_map["calculate_hypsometric_integral"]
@@ -1990,6 +2219,49 @@ int main (int nNumberofArgs,char *argv[])
       string remove_raster_name = OUT_DIR+OUT_ID+"_IsolateFixedChannel";
       NodesRemovedRaster.write_raster(remove_raster_name,raster_ext);
 
+    }
+
+    if (this_bool_map["tag_nodes_from_categorised_channel"])
+    {
+      cout << "Hello, I am going to take a channel file, categorise some quantity, and then tag nodes on that basis" << endl;
+      cout << "This is probably most useful for divide finding." << endl;
+
+      // now load the channel to be used
+      LSDRasterInfo RI(topography_raster);
+      cout << "I am reading points from the file: "+ this_string_map["fixed_channel_csv_name"] << endl;
+      LSDSpatialCSVReader channel_to_categorise( RI, (DATA_DIR+this_string_map["fixed_channel_csv_name"]) );
+
+      // now categorise the something
+      cout << "The category boundaries string is: " << this_string_map["category_boundaries"] << endl;
+      vector<double> new_boundary_vec = LSDPP.parse_double_vector( "category_boundaries" );
+      for(int i = 0; i<int(new_boundary_vec.size()); i++)
+      {
+        cout << "bound val: " << new_boundary_vec[i] << endl;
+      }
+
+      string new_column_name = this_string_map["column_to_categorise"] + "_categories";
+      channel_to_categorise.data_column_add_categorised(this_string_map["column_to_categorise"], 
+                                                        new_column_name, new_boundary_vec);
+      
+
+      // Now we get the nodeindex column
+      channel_to_categorise.add_nodeindex_vector_to_data_map_using_lat_long(FlowInfo);
+
+      // Now we make a map of the values
+      vector<int> ni_vec = channel_to_categorise.data_column_to_int("nodeindex");
+      vector<int> cat_vec = channel_to_categorise.data_column_to_int(this_string_map["column_to_categorise"] + "_categories");
+
+      LSDIndexRaster tagged_raster = FlowInfo.tag_donor_pixels_exclude_nodelist(ni_vec,cat_vec);
+
+      // print the tagged raster
+      string tag_raster_name = OUT_DIR+OUT_ID+"_channel_tagged_pixels";
+      tagged_raster.write_raster(tag_raster_name,raster_ext);
+
+      // Print the channel for bug checking
+      channel_to_categorise.print_data_to_csv(OUT_DIR+"categorised_"+this_string_map["fixed_channel_csv_name"]);
+
+      cout << "At present the tag_nodes_from_categorised_channel is still inder testing so I am exiting now" << endl;
+      exit(0);
     }
 
     // Now some logic for looking for upslope influenced pixels, used in the divide finder
@@ -2216,6 +2488,7 @@ int main (int nNumberofArgs,char *argv[])
         || this_bool_map["print_junctions_to_csv"]
         || this_bool_map["print_sources_to_csv"]
         || this_bool_map["find_basins"]
+        || this_bool_map["print_channel_tips_raster"]
         || this_bool_map["print_chi_data_maps"]
         || this_bool_map["print_junction_angles_to_csv"]
         || this_bool_map["extract_ridges"]
@@ -2279,6 +2552,13 @@ int main (int nNumberofArgs,char *argv[])
         }
       }
 
+
+      if( this_bool_map["print_channel_tips_raster"])
+      {
+        LSDIndexRaster channel_tips = FlowInfo.get_channel_tip_raster(sources, int_default_map["channel_tips_pixel_distance"]);
+        string ct_name = OUT_DIR+OUT_ID+"_chan_tips";
+        channel_tips.write_raster(ct_name,"bil");
+      }
 
       // Print channels and junctions if you want them.
       if( this_bool_map["print_channels_to_csv"])
@@ -2662,7 +2942,13 @@ int main (int nNumberofArgs,char *argv[])
         }
 
         //====================================================================================
-        // Chi data maps    
+        //
+        //..####...##..##..######..........######..##..##..######..#####....####....####...######..######...####...##..##.
+        //.##..##..##..##....##............##.......####.....##....##..##..##..##..##..##....##......##....##..##..###.##.
+        //.##......######....##............####......##......##....#####...######..##........##......##....##..##..##.###.
+        //.##..##..##..##....##............##.......####.....##....##..##..##..##..##..##....##......##....##..##..##..##.
+        //..####...##..##..######..........######..##..##....##....##..##..##..##...####.....##....######...####...##..##.
+        //
         //====================================================================================
         if ( this_bool_map["print_chi_data_maps"])
         {
@@ -2687,6 +2973,7 @@ int main (int nNumberofArgs,char *argv[])
             cout << "  set the option:" << endl;
             cout << "    extend_channel_to_node_before_receiver_junction" << endl;
             cout << "  to false." << endl;
+            cout << "Note if you have nested basins the basin numbers only take the larger basin." << endl;
             cout << "=====================================================" << endl << endl;
 
             JunctionNetwork.get_overlapping_channels_to_downstream_outlets(FlowInfo, BaseLevelJunctions, FD,
@@ -2702,6 +2989,7 @@ int main (int nNumberofArgs,char *argv[])
             cout << "  just before the receiver junction, then set the option:" << endl;
             cout << "    extend_channel_to_node_before_receiver_junction" << endl;
             cout << "  to true." << endl;
+            cout << "Note if you have nested basins the basin numbers only take the larger basin." << endl;
             cout << "=====================================================" << endl << endl;
 
             JunctionNetwork.get_overlapping_channels(FlowInfo, BaseLevelJunctions, FD,
@@ -2830,19 +3118,6 @@ int main (int nNumberofArgs,char *argv[])
 
     }     // end logic for tasks related to channel network extraction
     cout << "Done with channel extraction" << endl;
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   }       // end logic for tasks requiring flow info and filling
   cout << "I'm all finished! Have a nice day." << endl;

@@ -26,6 +26,7 @@
 #include "LSDRaster.hpp"
 #include "LSDIndexRaster.hpp"
 #include "LSDRasterMaker.hpp"
+#include "LSDRasterInfo.hpp"
 #include "LSDStatsTools.hpp"
 #include "LSDSpatialCSVReader.hpp"
 using namespace std;
@@ -90,8 +91,19 @@ void LSDRasterMaker::create(LSDRaster& An_LSDRaster)
   RasterData = An_LSDRaster.get_RasterData();
 }
 
-
-
+// this creates a LSDRasterModel raster from another LSDRaster
+void LSDRasterMaker::create(LSDRasterInfo& RI)
+{
+  //cout << "Lets get some info!" << endl;
+  NRows = RI.get_NRows();
+  NCols = RI.get_NCols();
+  XMinimum = RI.get_XMinimum();
+  YMinimum = RI.get_YMinimum();
+  DataResolution = RI.get_DataResolution();
+  NoDataValue = RI.get_NoDataValue();
+  GeoReferencingStrings =  RI.get_GeoReferencingStrings();
+  RasterData = Array2D <float> (NRows, NCols, 0.0);
+}
 
 
 // This returns the data in the raster model as a raster
@@ -125,6 +137,23 @@ void LSDRasterMaker::resize_and_reset( int new_rows, int new_cols, float new_res
   int zone = 1;
   string NorS = "N";
   impose_georeferencing_UTM(zone, NorS);
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This resizes and resets the model
+// This overloaded version also resets the data resolution
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterMaker::resize_and_reset( LSDRaster& An_LSDRaster )
+{
+  NRows = An_LSDRaster.get_NRows();
+  NCols = An_LSDRaster.get_NCols();
+  XMinimum = An_LSDRaster.get_XMinimum();
+  YMinimum = An_LSDRaster.get_YMinimum();
+  DataResolution = An_LSDRaster.get_DataResolution();
+  NoDataValue = An_LSDRaster.get_NoDataValue();
+  GeoReferencingStrings =  An_LSDRaster.get_GeoReferencingStrings();
+  RasterData = An_LSDRaster.get_RasterData();
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -1110,6 +1139,453 @@ void LSDRasterMaker::smooth(int boundary_type)
 
 }
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This raises and then fills the DEM
+// overloaded to take the min slope as an argument - FJC July 2018
+//
+// SMM 25/08/2017
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterMaker::raise_and_fill_raster(float min_slope_for_fill)
+{
+  Array2D<float> zeta=RasterData.copy();
+
+  // first we need to loop through all the data and raise above the sea level,
+  // or lower to sea level accordingly
+  float MinElev = 9999999;
+  for(int row = 0; row<NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      if (zeta[row][col] != NoDataValue)
+      {
+        if (zeta[row][col] < MinElev)
+        {
+          MinElev = zeta[row][col];
+        }
+      }
+    }
+  }
+  cout << "Raising raster. Found the mininum elevation, it is: " << MinElev << endl;
+
+
+  // now adjust elevations so the lowst points are at zero elevation
+  for(int row = 0; row<NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      if (zeta[row][col] != NoDataValue)
+      {
+        zeta[row][col] = zeta[row][col]-MinElev;
+      }
+    }
+  }
+
+  RasterData = zeta.copy();
+
+  cout << "Now I am filling the data" << endl;
+  LSDRaster *temp;
+  temp = new LSDRaster(*this);
+  *temp = fill(min_slope_for_fill);
+  RasterData = temp->get_RasterData();
+  delete temp;
+
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This fills the DEM
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterMaker::fill_raster(float min_slope_for_fill)
+{
+  //cout << "Now I am filling the data" << endl;
+  LSDRaster *temp;
+  temp = new LSDRaster(*this);
+  *temp = fill(min_slope_for_fill);
+  RasterData = temp->get_RasterData();
+  delete temp;
+}
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Make a diamond square
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterMaker::create_diamond_square_surface(int diamond_square_feature_order, float desired_relief, 
+                    float noise_relief, float parabola_relief, float minimum_slope_for_fill, 
+                    long* seed_pointer)
+{
+  cout << endl << endl << endl << "=<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]<>[]===" << endl;
+  cout << "Hello, I am going to make a fractal raster using the diamond square algorithm," << endl;
+  cout <<"then dissect the landscape for you." << endl;
+
+  int smallest_dimension;
+  if( NRows <= NCols)
+  {
+    smallest_dimension = NRows;
+  }
+  else
+  {
+    smallest_dimension = NCols;
+  }
+
+  float lps = floor( log2( float(smallest_dimension) ) );
+  int largest_possible_scale = int(lps);
+  if( diamond_square_feature_order > largest_possible_scale )
+  {
+    diamond_square_feature_order = largest_possible_scale;
+  }
+
+  // Now we make a first crack at the diamond square
+  Array2D<float> zeta=RasterData.copy();
+
+  // temporary raster for performing diamond square
+  LSDRaster temp_raster(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta);
+
+  // get the dimamond square raster
+  // IMPORTANT: this will be bigger than the original raster
+  LSDRaster DSRaster = temp_raster.DiamondSquare( diamond_square_feature_order, desired_relief, seed_pointer);
+
+  // resample the raster to get a surface the correct size
+  // it won't wrap but the running to steady will take care of that.
+  for(int row = 0; row<NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      zeta[row][col] = DSRaster.get_data_element(row,col);
+    }
+  }
+
+  RasterData = zeta.copy();
+
+  // figure out what the new relief is
+  float peak_elevation = 2*desired_relief;
+  superimpose_parabolic_surface(peak_elevation);
+
+  add_random_moise(noise_relief, seed_pointer);
+
+  temp_raster = return_as_raster();
+
+  LSDRaster filled_topography,carved_topography;
+  carved_topography = temp_raster.Breaching_Lindsay2016();
+  filled_topography = carved_topography.fill(minimum_slope_for_fill);
+
+  resize_and_reset(filled_topography);
+
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// This takes the model and calculates the steady state fluvial surface derived from
+// a chi map
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+float LSDRasterMaker::tune_K_for_relief(float U, float desired_relief,
+                                  float m_exp, float n_exp,
+                                  bool carve_before_fill, 
+                                  float min_slope_for_fill,
+                                  float threshold_area_for_hillslopes)
+{
+  Array2D<float> zeta=RasterData.copy();
+
+  // set some boundary conditions
+  vector<string> temp_bc(4);
+  for (int i = 0; i< 4; i++)
+  {
+    temp_bc[i] = "n";
+  }
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
+
+  // need to fill the raster to ensure there are no internal base level nodes
+  //cout << "I am going to carve and fill" << endl;
+  LSDRaster filled_topography,carved_topography;
+  if(carve_before_fill)
+  {
+    //cout << "Carving and filling." << endl;
+    carved_topography = temp.Breaching_Lindsay2016();
+    filled_topography = carved_topography.fill(min_slope_for_fill);
+  }
+  else
+  {
+    //cout << "Filling." << endl;
+    filled_topography = temp.fill(min_slope_for_fill);
+  }
+  //cout << "Getting the flow info. This might take some time." << endl;
+  LSDFlowInfo flow(temp_bc, filled_topography);
+
+  float m_over_n = m_exp/n_exp;
+  float A_0 = 1;
+  float one_over_n = 1/n_exp;
+
+  LSDRaster ChiValues = flow.get_upslope_chi_from_all_baselevel_nodes(m_over_n, A_0,threshold_area_for_hillslopes);
+  float thisChi;
+  float MaxChi = 0;
+  // now we calculate the elevations assuming that the elevation at chi = 0 is 0
+  // This is based on equation 4 from mudd et al 2014 JGR-ES
+  for (int row = 0; row<NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      thisChi = ChiValues.get_data_element(row,col);
+      if (thisChi != NoDataValue)
+      {
+        if (thisChi > MaxChi)
+        {
+          MaxChi = thisChi;
+        }
+      }
+    }
+  }
+
+  // calculate K (you need to do some algebra on equation 4 from mudd et al 2014 JGR-ES)
+  float K = U * pow((desired_relief/MaxChi),-n_exp);
+  cout << "I am updating K to " << K << " to get your desired relief." << endl;
+  return K;
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// This snaps to steady using uplift and erodibility rasters
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDRasterMaker::snap_to_steady(LSDRaster& K_values, 
+                                  LSDRaster& U_values, LSDRaster& Sc_values,
+                                  float m_exp, float n_exp,
+                                  bool carve_before_fill, 
+                                  float min_slope_for_fill,
+                                  float threshold_area_for_hillslopes)
+{
+
+  Array2D<float> zeta=RasterData.copy();
+
+  // set some boundary conditions
+  vector<string> temp_bc(4);
+  for (int i = 0; i< 4; i++)
+  {
+    temp_bc[i] = "n";
+  }
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
+
+  // need to fill the raster to ensure there are no internal base level nodes
+  //cout << "I am going to carve and fill" << endl;
+  LSDRaster filled_topography,carved_topography;
+  if(carve_before_fill)
+  {
+    //cout << "Carving and filling." << endl;
+    carved_topography = temp.Breaching_Lindsay2016();
+    filled_topography = carved_topography.fill(min_slope_for_fill);
+  }
+  else
+  {
+    //cout << "Filling." << endl;
+    filled_topography = temp.fill(min_slope_for_fill);
+  }
+  //cout << "Getting the flow info. This might take some time." << endl;
+  LSDFlowInfo flow(temp_bc, filled_topography);
+  vector<int> baselevel_vec = flow.get_BaseLevelNodeList();
+  //cout << "I have " << baselevel_vec.size() << " baselevel nodes" << endl;
+
+  // update the raster
+  zeta = filled_topography.get_RasterData();
+
+  float one_over_n = 1/n_exp;
+
+  //float FP_NDV = K_values.get_NoDataValue();
+  float FP_value, K_value, U_value, Sc_value, receiver_elev, parenth_term, area_pow;
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  vector <int> nodeList = flow.get_SVector();
+  int numNodes = nodeList.size();
+  int node, row, col, receiver, receiver_row, receiver_col;
+  float drainageArea, dx;
+
+  // these save a bit of computational expense.
+  float root_2 = pow(2, 0.5);
+  float dx_root2 = root_2*DataResolution;
+  float DR2 = DataResolution*DataResolution;
+
+  // Step two calculate new height
+  //for (int i=numNodes-1; i>=0; --i)
+  for (int i=0; i<numNodes; ++i)
+  {
+
+    // get the information about node relationships from the flow info object
+    node = nodeList[i];
+    flow.retrieve_current_row_and_col(node, row, col);
+    flow.retrieve_receiver_information(node, receiver, receiver_row, receiver_col);
+    drainageArea = flow.retrieve_contributing_pixels_of_node(node) *  DR2;
+
+
+    // check if this is a baselevel node
+    if(node == receiver)
+    {
+      //cout << "This is a base level node. I don't update this node." << endl;
+      //cout << "The elevation of this base level is: " << zeta[row][col] << endl;
+    }
+    else
+    {
+      // Get the data from the individual points
+      K_value = K_values.get_data_element(row,col);
+      U_value = U_values.get_data_element(row,col);
+      Sc_value = Sc_values.get_data_element(row,col);
+      //if (node == 200)
+      //{
+      //  cout << "Looking at the test node, the value of K is: " << K_value << " and the value of U is: " << U_value << endl;
+      //}
+
+      // get the distance between nodes. Depends on flow direction
+      switch (flow.retrieve_flow_length_code_of_node(node))
+      {
+        case 0:
+          dx = -99;
+        break;
+        case 1:
+          dx = DataResolution;
+        break;
+        case 2:
+          dx = dx_root2;
+        break;
+        default:
+          dx = -99;
+        break;
+      }
+
+      if (drainageArea<threshold_area_for_hillslopes)
+      {
+        receiver_elev = zeta[receiver_row][receiver_col];
+        zeta[row][col] = receiver_elev+ dx*Sc_value;
+      }
+      else
+      {
+        receiver_elev = zeta[receiver_row][receiver_col];
+        area_pow = pow(drainageArea,m_exp);
+        parenth_term = U_value/(K_value*area_pow);
+        zeta[row][col] = receiver_elev+ dx*( pow(parenth_term,one_over_n));
+      }
+    }
+  }
+  this->RasterData = zeta.copy();
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// This snaps to steady using uplift and erodibility rasters
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDRasterMaker::snap_to_steady(float K_value, 
+                                  float U_value, float Sc_value,
+                                  float m_exp, float n_exp,
+                                  bool carve_before_fill, 
+                                  float min_slope_for_fill,
+                                  float threshold_area_for_hillslopes)
+{
+
+  Array2D<float> zeta=RasterData.copy();
+
+  // set some boundary conditions
+  vector<string> temp_bc(4);
+  for (int i = 0; i< 4; i++)
+  {
+    temp_bc[i] = "n";
+  }
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
+
+  // need to fill the raster to ensure there are no internal base level nodes
+  //cout << "I am going to carve and fill" << endl;
+  LSDRaster filled_topography,carved_topography;
+  if(carve_before_fill)
+  {
+    //cout << "Carving and filling." << endl;
+    carved_topography = temp.Breaching_Lindsay2016();
+    filled_topography = carved_topography.fill(min_slope_for_fill);
+  }
+  else
+  {
+    //cout << "Filling." << endl;
+    filled_topography = temp.fill(min_slope_for_fill);
+  }
+  //cout << "Getting the flow info. This might take some time." << endl;
+  LSDFlowInfo flow(temp_bc, filled_topography);
+  vector<int> baselevel_vec = flow.get_BaseLevelNodeList();
+  //cout << "I have " << baselevel_vec.size() << " baselevel nodes" << endl;
+
+  // update the raster
+  zeta = filled_topography.get_RasterData();
+
+  float one_over_n = 1/n_exp;
+
+  //float FP_NDV = K_values.get_NoDataValue();
+  float FP_value, receiver_elev, parenth_term, area_pow;
+
+  // Step one, create donor "stack" etc. via FlowInfo
+  vector <int> nodeList = flow.get_SVector();
+  int numNodes = nodeList.size();
+  int node, row, col, receiver, receiver_row, receiver_col;
+  float drainageArea, dx;
+
+  // these save a bit of computational expense.
+  float root_2 = pow(2, 0.5);
+  float dx_root2 = root_2*DataResolution;
+  float DR2 = DataResolution*DataResolution;
+
+  // Step two calculate new height
+  //for (int i=numNodes-1; i>=0; --i)
+  for (int i=0; i<numNodes; ++i)
+  {
+
+    // get the information about node relationships from the flow info object
+    node = nodeList[i];
+    flow.retrieve_current_row_and_col(node, row, col);
+    flow.retrieve_receiver_information(node, receiver, receiver_row, receiver_col);
+    drainageArea = flow.retrieve_contributing_pixels_of_node(node) *  DR2;
+
+
+    // check if this is a baselevel node
+    if(node == receiver)
+    {
+      //cout << "This is a base level node. I don't update this node." << endl;
+      //cout << "The elevation of this base level is: " << zeta[row][col] << endl;
+    }
+    else
+    {
+
+      // get the distance between nodes. Depends on flow direction
+      switch (flow.retrieve_flow_length_code_of_node(node))
+      {
+        case 0:
+          dx = -99;
+        break;
+        case 1:
+          dx = DataResolution;
+        break;
+        case 2:
+          dx = dx_root2;
+        break;
+        default:
+          dx = -99;
+        break;
+      }
+
+      if (drainageArea<threshold_area_for_hillslopes)
+      {
+        receiver_elev = zeta[receiver_row][receiver_col];
+        zeta[row][col] = receiver_elev+ dx*Sc_value;
+      }
+      else
+      {
+        receiver_elev = zeta[receiver_row][receiver_col];
+        area_pow = pow(drainageArea,m_exp);
+        parenth_term = U_value/(K_value*area_pow);
+        zeta[row][col] = receiver_elev+ dx*( pow(parenth_term,one_over_n));
+      }
+    }
+  }
+  this->RasterData = zeta.copy();
+}
+
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // Some functions for making random values in the rasters
@@ -1132,6 +1608,49 @@ void LSDRasterMaker::random_values(float minimum_value, float maximum_value)
   // Now scale to min and max
   scale_to_new_minimum_and_maximum_value(minimum_value, minimum_value);
 }
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Some functions for making random values in the rasters
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterMaker::random_values(float minimum_value, float maximum_value, long* seed_pointer)
+{
+  for(int row = 0; row<NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      if (RasterData[row][col] != NoDataValue)
+      {
+        RasterData[row][col] = ran3(seed_pointer);  
+      }
+    }
+  }
+
+  // Now scale to min and max
+  scale_to_new_minimum_and_maximum_value(minimum_value, minimum_value);
+}
+
+
+void LSDRasterMaker::add_random_moise(float range, long* seed_pointer)
+{
+  // The random number generator gives a uniform distribution between 0 and 1. 
+  // so we simply take the number, subtrack 0.5, and muplitply by the range. 
+  float this_ran, add_value;
+  for(int row = 0; row<NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      if (RasterData[row][col] != NoDataValue)
+      {
+        this_ran = ran3(seed_pointer);
+        add_value = (this_ran-0.5)*range;
+        RasterData[row][col] += add_value;  
+      }
+    }
+  }
+
+
+}
+
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -1262,6 +1781,60 @@ void LSDRasterMaker::sine_waves(vector<float> x_coefficients, vector<float> y_co
   }
 }
 
+
+void LSDRasterMaker::tilted_plane(vector<double> plane_coefficients)
+{
+  float this_x_value;
+  float this_y_value;
+
+  // so the wavelengths of the sin waves depend on the number
+  for (int row = 0; row<NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      if(RasterData[row][col]!= NoDataValue)
+      {
+        get_x_and_y_locations(row, col, this_x_value, this_y_value);
+
+        RasterData[row][col] = float(get_z_coord_of_point_on_plane(this_x_value, this_y_value,plane_coefficients));
+      }
+    }
+  }
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// superimposes a parabolic surface with elevations on the north and south edges at zero and
+// elevation in the middle of 'peak elevation'
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRasterMaker::superimpose_parabolic_surface(float peak_elev)
+{
+
+  // set up the length coordinate
+  float local_x;
+  float L = DataResolution*(NRows-1);
+  float row_elev;
+
+  // loop through getting the parabolic elevation at each row, and then
+  // writing across the entire domain
+  for(int row = 0; row < NRows; row++)
+  {
+
+    local_x = row*DataResolution;
+    row_elev = - 4.0*(local_x*local_x-local_x*L)*peak_elev / (L*L);
+
+    for (int col = 0; col < NCols; col++)
+    {
+      if (RasterData[row][col] != NoDataValue)
+      {
+        // at N and S boundaries, tthere is no perturbation
+        if( row != 0 && row != NRows-1)
+        {
+          RasterData[row][col] = RasterData[row][col]+row_elev;
+        }
+      }
+    }
+  }
+}
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // THis clips to a smaller raster. The smaller raster does not need

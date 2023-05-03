@@ -1849,7 +1849,7 @@ void LSDBasin::add_basin_to_LSDIndexRaster(LSDIndexRaster& basin_raster,
   if (RNR != NRows || RNC != NCols)
   {
     cout << "LSDBasin::Add_basin_to_LSDIndexRaster, failed to add basins" << endl
-         << "since LSDIndexRaster does not have same georeferncing as basin." << endl;
+         << "since LSDIndexRaster does not have same georeferencing as basin." << endl;
   }
   else
   {
@@ -1864,16 +1864,16 @@ void LSDBasin::add_basin_to_LSDIndexRaster(LSDIndexRaster& basin_raster,
       }
       else
       {
-        // if there is already data there, the smaller basin overrwites the larger
+        // if there is already data there, the smaller basin overwrites the larger
         // basin. You will be able to see the larger basins since the smaller
         // basins are nested within the larger basins
         existing_basin_index = basin_raster.get_data_element(row,col);
 
         if(drainage_of_other_basins.find(existing_basin_index) == drainage_of_other_basins.end())
         {
-          cout << "LSDBasin::Add_basin_to_LSDIndexRaster, Something has gone wrong." << endl
-               << "The existing basin is not in the basin map. " << endl
-               << "Overwriting data." << endl;
+          //cout << "LSDBasin::Add_basin_to_LSDIndexRaster, Something has gone wrong." << endl
+          //     << "The existing basin is not in the basin map. " << endl
+          //     << "Overwriting data." << endl;
           basin_raster.set_data_element(row,col,this_basin_index);
         }
         else if (this_basin_pixel_area < drainage_of_other_basins[existing_basin_index])

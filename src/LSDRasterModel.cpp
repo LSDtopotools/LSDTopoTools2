@@ -6616,6 +6616,52 @@ void LSDRasterModel::get_points_for_divide_migration_test(int threshold_pixels_f
 }
 
 
+void LSDRasterModel::get_points_for_divide_migration_test(int threshold_pixels_for_dm_test, bool carve_before_fill,
+                                                          float min_slope_for_fill, 
+                                                          vector<int>& test_nodes_rows, vector<int>& test_nodes_cols,
+                                                          string DataDirectory, string fname_prefix)
+{
+
+  Array2D<float> zeta=RasterData.copy();
+  LSDRaster temp(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, zeta, GeoReferencingStrings);
+
+  // need to fill the raster to ensure there are no internal base level nodes
+  //cout << "I am going to carve and fill" << endl;
+  LSDRaster filled_topography,carved_topography;
+  if(carve_before_fill)
+  {
+    //cout << "Carving and filling." << endl;
+    carved_topography = temp.Breaching_Lindsay2016();
+    filled_topography = carved_topography.fill(min_slope_for_fill);
+  }
+  else
+  {
+    //cout << "Filling." << endl;
+    filled_topography = temp.fill(min_slope_for_fill);
+  }
+  //cout << "Getting the flow info. This might take some time." << endl;
+  LSDFlowInfo flow(boundary_conditions, filled_topography);
+
+  cout << "\t Calculating flow accumulation (in pixels)..." << endl;
+  LSDIndexRaster FlowAcc = flow.write_NContributingNodes_to_LSDIndexRaster();
+
+  //get the sources
+  vector<int> sources;
+  sources = flow.get_sources_index_threshold(FlowAcc, threshold_pixels_for_dm_test);
+
+  vector<int> sources_row;
+  vector<int> sources_col;
+
+  flow.retrieve_rows_and_cols_from_node_list(sources,sources_row,sources_col);
+
+  test_nodes_rows = sources_row;
+  test_nodes_cols = sources_col;
+
+  flow.print_vector_of_nodeindices_to_csv_file_with_latlong(sources,DataDirectory, fname_prefix);
+
+}
+
+
 
 vector<int> LSDRasterModel::get_contributing_areas_from_points(bool carve_before_fill, float min_slope_for_fill, 
                                           vector<int> test_nodes_rows, vector<int> test_nodes_cols)

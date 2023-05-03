@@ -605,10 +605,10 @@ void LSDCRNParticle::update_cosmo_conc_const(double C_10Be, double C_26Al, doubl
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // this function updates the concentration of CRNs in a particle
 // the model assumes that during the timestep the change in the
-// 'depth' of the particle occurs ofver a constant rate.
-// The depth in this case is an equvalent depth...it is linearly
+// 'depth' of the particle occurs at a constant rate.
+// The depth in this case is an equivalent depth...it is linearly
 // proportional to depth if overlying density is constant, but
-// really represetnt the mass per area above a point in the subsurface
+// really represents the mass per area above a point in the subsurface
 // thus the erosion rate represent a mass removal rate.
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDCRNParticle::update_10Be_conc(double dt,double erosion_rate, LSDCRNParameters& CRNp)
@@ -1089,6 +1089,98 @@ vector<double> LSDCRNParticle::apparent_erosion_10Be_COSMOCALC(double rho, LSDCR
 }                                    
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function uses newton iteration to get an apparent erosion rate
+// for full muons. 
+// It is intended to mimic the cosmocalc erosion rate finder
+// This is pre scaled so the F values have already been adjustded for the total
+// shielding and the parameter settings, these are contained in the CRNp object.
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<double> LSDCRNParticle::apparent_erosion_10Be_COSMOCALC_prescaled(double rho, LSDCRNParameters& CRNp,
+                                    double top_eff_depth, double bottom_eff_depth)
+{
+  double Target_conc = Conc_10Be;
+  
+  // get the initial guess
+  effective_dLoc = top_eff_depth;
+  double erate_guess = apparent_erosion_10Be_neutron_only(rho, CRNp);
+  double eff_erate_guess = convert_m_to_gpercm2(erate_guess,rho);
+  
+  // now do Newton Iteration to find the correct erosion rate
+  // convert to  g/cm^2/yr
+  eff_erate_guess = 0.1*erate_guess*rho;
+  
+  // now using this as the initial guess, use Newton-Raphson to zero in on the
+  // correct erosion rate
+  double eff_e_new = eff_erate_guess; // the erosion rate upon which we iterate
+  double eff_e_change;                // the change in erosion rate between iterations
+  double tolerance = 1e-10;           // tolerance for a change in the erosion rate
+                                      // between Newton-Raphson iterations
+  double eff_e_displace = 1e-6;       // A small displacment in the erosion rate used
+                                      // to calculate the derivative
+  double N_this_step;                 // the concentration of the nuclide reported this step
+  double N_displace;                  // the concentration at the displaced erosion rate
+  double N_derivative;                // dN/de derivative for Newton-Raphson
+  double f_x;                         // the function being tested by newton raphson
+  double f_x_displace;                // the displaced function (for calculating the derivative)
+  
+  do
+  {
+    update_10Be_SSfull_depth_integrated(eff_e_new, CRNp,
+                                           top_eff_depth,  bottom_eff_depth);
+    N_this_step = Conc_10Be;
+    
+    update_10Be_SSfull_depth_integrated(eff_e_new+eff_e_displace, CRNp,
+                                           top_eff_depth,  bottom_eff_depth); 
+    N_displace = Conc_10Be;
+    
+    
+    // print to screen:
+    //cout << "eff_e_new = " << eff_e_new << " in cm/kyr: " << eff_e_new*1e6/rho 
+    //     << " 10Be: " << N_this_step << " atoms/yr" << endl;
+    
+    f_x =  N_this_step-Target_conc;
+    f_x_displace =  N_displace-Target_conc;
+    
+    N_derivative = (f_x_displace-f_x)/eff_e_displace;
+      
+    if(N_derivative != 0)
+    {
+      
+      eff_e_new = eff_e_new-f_x/N_derivative;
+      
+      // check to see if the difference in erosion rates meet a tolerance
+      eff_e_change = f_x/N_derivative;
+      //cout << "Change is: " << eff_e_change << " and erosion rate is: " << eff_e_new << endl;
+    }
+    else
+    {
+      eff_e_change = 0;
+    }
+  
+  } while(fabs(eff_e_change) > tolerance);
+  
+  vector<double> erosion_rate_vec;
+  erosion_rate_vec.push_back(eff_e_new);
+  erosion_rate_vec.push_back(eff_e_new*10/rho);
+  
+  Conc_10Be = Target_conc;
+  return erosion_rate_vec;
+
+}                                    
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+
+
+
+
+
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This gets the apparent erosion rate. 
 // if rho is in kg/m^3 this returns erosion in m/yr
@@ -1299,6 +1391,93 @@ vector<double> LSDCRNParticle::apparent_erosion_26Al_COSMOCALC(double rho, LSDCR
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 
+
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function uses newton iteration to get an apparent erosion rate
+// for full muons. 
+// It is intended to mimic the cosmocalc erosion rate finder
+// This is pre scaled so the F values have already been adjustded for the total
+// shielding and the parameter settings, these are contained in the CRNp object.
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<double> LSDCRNParticle::apparent_erosion_26Al_COSMOCALC_prescaled(double rho, LSDCRNParameters& CRNp,
+                                    double top_eff_depth, double bottom_eff_depth)
+{
+  double Target_conc = Conc_26Al;
+  
+  // get the initial guess
+  effective_dLoc = top_eff_depth;
+  double erate_guess = apparent_erosion_26Al_neutron_only(rho, CRNp);
+  double eff_erate_guess = convert_m_to_gpercm2(erate_guess,rho);
+  
+  // now do Newton Iteration to find the correct erosion rate
+  // convert to  g/cm^2/yr
+  eff_erate_guess = 0.1*erate_guess*rho;
+  
+  // now using this as the initial guess, use Newton-Raphson to zero in on the
+  // correct erosion rate
+  double eff_e_new = eff_erate_guess; // the erosion rate upon which we iterate
+  double eff_e_change;                // the change in erosion rate between iterations
+  double tolerance = 1e-10;           // tolerance for a change in the erosion rate
+                                      // between Newton-Raphson iterations
+  double eff_e_displace = 1e-6;       // A small displacment in the erosion rate used
+                                      // to calculate the derivative
+  double N_this_step;                 // the concentration of the nuclide reported this step
+  double N_displace;                  // the concentration at the displaced erosion rate
+  double N_derivative;                // dN/de derivative for Newton-Raphson
+  double f_x;                         // the function being tested by newton raphson
+  double f_x_displace;                // the displaced function (for calculating the derivative)
+  
+  do
+  {
+    update_26Al_SSfull_depth_integrated(eff_e_new, CRNp,
+                                           top_eff_depth,  bottom_eff_depth);
+    N_this_step = Conc_26Al;
+    
+    update_26Al_SSfull_depth_integrated(eff_e_new+eff_e_displace, CRNp,
+                                           top_eff_depth,  bottom_eff_depth); 
+    N_displace = Conc_26Al;
+    
+    
+    // print to screen:
+    //cout << "eff_e_new = " << eff_e_new << " in cm/kyr: " << eff_e_new*1e6/rho 
+    //     << " 26Al: " << N_this_step << " atoms/yr" << endl;
+    
+    f_x =  N_this_step-Target_conc;
+    f_x_displace =  N_displace-Target_conc;
+    
+    N_derivative = (f_x_displace-f_x)/eff_e_displace;
+      
+    if(N_derivative != 0)
+    {
+      
+      eff_e_new = eff_e_new-f_x/N_derivative;
+      
+      // check to see if the difference in erosion rates meet a tolerance
+      eff_e_change = f_x/N_derivative;
+      //cout << "Change is: " << eff_e_change << " and erosion rate is: " << eff_e_new << endl;
+    }
+    else
+    {
+      eff_e_change = 0;
+    }
+  
+  } while(fabs(eff_e_change) > tolerance);
+  
+  vector<double> erosion_rate_vec;
+  erosion_rate_vec.push_back(eff_e_new);
+  erosion_rate_vec.push_back(eff_e_new*10/rho);
+  
+  Conc_26Al = Target_conc;
+  return erosion_rate_vec;
+
+}                                    
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // Gets steady concentration
 // The erosion rate should be in g/cm^2/yr
@@ -1331,8 +1510,8 @@ void LSDCRNParticle::update_26Al_SSfull(double erosion_rate, LSDCRNParameters& C
   Conc_26Al = CRNp.S_t*CRNp.P0_26Al*sum_term;
   spall_tot = CRNp.S_t*CRNp.P0_26Al*spall_tot;
   muon_tot =  CRNp.S_t*CRNp.P0_26Al*muon_tot;
-  cout << "Line 717, Conc 26Al is: " << Conc_26Al << " from spallation: " << spall_tot
-       << " and muons: " << muon_tot << endl;
+  //cout << "Line 717, Conc 26Al is: " << Conc_26Al << " from spallation: " << spall_tot
+  //     << " and muons: " << muon_tot << endl;
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -2011,6 +2190,86 @@ vector<double> LSDCRNParticle::apparent_erosion_14C_COSMOCALC(double rho, LSDCRN
 
 
 
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function uses newton iteration to get an apparent erosion rate
+// for full muons. 
+// It is intended to mimic the cosmocalc erosion rate finder
+// This is pre scaled so the F values have already been adjustded for the total
+// shielding and the parameter settings, these are contained in the CRNp object.
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<double> LSDCRNParticle::apparent_erosion_14C_COSMOCALC_prescaled(double rho, LSDCRNParameters& CRNp,
+                                    double top_eff_depth, double bottom_eff_depth)
+{
+  double Target_conc = Conc_14C;
+  
+  // get the initial guess
+  effective_dLoc = top_eff_depth;
+  double erate_guess = apparent_erosion_14C_neutron_only(rho, CRNp);
+  double eff_erate_guess = convert_m_to_gpercm2(erate_guess,rho);
+  
+  // now do Newton Iteration to find the correct erosion rate
+  // convert to  g/cm^2/yr
+  eff_erate_guess = 0.1*erate_guess*rho;
+  
+  // now using this as the initial guess, use Newton-Raphson to zero in on the
+  // correct erosion rate
+  double eff_e_new = eff_erate_guess; // the erosion rate upon which we iterate
+  double eff_e_change;                // the change in erosion rate between iterations
+  double tolerance = 1e-10;           // tolerance for a change in the erosion rate
+                                      // between Newton-Raphson iterations
+  double eff_e_displace = 1e-6;       // A small displacment in the erosion rate used
+                                      // to calculate the derivative
+  double N_this_step;                 // the concentration of the nuclide reported this step
+  double N_displace;                  // the concentration at the displaced erosion rate
+  double N_derivative;                // dN/de derivative for Newton-Raphson
+  double f_x;                         // the function being tested by newton raphson
+  double f_x_displace;                // the displaced function (for calculating the derivative)
+  
+  do
+  {
+    update_14C_SSfull_depth_integrated(eff_e_new, CRNp,
+                                           top_eff_depth,  bottom_eff_depth);
+    N_this_step = Conc_14C;
+    
+    update_14C_SSfull_depth_integrated(eff_e_new+eff_e_displace, CRNp,
+                                           top_eff_depth,  bottom_eff_depth); 
+    N_displace = Conc_14C;
+    
+    f_x =  N_this_step-Target_conc;
+    f_x_displace =  N_displace-Target_conc;
+    
+    N_derivative = (f_x_displace-f_x)/eff_e_displace;
+      
+    if(N_derivative != 0)
+    {
+      
+      eff_e_new = eff_e_new-f_x/N_derivative;
+      
+      // check to see if the difference in erosion rates meet a tolerance
+      eff_e_change = f_x/N_derivative;
+      //cout << "Change is: " << eff_e_change << " and erosion rate is: " << eff_e_new << endl;
+    }
+    else
+    {
+      eff_e_change = 0;
+    }
+  
+  } while(fabs(eff_e_change) > tolerance);
+  
+  vector<double> erosion_rate_vec;
+  erosion_rate_vec.push_back(eff_e_new);
+  erosion_rate_vec.push_back(eff_e_new*10/rho);
+  
+  Conc_14C = Target_conc;
+  return erosion_rate_vec;
+
+}                                    
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //.######....##.....####...##.....
 //....##....##.....##..##..##.....
@@ -2320,6 +2579,22 @@ void LSDCRNParticle::update_depths(double d, double ed)
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 
+void LSDCRNParticle::remove_mass_one_layer(double d, double rho)
+{
+  // this removes a thickness of sediment, which 
+  // updates the depth and effective depth. 
+  // assumes a one layer model
+  dLoc=dLoc-d;
+  effective_dLoc=effective_dLoc-d*rho*0.1;
+
+  if(dLoc < 0)
+  {
+    cout << "Warning, you have removed mass so that the particle depth is now" << endl;
+    cout << "above the surface. " << endl;
+  }
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // this function resets the depth and calculates the effective depth
@@ -2384,7 +2659,7 @@ void LSDCRNParticle::update_zetaLoc_with_new_surface(double new_zeta)
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //
-// !!!FUNCTIONS FOR SCALINF
+// !!!FUNCTIONS FOR SCALING
 //
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 

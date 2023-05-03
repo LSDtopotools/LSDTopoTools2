@@ -219,196 +219,197 @@ void LSDJunctionNetwork::create(vector<int> Sources, LSDFlowInfo& FlowInfo)
   // this loop sets the stream orders and identifies the
   // junctions
   // it is the first of two loops through the stream network
+  int NDataNodes = FlowInfo.get_NDataNodes();
   // the second will generate the stream link information
   for(int src = 0; src<n_sources; src++)
   {
     baselevel_switch =0;    // 0 == not base level
     junction_switch = 0;    // 0 == no junction so far
     current_node = SourcesVector[src];
-    current_row = FlowInfo.RowIndex[current_node];
-    current_col = FlowInfo.ColIndex[current_node];
-    receiver_node = FlowInfo.ReceiverVector[current_node];
-
-    //cout << "current node " << current_node << endl;  
-    //cout << "current row " << current_row << " current col " << current_col << endl;
-
-    current_stream_order = 1;
-
-    if (current_node == receiver_node)
+    if (current_node != NoDataValue && current_node > 0 && current_node < NDataNodes-1) //check for nodata nodes
     {
-      baselevel_switch = 1;
-    }
+      current_row = FlowInfo.RowIndex[current_node];
+      current_col = FlowInfo.ColIndex[current_node];
+      receiver_node = FlowInfo.ReceiverVector[current_node];
 
+      //cout << "current node " << current_node << endl;  
+      //cout << "current row " << current_row << " current col " << current_col << endl;
 
-    // follow node down through receivers until it hits a base level node
-    // the switch is set to 2 because if there is a baselevel node
-    // the algorithm has to go through the loop once to register the
-    // 'downslope node' as the baselevel
-    while ( baselevel_switch <2 )
-    {
+      current_stream_order = 1;
 
-      // check if this node has already been added to the channel network
-      // if it hasn't, then this becomes a channel of order of the current order
-      if(StreamOrderArray[current_row][current_col] == NoDataValue)
+      if (current_node == receiver_node)
       {
-      	StreamOrderArray[current_row][current_col] = current_stream_order;
+        baselevel_switch = 1;
       }
-      // if it isn't a nodata node:
-      // note that the junction switch starts out as a zero.
-      // the channel is followed looking at nodata values in the stream order array
-      // once it hits the first junction, the StreamOrderArray has finite values,
-      // so this logic is triggered.
-      else if(StreamOrderArray[current_row][current_col] != NoDataValue)
+
+
+      // follow node down through receivers until it hits a base level node
+      // the switch is set to 2 because if there is a baselevel node
+      // the algorithm has to go through the loop once to register the
+      // 'downslope node' as the baselevel
+      while ( baselevel_switch <2 )
       {
 
-        // each source contributes a junction unless it is the
-        // only source to go to a given baselevel node
-        // check to see if this is the first time the channel
-        // has hit another channel. If so, add the junction
-        // and set the junction switch to 1 so that no further
-        // junctions are added
-        // also if it is a junction check to see if the stream order has been incremented
-        // if it has not, the base level switch is turn to 2 and the
-        // algorithm exits this loop and goes to the next source
-        // if it has, this and all downstream nodes take on the new stream order
-        // if junction switch is zero it means this is the first visit of a previously visited channel
-        if (junction_switch == 0)
+        // check if this node has already been added to the channel network
+        // if it hasn't, then this becomes a channel of order of the current order
+        if(StreamOrderArray[current_row][current_col] == NoDataValue)
         {
-          junction_switch = 1;
-          JunctionArray[current_row][current_col]  = 1;
-
-          // if it is the the first junction for this source, the current_stream_order
-          // is one. Therefore any junction will result in a stream order
-          // of at least 2.
-          // If the junction is currently at a stream order of 1, then it
-          // gets incremented
-          if (StreamOrderArray[current_row][current_col] == current_stream_order)
-          {
-            current_stream_order ++;
-            StreamOrderArray[current_row][current_col]= current_stream_order;
-          }
-          // if the junction is two or greater, the loop exits since there can
-          // be no more incrementing of the stream order
-          else
-          {
-            baselevel_switch = 2;
-          }
+        	StreamOrderArray[current_row][current_col] = current_stream_order;
         }
-        else
+        // if it isn't a nodata node:
+        // note that the junction switch starts out as a zero.
+        // the channel is followed looking at nodata values in the stream order array
+        // once it hits the first junction, the StreamOrderArray has finite values,
+        // so this logic is triggered.
+        else if(StreamOrderArray[current_row][current_col] != NoDataValue)
         {
-          // first, we check to see if it is not a junction. if not, we update the
-          // stream order. If the stream order hasn't changed, then something
-          // is amiss since there is no point moving downstream
-          // when the current stream order is the same as the previous stream order,
-          // since it can't increase stream order downstream
-          // nodes following downstream will be at the current stream order
-          if (JunctionArray[current_row][current_col]  != 1)
+
+          // each source contributes a junction unless it is the
+          // only source to go to a given baselevel node
+          // check to see if this is the first time the channel
+          // has hit another channel. If so, add the junction
+          // and set the junction switch to 1 so that no further
+          // junctions are added
+          // also if it is a junction check to see if the stream order has been incremented
+          // if it has not, the base level switch is turn to 2 and the
+          // algorithm exits this loop and goes to the next source
+          // if it has, this and all downstream nodes take on the new stream order
+          // if junction switch is zero it means this is the first visit of a previously visited channel
+          if (junction_switch == 0)
           {
-            // THIS IS NOT A JUNCTION
-            // if the current stream order is bigger than the existing stream order
-            // at this point, then increase the existing stream order
-            if ( current_stream_order > StreamOrderArray[current_row][current_col])
+            junction_switch = 1;
+            JunctionArray[current_row][current_col]  = 1;
+
+            // if it is the the first junction for this source, the current_stream_order
+            // is one. Therefore any junction will result in a stream order
+            // of at least 2.
+            // If the junction is currently at a stream order of 1, then it
+            // gets incremented
+            if (StreamOrderArray[current_row][current_col] == current_stream_order)
             {
-              StreamOrderArray[current_row][current_col] = current_stream_order;
+              current_stream_order ++;
+              StreamOrderArray[current_row][current_col]= current_stream_order;
             }
+            // if the junction is two or greater, the loop exits since there can
+            // be no more incrementing of the stream order
             else
             {
               baselevel_switch = 2;
             }
-
           }
-          // if it is a junction, see if there is an increment
-          // in the current stream order
-          // the node it has come from has an updated current stream order
-          // so just look at the donor nodes to
-          // see if there are two or more
-          // donors at a higher stream order
-          else if (JunctionArray[current_row][current_col]  == 1)
+          else
           {
-            // THIS IS A JUNCTION
-            // first, check to see if this has a higher stream order than the current stream
-            // order
-            if (StreamOrderArray[current_row][current_col] > current_stream_order)
+            // first, we check to see if it is not a junction. if not, we update the
+            // stream order. If the stream order hasn't changed, then something
+            // is amiss since there is no point moving downstream
+            // when the current stream order is the same as the previous stream order,
+            // since it can't increase stream order downstream
+            // nodes following downstream will be at the current stream order
+            if (JunctionArray[current_row][current_col]  != 1)
             {
-              // yes, the stream order at this junction is higher than the current stream order
-              // even if the junction is incremented the downstream search would
-              // stop here, so get out with the baselevel switch
-              baselevel_switch = 2;
-            }
-            else if ( StreamOrderArray[current_row][current_col] == current_stream_order)
-            {
-
-
-              // this means that the current stream order is equal to or less than the streamorder
-              // currently at this node this means you need to check and see if the thing is incremented
-              n_current_stream_order_donors = 0;
-              for(int dnode = 0; dnode<FlowInfo.NDonorsVector[current_node]; dnode++)
+              // THIS IS NOT A JUNCTION
+              // if the current stream order is bigger than the existing stream order
+              // at this point, then increase the existing stream order
+              if ( current_stream_order > StreamOrderArray[current_row][current_col])
               {
-                donor_node = FlowInfo.DonorStackVector[ FlowInfo.DeltaVector[current_node]+dnode];
-
-                // ignore the base level donor
-                if (donor_node != current_node)
-                {
-                  donor_row = FlowInfo.RowIndex[ donor_node ];
-                  donor_col = FlowInfo.ColIndex[ donor_node ];
-
-                  if (StreamOrderArray[donor_row][donor_col] == current_stream_order)
-                  {
-                    n_current_stream_order_donors++;
-                  }
-                }
-              }
-
-              // now check to see if the stream order has increased
-              if (n_current_stream_order_donors >= 2)
-              {
-                current_stream_order++;
                 StreamOrderArray[current_row][current_col] = current_stream_order;
               }
-              else    // if it hasn't, the loop ends here.
+              else
               {
                 baselevel_switch = 2;
               }
 
             }
-            else if (StreamOrderArray[current_row][current_col] < current_stream_order)
+            // if it is a junction, see if there is an increment
+            // in the current stream order
+            // the node it has come from has an updated current stream order
+            // so just look at the donor nodes to
+            // see if there are two or more
+            // donors at a higher stream order
+            else if (JunctionArray[current_row][current_col]  == 1)
             {
-
-              // the current stream order is higher than the stream order at this point.
-              // the node needs to update its stream order and keep going
-              StreamOrderArray[current_row][current_col] = current_stream_order;
-            }
-            else
-            {
-              cout << "something about the logic has gone wrong. " <<endl;
-              cout << "hhh node: " << current_node << ", current_stream_order " << current_stream_order
-                   << " array: " << StreamOrderArray[current_row][current_col]<<" and src: " << SourcesVector[src] << endl;
-            }
-
-          }  // end logic for if this is a downstream junction
-        }    // end logic for if this is not the first junction
-      }      // end logic for if this is not a NoData node
+              // THIS IS A JUNCTION
+              // first, check to see if this has a higher stream order than the current stream
+              // order
+              if (StreamOrderArray[current_row][current_col] > current_stream_order)
+              {
+                // yes, the stream order at this junction is higher than the current stream order
+                // even if the junction is incremented the downstream search would
+                // stop here, so get out with the baselevel switch
+                baselevel_switch = 2;
+              }
+              else if ( StreamOrderArray[current_row][current_col] == current_stream_order)
+              {
 
 
-      // get the next current node, which is this nodes receiver
-      current_node = FlowInfo.ReceiverVector[current_node];
-     // cout << "receiver node " << current_node << endl;
-     // cout << "receiver row " << current_row << " receiver col " << current_col << endl;
+                // this means that the current stream order is equal to or less than the streamorder
+                // currently at this node this means you need to check and see if the thing is incremented
+                n_current_stream_order_donors = 0;
+                for(int dnode = 0; dnode<FlowInfo.NDonorsVector[current_node]; dnode++)
+                {
+                  donor_node = FlowInfo.DonorStackVector[ FlowInfo.DeltaVector[current_node]+dnode];
 
-      // get the next receiver node, which is the next node
-      receiver_node = FlowInfo.ReceiverVector[current_node];
-      current_row = FlowInfo.RowIndex[current_node];
-      current_col = FlowInfo.ColIndex[current_node];
+                  // ignore the base level donor
+                  if (donor_node != current_node)
+                  {
+                    donor_row = FlowInfo.RowIndex[ donor_node ];
+                    donor_col = FlowInfo.ColIndex[ donor_node ];
 
-      // if this is a baselevel node
-      if (current_node == receiver_node)
-      {
-        baselevel_switch ++;
-      }
+                    if (StreamOrderArray[donor_row][donor_col] == current_stream_order)
+                    {
+                      n_current_stream_order_donors++;
+                    }
+                  }
+                }
+
+                // now check to see if the stream order has increased
+                if (n_current_stream_order_donors >= 2)
+                {
+                  current_stream_order++;
+                  StreamOrderArray[current_row][current_col] = current_stream_order;
+                }
+                else    // if it hasn't, the loop ends here.
+                {
+                  baselevel_switch = 2;
+                }
+
+              }
+              else if (StreamOrderArray[current_row][current_col] < current_stream_order)
+              {
+
+                // the current stream order is higher than the stream order at this point.
+                // the node needs to update its stream order and keep going
+                StreamOrderArray[current_row][current_col] = current_stream_order;
+              }
+              else
+              {
+                cout << "something about the logic has gone wrong. " <<endl;
+                cout << "hhh node: " << current_node << ", current_stream_order " << current_stream_order
+                     << " array: " << StreamOrderArray[current_row][current_col]<<" and src: " << SourcesVector[src] << endl;
+              }
+
+            }  // end logic for if this is a downstream junction
+          }    // end logic for if this is not the first junction
+        }      // end logic for if this is not a NoData node
 
 
-    }    // end flow to baselevel loop
+        // get the next current node, which is this nodes receiver
+        current_node = FlowInfo.ReceiverVector[current_node];
+       // cout << "receiver node " << current_node << endl;
+       // cout << "receiver row " << current_row << " receiver col " << current_col << endl;
 
+        // get the next receiver node, which is the next node
+        receiver_node = FlowInfo.ReceiverVector[current_node];
+        current_row = FlowInfo.RowIndex[current_node];
+        current_col = FlowInfo.ColIndex[current_node];
+
+        // if this is a baselevel node
+        if (current_node == receiver_node)
+        {
+          baselevel_switch ++;
+        }
+      }  // end flow to baselevel loop
+    }    // end nodata check loop
   }      // end sources loop
 
 
@@ -426,138 +427,141 @@ void LSDJunctionNetwork::create(vector<int> Sources, LSDFlowInfo& FlowInfo)
     baselevel_switch =0;			// 0 == not base level
     junction_switch = 0;			// 0 == no junction so far
     current_node = SourcesVector[src];
-    current_row = FlowInfo.RowIndex[current_node];
-    current_col = FlowInfo.ColIndex[current_node];
-    receiver_node = FlowInfo.ReceiverVector[current_node];
-
-    // cout << "LINE 257 ChNet, SOURCE: " << src <<  " n_src: " << n_sources << " current_node: " << current_node
-    //      << " and rnode: " << receiver_node << endl;
-
-    //each source is a junction node. Push back the junction vector
-    JunctionVector.push_back(current_node);
-
-    // set the junction Index Array
-    JunctionIndexArray[current_row][current_col] = this_junction;
-
-    // stream order only increases at junctions. So the junction node has a stream
-    // order that remains the same until it gets to the next junction, where it possibly
-    // could change
-    StreamOrderVector.push_back( StreamOrderArray[current_row][current_col] );
-
-    // check if this is a baselevel node
-    if(receiver_node == current_node)
+    if (current_node != NoDataValue && current_node > 0 && current_node < NDataNodes-1) //check for nodata nodes
     {
-      baselevel_switch = 1;			// turn the baselevel switch on
-      ReceiverVector.push_back(this_junction);		// the Receiver node is iteself
-
-      // this logic only applies to sources, which cannot lie downstream of another source
-      // ***THIS MUST BE ENFORCED BY THE GET_SOURCES ALGORITHM***
-      // this means that if a source is also a baselevel, then this is the one and only time
-      // this baselevel junction is added, so add it to the baselevel vector
-      BaseLevelJunctions.push_back(this_junction);
-    }
-
-    // the next element is the receiver junction, we need to follow the path to this receiver
-    // the routine continues until the junction has been visited or until it hits
-    // a baselevel node
-    //cout << "LINE 463" << endl;
-    while (baselevel_switch == 0 && junction_switch <2)
-    {
-      //cout << "Line 283" << endl;
-
-      //cout << "Line 286, current node = " << current_node << " and rode: " << receiver_node << endl;
-      current_node = receiver_node;
-      //cout << "Line 288, current node = " << current_node << " and rode: " << receiver_node << endl;
       current_row = FlowInfo.RowIndex[current_node];
       current_col = FlowInfo.ColIndex[current_node];
       receiver_node = FlowInfo.ReceiverVector[current_node];
 
-      // first we need logic for if this is a baselevel node
-      if (current_node == receiver_node)
+      // cout << "LINE 257 ChNet, SOURCE: " << src <<  " n_src: " << n_sources << " current_node: " << current_node
+      //      << " and rnode: " << receiver_node << endl;
+
+      //each source is a junction node. Push back the junction vector
+      JunctionVector.push_back(current_node);
+
+      // set the junction Index Array
+      JunctionIndexArray[current_row][current_col] = this_junction;
+
+      // stream order only increases at junctions. So the junction node has a stream
+      // order that remains the same until it gets to the next junction, where it possibly
+      // could change
+      StreamOrderVector.push_back( StreamOrderArray[current_row][current_col] );
+
+      // check if this is a baselevel node
+      if(receiver_node == current_node)
       {
-        //cout << "source: " << src << " and BASELEVEL, node: " << current_node << " rnode: " << receiver_node << endl;
-        // check to see if it has a junction index number.
-        if(JunctionIndexArray[current_row][current_col] == NoDataValue)
-        {
-        	// it doens't have a JunctionIndexNumber. This is a new
-        	// junction
-        	this_junction++;
+        baselevel_switch = 1;			// turn the baselevel switch on
+        ReceiverVector.push_back(this_junction);		// the Receiver node is iteself
 
-        	// this junction has the this_junction index. Set the JunctionIndexArray
-        	JunctionIndexArray[current_row][current_col] = this_junction;
-
-          // the receiver node of the previous junction is the new junction
-          ReceiverVector.push_back( JunctionIndexArray[current_row][current_col] );
-
-          //push back the junction vector
-          JunctionVector.push_back(current_node);
-
-          // because this is a baselevel node, the Receiver of this junction
-          // is iteself
-          ReceiverVector.push_back( JunctionIndexArray[current_row][current_col] );
-
-          // the stream order of this node is also determined by the node
-          StreamOrderVector.push_back( StreamOrderArray[current_row][current_col] );
-
-          // finally, this is the first time we have visted this baselevel node.
-          // So it gets added to the baselevel vector
-          BaseLevelJunctions.push_back(this_junction);
-
-        }
-        else    // this junction does have an index number, no new junction is created
-        {
-          // the receiver node of the previous junction is the new junction
-          ReceiverVector.push_back( JunctionIndexArray[current_row][current_col] );
-        }
-        junction_switch = 2;
-        baselevel_switch = 1;      // this is a baselevel. It will exit the
-                                    // loop and move to the next source
+        // this logic only applies to sources, which cannot lie downstream of another source
+        // ***THIS MUST BE ENFORCED BY THE GET_SOURCES ALGORITHM***
+        // this means that if a source is also a baselevel, then this is the one and only time
+        // this baselevel junction is added, so add it to the baselevel vector
+        BaseLevelJunctions.push_back(this_junction);
       }
-      else                  // this is not a baselevel node
+
+      // the next element is the receiver junction, we need to follow the path to this receiver
+      // the routine continues until the junction has been visited or until it hits
+      // a baselevel node
+      //cout << "LINE 463" << endl;
+      while (baselevel_switch == 0 && junction_switch <2)
       {
-        //cout << "LINE 330, not baselevel; src: " << src << " and node: " << current_node << " rnde: " << receiver_node << endl;
-        // the node in the junction array is zero if it is not a
-        // junction, 1 if it is an unvisited junction, and 2 or more if it
-        // is a visited junction
-        if(JunctionArray[current_row][current_col] != NoDataValue)
+        //cout << "Line 283" << endl;
+
+        //cout << "Line 286, current node = " << current_node << " and rode: " << receiver_node << endl;
+        current_node = receiver_node;
+        //cout << "Line 288, current node = " << current_node << " and rode: " << receiver_node << endl;
+        current_row = FlowInfo.RowIndex[current_node];
+        current_col = FlowInfo.ColIndex[current_node];
+        receiver_node = FlowInfo.ReceiverVector[current_node];
+
+        // first we need logic for if this is a baselevel node
+        if (current_node == receiver_node)
         {
-          // cout << "LINE 524, found a junction at node: " << current_node
-          // 	 << " JArray: " << JunctionArray[current_row][current_col]  << endl;
-          junction_switch = JunctionArray[current_row][current_col];
-          JunctionArray[current_row][current_col] ++;		// increment the junction array
-                        // it will be greater than 1 if
-                        // the junction has been visited
-
-          // if this junction has been visited, it will have a junction number
-          // include the receiver vector
-          if (JunctionIndexArray[current_row][current_col] != NoDataValue )
+          //cout << "source: " << src << " and BASELEVEL, node: " << current_node << " rnode: " << receiver_node << endl;
+          // check to see if it has a junction index number.
+          if(JunctionIndexArray[current_row][current_col] == NoDataValue)
           {
-            ReceiverVector.push_back( JunctionIndexArray[current_row][current_col] );
+          	// it doens't have a JunctionIndexNumber. This is a new
+          	// junction
+          	this_junction++;
 
-            // the loop will not continue; it will move onto the next
-            // source since it has visited an already visited junction
-          }
-          else    // the junction has not been visited
-          {
-            // this is a new junction. Increment the 'last junction' int
-            this_junction++;
-
-            // this junction has the this_junction index. Set the JunctionIndexArray
-            JunctionIndexArray[current_row][current_col] = this_junction;
+          	// this junction has the this_junction index. Set the JunctionIndexArray
+          	JunctionIndexArray[current_row][current_col] = this_junction;
 
             // the receiver node of the previous junction is the new junction
             ReceiverVector.push_back( JunctionIndexArray[current_row][current_col] );
 
-            //push back the junction vector; this is a new junction
+            //push back the junction vector
             JunctionVector.push_back(current_node);
 
-            // get the stream order of this new junction
+            // because this is a baselevel node, the Receiver of this junction
+            // is iteself
+            ReceiverVector.push_back( JunctionIndexArray[current_row][current_col] );
+
+            // the stream order of this node is also determined by the node
             StreamOrderVector.push_back( StreamOrderArray[current_row][current_col] );
+
+            // finally, this is the first time we have visted this baselevel node.
+            // So it gets added to the baselevel vector
+            BaseLevelJunctions.push_back(this_junction);
+
           }
-        }   // end logic for is this a junction
-      }     // end logic for not a baselevel node
-    }       // end baselevel logic
-  }         // end sources loop
+          else    // this junction does have an index number, no new junction is created
+          {
+            // the receiver node of the previous junction is the new junction
+            ReceiverVector.push_back( JunctionIndexArray[current_row][current_col] );
+          }
+          junction_switch = 2;
+          baselevel_switch = 1;      // this is a baselevel. It will exit the
+                                      // loop and move to the next source
+        }
+        else                  // this is not a baselevel node
+        {
+          //cout << "LINE 330, not baselevel; src: " << src << " and node: " << current_node << " rnde: " << receiver_node << endl;
+          // the node in the junction array is zero if it is not a
+          // junction, 1 if it is an unvisited junction, and 2 or more if it
+          // is a visited junction
+          if(JunctionArray[current_row][current_col] != NoDataValue)
+          {
+            // cout << "LINE 524, found a junction at node: " << current_node
+            // 	 << " JArray: " << JunctionArray[current_row][current_col]  << endl;
+            junction_switch = JunctionArray[current_row][current_col];
+            JunctionArray[current_row][current_col] ++;		// increment the junction array
+                          // it will be greater than 1 if
+                          // the junction has been visited
+
+            // if this junction has been visited, it will have a junction number
+            // include the receiver vector
+            if (JunctionIndexArray[current_row][current_col] != NoDataValue )
+            {
+              ReceiverVector.push_back( JunctionIndexArray[current_row][current_col] );
+
+              // the loop will not continue; it will move onto the next
+              // source since it has visited an already visited junction
+            }
+            else    // the junction has not been visited
+            {
+              // this is a new junction. Increment the 'last junction' int
+              this_junction++;
+
+              // this junction has the this_junction index. Set the JunctionIndexArray
+              JunctionIndexArray[current_row][current_col] = this_junction;
+
+              // the receiver node of the previous junction is the new junction
+              ReceiverVector.push_back( JunctionIndexArray[current_row][current_col] );
+
+              //push back the junction vector; this is a new junction
+              JunctionVector.push_back(current_node);
+
+              // get the stream order of this new junction
+              StreamOrderVector.push_back( StreamOrderArray[current_row][current_col] );
+            }
+          }   // end logic for is this a junction
+        }     // end logic for not a baselevel node
+      }       // end baselevel logic
+    }         // end nodata check loop
+  }           // end sources loop
 
   // cout << "ChanNet; LINE 562; sz ReceiverVec: " << ReceiverVector.size() << " sz JuncVec: " << JunctionVector.size()
   //    << " sz SOVec: " << StreamOrderVector.size() << endl;
@@ -2849,7 +2853,7 @@ vector<int> LSDJunctionNetwork::extract_basin_nodes_by_drainage_area(float Drain
       int flag = 0;
       //int ChannelSizeTest;
       int NodeCount = 0;
-      while ((flag == 0))
+      while (flag == 0)
       {
         int TargetNode = StreamLinkVector.get_node_in_channel(NodeCount);
         float TargetNodeDrainageArea = FlowInfo.NContributingNodes[TargetNode] * PixelArea;
@@ -5517,7 +5521,6 @@ LSDRaster LSDJunctionNetwork::ExtractRidges(LSDFlowInfo& FlowInfo, int& min_orde
 //------------------------------------------------------------------------------
 map<int,int> LSDJunctionNetwork::ExtractAllRidges(LSDFlowInfo& FlowInfo)
 {
-
   vector<int> upslope_junc_nodes;
 
   // get the penultamite node from each junction
@@ -5530,18 +5533,20 @@ map<int,int> LSDJunctionNetwork::ExtractAllRidges(LSDFlowInfo& FlowInfo)
 
   map<int,int> node_map;
 
-
+  int NDataNodes = FlowInfo.get_NDataNodes();
   for(int i = NJunctions-1; i>= 0; i--)
   {
     so_stack.push_back(StreamOrderVector[ SVector[i] ]);
 
+
+    cout << flush << "\t I have: " << i << " junctions left to do" << "\r";
     // for debugging
     //cout << "O: " << StreamOrderVector[ SVector[i] ] << endl;
 
-    if(pen_nodes[i] != NoDataValue)
+    if(pen_nodes[i] != NoDataValue && pen_nodes[i] > 0 && pen_nodes[i] < NDataNodes-1)
     {
       upslope_junc_nodes = FlowInfo.get_upslope_nodes(pen_nodes[i]);
-      cout << "Number of upslope nodes: " << int(upslope_junc_nodes.size()) << endl;
+      //cout << "Number of upslope nodes: " << int(upslope_junc_nodes.size()) << endl;
 
       // now get the nodes that are internal
       vector<bool> is_internal = FlowInfo.internal_nodes(upslope_junc_nodes);
@@ -7517,6 +7522,95 @@ void LSDJunctionNetwork::PrintChannelNetworkToCSV_WithSurfaceMetrics(LSDFlowInfo
 
 }
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+// This prints a channel network to a line vector.
+// FJC 18/04/2023
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=
+void LSDJunctionNetwork::PrintChannelNetworkToLineVector(LSDFlowInfo& flowinfo, string fname_prefix, LSDRaster& Elevation, LSDRaster& DrainageArea, LSDRaster &DistanceFromOutlet)
+{
+
+  // first get the vectors
+  vector<int> NIvec;
+  vector<int> SOvec;
+  vector<int> JIvec;
+  GetChannelNodesAndJunctions(flowinfo, NIvec, JIvec, SOvec);
+
+  // open a geojson to write the channel network
+  ofstream WriteData;
+  WriteData.precision(9);
+  WriteData.open((fname_prefix+".geojson").c_str());
+
+  WriteData << "{" << endl;
+  WriteData << "\"type\": \"FeatureCollection\"," << endl;
+  WriteData << "\"crs\": { \"type\": \"name\", \"properties\": { \"name\": \"urn:ogc:def:crs:OGC:1.3:CRS84\" } }," << endl;
+  WriteData << "\"features\": [" << endl;
+
+  WriteData.precision(8);
+
+  // the x and y locations
+  double latitude,longitude,receiver_latitude,receiver_longitude;
+
+  // this is for latitude and longitude
+  LSDCoordinateConverterLLandUTM Converter;
+
+
+  // now get the number of channel nodes
+  int this_NI, receiver_NI, RJ;
+  int row,col;
+  int NNodes = int(NIvec.size());
+  //cout << "The number of nodes is: " << NNodes << endl;
+  int count = 0;
+  for(int node = 0; node<NNodes; node++)
+  {
+    count += 1;
+    this_NI = NIvec[node];
+    flowinfo.retrieve_current_row_and_col(this_NI,row,col);
+    get_lat_and_long_locations(row, col, latitude, longitude, Converter);
+    flowinfo.retrieve_receiver_information(this_NI, receiver_NI);
+    RJ = get_Receiver_of_Junction(JIvec[node]);
+    // get receiver lat and lon information
+    flowinfo.get_lat_and_long_from_current_node(receiver_NI, receiver_latitude, receiver_longitude, Converter);
+
+    // now write the geojson
+    string first_bit = "{ \"type\": \"Feature\", \"properties\": { \"latitude\": ";
+    string lon_bit = ", \"longitude\": ";
+    string ji_bit = ", \"Junction_Index\": ";
+    string so_bit = ", \"Stream_Order\": ";
+    string receiver_ji_bit = ", \"receiver_JI\": ";
+    string elev_bit = ", \"elevation\": ";
+    string dist_bit = ", \"distance_from_outlet\": ";
+    string area_bit = ", \"drainage_area\": ";
+
+    string ninth_bit = " }, \"geometry\": { \"type\": \"LineString\", \"coordinates\": [ [";
+
+    string last_bit = " ] ] } }";
+
+    if (count == 1)
+    {
+      WriteData << first_bit << latitude << lon_bit << longitude << ji_bit << JIvec[node] << so_bit << SOvec[node]
+                  << receiver_ji_bit << RJ << elev_bit << Elevation.get_data_element(row, col) << dist_bit 
+                  << DistanceFromOutlet.get_data_element(row, col) << area_bit << DrainageArea.get_data_element(row, col)
+                  << ninth_bit << longitude << "," << latitude << "], [" << receiver_longitude << "," << receiver_latitude << last_bit
+                  << endl;
+    }
+    else
+    {
+      WriteData << "," << first_bit << latitude << lon_bit << longitude << ji_bit << JIvec[node] << so_bit << SOvec[node] 
+                  << receiver_ji_bit << RJ << elev_bit << Elevation.get_data_element(row, col) << dist_bit 
+                  << DistanceFromOutlet.get_data_element(row, col) << area_bit << DrainageArea.get_data_element(row, col)
+                  << ninth_bit << longitude << "," << latitude << "], [" << receiver_longitude << "," << receiver_latitude << last_bit
+                  << endl;
+    }
+
+  }
+  // closing lines of geojson
+  WriteData << "]" << endl;
+  WriteData << "}" << endl;
+  WriteData.close();
+
+}
+
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -9260,7 +9354,7 @@ void LSDJunctionNetwork::snap_point_locations_to_channels(vector<float> x_locs,
     x_loc = x_locs[samp];
     y_loc = y_locs[samp];
 
-    cout << "JN 6322 x_loc: " << x_loc << " y_loc: " << y_loc << endl;
+    //cout << "JN 6322 x_loc: " << x_loc << " y_loc: " << y_loc << endl;
 
     // check to see if the node is in the raster
     bool is_in_raster = FlowInfo.check_if_point_is_in_raster(x_loc,y_loc);
@@ -9283,15 +9377,15 @@ void LSDJunctionNetwork::snap_point_locations_to_channels(vector<float> x_locs,
 
     if(is_in_raster)
     {
-      cout << "Snapping: This point is in the raster!" << endl;
+      //cout << "Snapping: This point is in the raster!" << endl;
       this_chan_node = get_nodeindex_of_nearest_channel_for_specified_coordinates(x_loc, y_loc,
                        search_radius_nodes, threshold_stream_order,
                        FlowInfo);
-      cout << "Snapping: Got channel!, channel node is: " << this_chan_node << endl;
+      //cout << "Snapping: Got channel!, channel node is: " << this_chan_node << endl;
       if(this_chan_node != NoDataValue)
       {
         this_junc = find_upstream_junction_from_channel_nodeindex(this_chan_node, FlowInfo);
-        cout << "Snapping, got_this_junc with the node index " << this_chan_node <<  endl;
+        //cout << "Snapping, got_this_junc with the node index " << this_chan_node <<  endl;
         snapped_node_indices.push_back(this_chan_node);
         snapped_junction_indices.push_back(this_junc);
         valid_cosmo_points.push_back(samp);
@@ -9351,7 +9445,7 @@ void LSDJunctionNetwork::snap_point_locations_to_nearest_channel_node_index(vect
     x_loc = x_locs[samp];
     y_loc = y_locs[samp];
 
-    cout << "Snapping to nearest channel node index. x_loc: " << x_loc << " y_loc: " << y_loc << endl;
+    //cout << "Snapping to nearest channel node index. x_loc: " << x_loc << " y_loc: " << y_loc << endl;
 
     // check to see if the node is in the raster
     bool is_in_raster = FlowInfo.check_if_point_is_in_raster(x_loc,y_loc);
@@ -9374,9 +9468,9 @@ void LSDJunctionNetwork::snap_point_locations_to_nearest_channel_node_index(vect
 
     if(is_in_raster)
     {
-      cout << "Snapping: This point is in the raster!" << endl;
+      //cout << "Snapping: This point is in the raster!" << endl;
       this_chan_node = find_nearest_downslope_channel(x_loc, y_loc,threshold_stream_order,FlowInfo);
-      cout << "Snapping: Got channel!, channel node is: " << this_chan_node << endl;
+      //cout << "Snapping: Got channel!, channel node is: " << this_chan_node << endl;
       if(this_chan_node != NoDataValue)
       {
         cout << "Snapping, got the node index!" << endl;
@@ -9431,7 +9525,7 @@ vector<int> LSDJunctionNetwork::snap_point_locations_to_upstream_junctions_from_
   // Get the local coordinates
   vector<float> fUTM_easting,fUTM_northing;
   outlets_data.get_x_and_y_from_latlong(fUTM_easting,fUTM_northing);
-  cout << "The x and y data are: " << endl;
+  //cout << "The x and y data are: " << endl;
   for (int i = 0; i< int(fUTM_easting.size()); i++)
   {
     cout << fUTM_easting[i] << "," << fUTM_northing[i] << endl;
@@ -9448,7 +9542,7 @@ vector<int> LSDJunctionNetwork::snap_point_locations_to_upstream_junctions_from_
     x_loc = fUTM_easting[samp];
     y_loc = fUTM_northing[samp];
 
-    cout << "Snapping to nearest channel node index. x_loc: " << x_loc << " y_loc: " << y_loc << endl;
+    //cout << "Snapping to nearest channel node index. x_loc: " << x_loc << " y_loc: " << y_loc << endl;
 
     // check to see if the node is in the raster
     bool is_in_raster = FlowInfo.check_if_point_is_in_raster(x_loc,y_loc);
@@ -9471,12 +9565,12 @@ vector<int> LSDJunctionNetwork::snap_point_locations_to_upstream_junctions_from_
 
     if(is_in_raster)
     {
-      cout << "Snapping: This point is in the raster!" << endl;
+      //cout << "Snapping: This point is in the raster!" << endl;
       this_chan_node = find_nearest_downslope_channel(x_loc, y_loc,threshold_stream_order,FlowInfo);
-      cout << "Snapping: Got channel!, channel node is: " << this_chan_node << endl;
+      //cout << "Snapping: Got channel!, channel node is: " << this_chan_node << endl;
       if(this_chan_node != NoDataValue)
       {
-        cout << "Snapping, got the node index and the junction" << endl;
+        //cout << "Snapping, got the node index and the junction" << endl;
         // now get the upslope junction
         int temp_junc = find_upstream_junction_from_channel_nodeindex(this_chan_node, FlowInfo);
         snapped_junction_indices.push_back(temp_junc);
@@ -10210,7 +10304,7 @@ void LSDJunctionNetwork::get_overlapping_channels(LSDFlowInfo& FlowInfo,
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This function is for calculating a bonehead version of the chi slope
 // and the chi intercept
-// overlaoded, overwrite the baselevel nodes vector (used for visualisation).
+// overloaded, overwrite the baselevel nodes vector (used for visualisation).
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDJunctionNetwork::get_overlapping_channels(LSDFlowInfo& FlowInfo,
                                     vector<int> BaseLevel_Junctions,
@@ -10275,6 +10369,67 @@ void LSDJunctionNetwork::get_overlapping_channels(LSDFlowInfo& FlowInfo,
 }
 
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function is for calculating a bonehead version of the chi slope
+// and the chi intercept
+// overloaded, overwrite the baselevel nodes vector (used for visualisation).
+// This version only retains the longest channel
+// The data members are fed to the chi map automator
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDJunctionNetwork::get_longest_channels(LSDFlowInfo& FlowInfo,
+                                    vector<int> BaseLevel_Junctions,
+                                    LSDRaster& DistanceFromOutlet,
+                                    vector<int>& source_nodes,
+                                    vector<int>& outlet_nodes,
+                                    vector<int>& baselevel_nodes,
+                                    int n_nodes_to_visit)
+{
+  // Get the number of baselevel nodes
+  int N_baselevel_nodes = int(BaseLevel_Junctions.size());
+
+  // create the visited array
+  int not_visited = 0;
+  LSDIndexRaster VisitedRaster(NRows,NCols, XMinimum, YMinimum, DataResolution, NoDataValue, GeoReferencingStrings,not_visited);
+
+  vector<int> NewSources;
+  vector<int> NewOutlets;
+  vector<int> NewBaselevelNodes;
+  int thisOutlet;
+
+  // loop through these nodes
+  for (int BL = 0; BL < N_baselevel_nodes; BL++)
+  {
+    int outlet_node = JunctionVector[BaseLevel_Junctions[BL] ];
+    //cout << "The outlet node is: " << outlet_node << endl;
+
+    // get all the source nodes of the base level
+    vector<int> source_nodes = get_all_source_nodes_of_an_outlet_junction(BaseLevel_Junctions[BL]);
+    //cout << "The number of sources is: " << source_nodes.size() << endl;
+
+
+    // sort the nodes by flow distance in ascending order
+    vector<int> SortedSources = FlowInfo.sort_node_list_based_on_raster(source_nodes, DistanceFromOutlet);
+
+    // get them in descending order
+    reverse(SortedSources.begin(),SortedSources.end());
+
+    // get the channel from this source and mark up the covered raster
+    thisOutlet = FlowInfo.get_downslope_node_after_fixed_visited_nodes(SortedSources[0],
+                outlet_node, n_nodes_to_visit, VisitedRaster);
+
+    NewSources.push_back(SortedSources[0]);
+    NewOutlets.push_back(thisOutlet);
+    NewBaselevelNodes.push_back(outlet_node);
+
+  }
+
+  outlet_nodes = NewOutlets;
+  source_nodes = NewSources;
+  baselevel_nodes = NewBaselevelNodes;
+}
+
+
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This function is for calculating a bonehead version of the chi slope
@@ -10299,39 +10454,43 @@ void LSDJunctionNetwork::get_overlapping_channels_to_downstream_outlets(LSDFlowI
   vector<int> NewSources;
   vector<int> NewOutlets;
   int thisOutlet;
+  int NDataNodes = FlowInfo.get_NDataNodes();
 
   // loop through these nodes
   for (int BL = 0; BL < N_baselevel_nodes; BL++)
   {
-    int outlet_node = get_penultimate_node_from_stream_link(BaseLevel_Junctions[BL],FlowInfo);
-    //cout << "The outlet node is: " << outlet_node << endl;
-
-    // get all the source nodes of the base level
-    vector<int> source_nodes = get_all_source_nodes_of_an_outlet_junction(BaseLevel_Junctions[BL]);
-    //cout << "The number of sources is: " << source_nodes.size() << endl;
-
-
-    // sort the nodes by flow distance in ascending order
-    vector<int> SortedSources = FlowInfo.sort_node_list_based_on_raster(source_nodes, DistanceFromOutlet);
-
-    // get them in descending order
-    reverse(SortedSources.begin(),SortedSources.end());
-
-    // now loop through the sorted sources
-    int n_sources = int(SortedSources.size());
-
-    for(int s = 0; s<n_sources; s++)
+    if (BaseLevel_Junctions[BL] != NoDataValue && BaseLevel_Junctions[BL] > 0 && BaseLevel_Junctions[BL] < NDataNodes-1)
     {
-      // get the channel from this source and mark up the covered raster
-      thisOutlet = FlowInfo.get_downslope_node_after_fixed_visited_nodes(SortedSources[s],
-                  outlet_node, n_nodes_to_visit, VisitedRaster);
+      int outlet_node = get_penultimate_node_from_stream_link(BaseLevel_Junctions[BL],FlowInfo);
+      //cout << "The outlet node is: " << outlet_node << endl;
 
-      //cout << "Source number " << s << " source node is: " << SortedSources[s] << " BL node: " << outlet_node
-      //     << " and new outlet: " << thisOutlet << endl;
+      // get all the source nodes of the base level
+      vector<int> source_nodes = get_all_source_nodes_of_an_outlet_junction(BaseLevel_Junctions[BL]);
+      //cout << "The number of sources is: " << source_nodes.size() << endl;
 
 
-      NewSources.push_back(SortedSources[s]);
-      NewOutlets.push_back(thisOutlet);
+      // sort the nodes by flow distance in ascending order
+      vector<int> SortedSources = FlowInfo.sort_node_list_based_on_raster(source_nodes, DistanceFromOutlet);
+
+      // get them in descending order
+      reverse(SortedSources.begin(),SortedSources.end());
+
+      // now loop through the sorted sources
+      int n_sources = int(SortedSources.size());
+
+      for(int s = 0; s<n_sources; s++)
+      {
+        // get the channel from this source and mark up the covered raster
+        thisOutlet = FlowInfo.get_downslope_node_after_fixed_visited_nodes(SortedSources[s],
+                    outlet_node, n_nodes_to_visit, VisitedRaster);
+
+        //cout << "Source number " << s << " source node is: " << SortedSources[s] << " BL node: " << outlet_node
+        //     << " and new outlet: " << thisOutlet << endl;
+
+
+        NewSources.push_back(SortedSources[s]);
+        NewOutlets.push_back(thisOutlet);
+      }
     }
 
   }

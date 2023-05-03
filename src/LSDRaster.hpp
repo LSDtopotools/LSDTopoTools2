@@ -548,6 +548,14 @@ class LSDRaster
   /// @date 18/02/14
   void rewrite_with_random_values(float range);
 
+  /// @brief rewrite all the data array values with random numbers (with a
+  /// uniform distribution).
+  /// @param range is the range of values.
+  /// @param seed a random seed (can be any number). If the seed is the same the random output will be the same
+  /// @author SMM
+  /// @date 18/02/14
+  void rewrite_with_random_values(float range, long seed);
+
   /// @brief Create a raster in of the same number of rows and cols with nodata
   /// @author FJC
   /// @date 07/04/17
@@ -828,6 +836,14 @@ class LSDRaster
   /// @date 27/10/2016
   LSDRaster MapAlgebra_multiply(LSDRaster& M_raster);
 
+  /// @brief This multiplies two rasters, elementwise
+  /// @detail Simple elementwise multiplictation
+  /// @param the number with which to mupliply the raster
+  /// @return A raster holding the elementwise product of the two rasters
+  /// @author SMM
+  /// @date 07/11/2022
+  LSDRaster MapAlgebra_multiply(float multiplier);
+
   /// @brief This divides two rasters, elementwise
   /// @detail Simple elementwise division
   /// @param M_raster The raster by which to divide the current raster
@@ -835,6 +851,14 @@ class LSDRaster
   /// @author SMM
   /// @date 27/10/2016
   LSDRaster MapAlgebra_divide(LSDRaster& M_raster);
+
+  /// @brief This divides a raster by a number
+  /// @detail Simple elementwise division
+  /// @param the number with which to divide the raster
+  /// @return A raster holding the elementwise quotient of the two rasters
+  /// @author SMM
+  /// @date 07/11/2022
+  LSDRaster MapAlgebra_divide(float multiplier);
 
   /// @brief This add two rasters, elementwise
   /// @detail Simple elementwise addition
@@ -844,6 +868,14 @@ class LSDRaster
   /// @date 27/10/2016
   LSDRaster MapAlgebra_add(LSDRaster& M_raster);
 
+  /// @brief This adds a number to a raster, but returns a new raster
+  /// @detail Simple elementwise addition
+  /// @param adjuster the value to add to the raster
+  /// @return A raster holding the elementwise sum of the two rasters
+  /// @author SMM
+  /// @date 07/11/2022
+  LSDRaster MapAlgebra_add(float adjuster);
+
   /// @brief This subtracts two rasters, elementwise
   /// @detail Simple elementwise subtraction
   /// @param M_raster The raster by which to subtract the current raster
@@ -852,6 +884,13 @@ class LSDRaster
   /// @date 27/10/2016
   LSDRaster MapAlgebra_subtract(LSDRaster& M_raster);
 
+  /// @brief This divides a number to a raster, but returns a new raster
+  /// @detail Simple elementwise subtraction
+  /// @param adjuster the value to subtract from the raster
+  /// @return A raster holding the elementwise difference of the two rasters
+  /// @author SMM
+  /// @date 07/11/2022
+  LSDRaster MapAlgebra_subtract(float adjuster);
 
   /// @brief This changes the elevation of a raster
   /// @param elevation_adjust The change in elevation
@@ -890,8 +929,17 @@ class LSDRaster
   /// @date 16/02/2014
   void DSSetFeatureCorners(int featuresize, float scale);
 
-
-
+  /// @brief This sets the corners of features as the first step in the diamond
+  /// square algorithm.
+  /// @param The first parameter is the feature size. This needs to be a power of 2, but
+  /// this is set by the parent DiamondSquare function (that is, this function should not
+  /// be called independantly.
+  /// @param The scale is effectivly the maximum relief of the surface to be produced by the
+  /// algorithm.
+  /// @param seed_pointer the pointer to seed for the random number generator
+  /// @author SMM
+  /// @date 14/10/2022
+  void DSSetFeatureCorners(int featuresize, float scale, long* seed_pointer);
 
   /// @brief This is the square sampling step of the diamond square algorithm: it takes
   /// the average of the four corners and adds a random number to set the centrepoint
@@ -925,6 +973,7 @@ class LSDRaster
   /// @author SMM
   /// @date 16/02/2014
   void DiamondSquare_SampleStep(int stepsize, float scale);
+  void DiamondSquare_SampleStep(int stepsize, float scale, long* seed_pointer);
 
   /// @brief This is the driving function for the diamond square algorithm.
   /// @details The driving function takes the current raster and then pads it
@@ -942,6 +991,24 @@ class LSDRaster
   /// @author SMM
   /// @date 16/02/2014
   LSDRaster DiamondSquare(int feature_order, float scale);
+
+  /// @brief This is the driving function for the diamond square algorithm.
+  /// @details The driving function takes the current raster and then pads it
+  /// in each direction to have rows and columns that are the nearest powers
+  /// of 2. The xllocation and yllocation data values are preserved. The function
+  /// returns a pseudo fractal landscape generated with the diamond square algorithm
+  /// Believe it or not this algorithm is absed on code poseted by Notch, the creator of Minecraft,
+  /// who then had it modified by Charles Randall
+  /// https://www.bluh.org/code-the-diamond-square-algorithm/
+  /// @param feature order is an interger n where the feature size consists of 2^n nodes.
+  /// If the feature order is set bigger than the dimensions of the parent raster then
+  /// this will default to the order of the parent raster.
+  /// @param Scale is a floating point number that sets the maximum relief of the resultant raster.
+  /// @param seed_pointer the pointer to seed for the random number generator
+  /// @return Returns a diamond square pseudo-fractal surface in and LSDRaster object.
+  /// @author SMM
+  /// @date 16/02/2014
+  LSDRaster DiamondSquare(int feature_order, float scale, long* seed_pointer);
 
 
   // Functions relating to shading, shadowing and shielding

@@ -113,6 +113,7 @@ void LSDFloodplain::create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJuncti
   //declare the vectors
   vector<int> FloodplainNodes_temp, patch_ids_channel;
 
+  int this_node = NoDataValue;
   //loop through every row and col and get the slope and relief values
   for (int i =0; i < NRows; i++)
   {
@@ -125,6 +126,8 @@ void LSDFloodplain::create(LSDRaster& ChannelRelief, LSDRaster& Slope, LSDJuncti
         if (relief < relief_threshold && slope < slope_threshold)        //floodplain points must be lower than both the relief
         {                                                                //and the slope threshold.
           BinaryArray[i][j] = 1;
+          this_node = FlowInfo.retrieve_node_from_row_and_column(i, j);
+          FloodplainNodes_temp.push_back(this_node);
         }
         if (StreamOrderArray[i][j] != NoDataValue)                    // assign all parts of the channel network as part of the valley/floodplain network.
         {
@@ -386,14 +389,14 @@ vector<LSDRaster> LSDFloodplain::get_valley_walls(LSDJunctionNetwork& ChanNetwor
 // also writes the valley widths to a csv file and geojson
 // FJC 05/03/21
 //---------------------------------------------------------------------------------------
-vector<vector<float>> LSDFloodplain::calculate_valley_widths(LSDSpatialCSVReader channel_csv, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, int channel_bearing_node__spacing, bool print_bearings, string bearing_fname, int template_scale, string outfilename, vector<int> nodes_to_remove)
+vector<vector<float>> LSDFloodplain::calculate_valley_widths(LSDSpatialCSVReader channel_csv, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& DrainageArea, LSDRaster& Elevation, int channel_bearing_node__spacing, bool print_bearings, string bearing_fname, int template_scale, string outfilename, vector<int> nodes_to_remove)
 {
   // open the outfile
   ofstream out_file;
   out_file.open((outfilename+".csv").c_str());
   out_file.precision(9);
 
-  out_file << "node,latitude,longitude,distance_from_outlet,flow_bearing,orthogonal_bearing,left_valley_width,right_valley_width,total_valley_width" << endl;
+  out_file << "node,latitude,longitude,distance_from_outlet,drainage_area,elevation,flow_bearing,orthogonal_bearing,left_valley_width,right_valley_width,total_valley_width" << endl;
 
   // open the geojson for orthogonal lines
   ofstream width_lines;
@@ -421,7 +424,7 @@ vector<vector<float>> LSDFloodplain::calculate_valley_widths(LSDSpatialCSVReader
 
   // loop through each node along the channel
   int this_node, this_row, this_col, left_bank_node, right_bank_node;
-  float flow_bearing, orthogonal_bearing, left_bank_width, right_bank_width, total_width;
+  float flow_bearing, orthogonal_bearing, left_bank_width, right_bank_width, total_width, drainage_area, elev;
   LSDCoordinateConverterLLandUTM Converter;
   double left_latitude = NoDataValue;
   double left_longitude = NoDataValue;
@@ -558,8 +561,12 @@ vector<vector<float>> LSDFloodplain::calculate_valley_widths(LSDSpatialCSVReader
       FlowInfo.get_lat_and_long_from_current_node(this_node, latitude, longitude, Converter);
       //cout << "this node: " << this_node << " latitude: " << latitude << " longitude: " << longitude << endl;
 
+      // get drainage area and elevation from this node
+      drainage_area = DrainageArea.get_data_element(this_row, this_col);
+      elev = Elevation.get_data_element(this_row, this_col);
+
       // write to a csv file along the channel
-      out_file << this_node << "," << latitude << "," << longitude << "," << DistFromOutlet_array[this_row][this_col] << "," << flow_bearing << "," << orthogonal_bearing << "," << left_bank_width << "," << right_bank_width << "," << total_width << endl;
+      out_file << this_node << "," << latitude << "," << longitude << "," << DistFromOutlet_array[this_row][this_col] << "," << drainage_area << "," << elev << "," << flow_bearing << "," << orthogonal_bearing << "," << left_bank_width << "," << right_bank_width << "," << total_width << endl;
 
       if (total_width != NoDataValue && left_latitude != NoDataValue && right_latitude != NoDataValue)
       {
@@ -574,8 +581,11 @@ vector<vector<float>> LSDFloodplain::calculate_valley_widths(LSDSpatialCSVReader
         string sixth_bit = ", \"centreline_longitude\": ";
         string seventh_bit = ", \"flow_bearing\": ";
         string eighth_bit = ", \"orthogonal_bearing\": ";
+        string ninth_bit = ", \"distance_from_outlet\": ";
+        string tenth_bit = ", \"drainage_area\": ";
+        string eleventh_bit = ", \"elevation\": ";
 
-        string ninth_bit = " }, \"geometry\": { \"type\": \"Linestring\", \"coordinates\": [ [";
+        string twelvth_bit = " }, \"geometry\": { \"type\": \"Linestring\", \"coordinates\": [ [";
         //string fifth_bit = dtoa(this_longitude) +","+ dtoa(latitude[i]) +" ] } },";
 
         string last_bit = " ] ] } }";
@@ -583,14 +593,16 @@ vector<vector<float>> LSDFloodplain::calculate_valley_widths(LSDSpatialCSVReader
         {
           width_lines << first_bit << total_width << second_bit << left_bank_width
                   << third_bit << right_bank_width << fourth_bit << this_node << fifth_bit << latitude << sixth_bit << longitude << seventh_bit 
-                  << flow_bearing << eighth_bit << orthogonal_bearing << ninth_bit << left_longitude << "," << left_latitude << "], [" << right_longitude << "," << right_latitude << last_bit
+                  << flow_bearing << eighth_bit << orthogonal_bearing << ninth_bit << DistFromOutlet_array[this_row][this_col]
+                  << tenth_bit << drainage_area << eleventh_bit << elev << twelvth_bit << left_longitude << "," << left_latitude << "], [" << right_longitude << "," << right_latitude << last_bit
                   << endl;
         }
         else
         {
           width_lines << "," << first_bit << total_width << second_bit << left_bank_width
                   << third_bit << right_bank_width << fourth_bit << this_node << fifth_bit << latitude << sixth_bit << longitude << seventh_bit 
-                  << flow_bearing << eighth_bit << orthogonal_bearing << ninth_bit << left_longitude << "," << left_latitude << "], [" << right_longitude << "," << right_latitude << last_bit
+                  << flow_bearing << eighth_bit << orthogonal_bearing << ninth_bit << DistFromOutlet_array[this_row][this_col]
+                  << tenth_bit << drainage_area << eleventh_bit << elev << twelvth_bit << left_longitude << "," << left_latitude << "], [" << right_longitude << "," << right_latitude << last_bit
                   << endl;
         }
       }
@@ -1132,6 +1144,15 @@ LSDRaster LSDFloodplain::print_UpstreamDistance_to_Raster()
   return UpstreamDistance;
 }
 
+////----------------------------------------------------------------------------------------
+//// Get the raster of nearest channel nodes for every floodplain or terrace pixel
+//// FJC 19/01/23
+////----------------------------------------------------------------------------------------
+LSDIndexRaster LSDFloodplain::print_NearestChannelNode_to_Raster()
+{
+  LSDIndexRaster NearestChannelNode(NRows,NCols, XMinimum, YMinimum, DataResolution, NoDataValue, NearestChannelNode_array, GeoReferencingStrings);
+  return NearestChannelNode;
+}
 
 ////----------------------------------------------------------------------------------------
 //// FUNCTIONS TO PRINT TEXT FILES

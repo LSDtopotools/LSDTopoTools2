@@ -51,6 +51,7 @@
 #include <math.h>
 #include <iostream>
 #include <map>
+#include <list>
 #include "LSDRaster.hpp"
 #include "LSDFlowInfo.hpp"
 #include "LSDJunctionNetwork.hpp"
@@ -146,6 +147,17 @@ class LSDCosmoData
     void check_files(string crn_fname,string Rasters_fname,string parameters_fname,
                                string soil_fname);
 
+
+
+    /// @brief This adds shielding names, with suffix _SH, to the raster vecvec
+    /// @detail This function gets implemented if you calculate shielding within the
+    ///  computation routine
+    /// @return none, but updates the raster name vecvec so that the shielding raster is included in the 
+    ///  subsequent calculations
+    /// @author SMM 
+    /// @date 03/05/2023
+    void add_shielding_fnames_to_raster_vecvec();
+
     /// @brief this gets the names of the DEMs to be used in the analysis
     /// @detail only returns the DEM, not snow shielding, topo shielding, etc
     ///  rasters
@@ -171,6 +183,16 @@ class LSDCosmoData
     /// @author SMM 
     /// @date 07/07/2015
     vector<string> get_Self_fnames();
+
+    /// @brief this gets the names of the topographic shielding rasters
+    //  to be used in the analysis
+    /// @detail returns only topographic shielding names. If name does not exist,  
+    ///  returns NULL.
+    /// @return a vector of fname strings
+    /// @author SMM 
+    /// @date 03/05/2023
+    vector<string> get_toposhield_fnames();
+
 
     /// @brief This function checks to make sure parameter values are
     ///  valid for the cosmo data
@@ -257,6 +279,30 @@ class LSDCosmoData
     /// @author SMM
     /// @date 09/02/2015 
     void basic_cosmogenic_analysis(string DEM_prefix);
+
+    /// @brief This creates a nesting map which allows one to compute the order at which 
+    ///  nested basins are calculated
+    /// @return nesting_map map that has a key as the nesting level (so smalles basis are level 0) and the sample references in lists in each level    
+    /// @author SMM
+    /// @date 30/04/2023
+    map<int,list<int>> calculate_nesting_map();
+
+    /// @brief Prints the nesting map from calculate_nesting_map()
+    /// @param nesting_map map that has a key as the nesting level (so smalles basis are level 0) and the sample references in lists in each level    
+    /// @author SMM
+    /// @date 01/05/2023
+    void print_nesting_map_to_screen(map<int, list<int>> nesting_map);
+
+
+    /// @brief This iterates through the nesting levels creating new erate rasters as it goes
+    /// @param nesting_map map that has a key as the nesting level (so smalles basis are level 0) and the sample references in lists in each level    
+    /// @param OUT_DIR the file output directory
+    /// @param OUT_ID the file prefix for the erosion file
+    /// @author SMM
+    /// @date 02/05/2023
+    void cosmogenic_analysis_nested_build_erosion_rasters(map<int, list<int>> nesting_map, 
+                                                    string OUT_DIR,string OUT_ID);
+
 
     /// @brief This function computes erosion rates and uncertainties for 
     ///  a given DEM. It is wrapped by a function that goes through
@@ -595,6 +641,12 @@ class LSDCosmoData
     /// @author SMM
     /// @date 12/03/2015
     void print_results();
+
+    /// @brief Same as print_results but you can add a string to the filename
+    /// @param file_extension this gets added to the filename
+    /// @author SMM
+    /// @date 03/05/2023
+    void print_results(string file_extension);
 
     /// @brief This function prints several rasters to file:
     ///  1) Pixel-by-pixel production scaling

@@ -711,8 +711,15 @@ void  LSDFlowInfo::get_lat_and_long_locations(double X, double Y, double& lat,
   int UTM_zone;
   bool is_North;
   get_UTM_information(UTM_zone, is_North);
-  //cout << endl << endl << "Line 1034, UTM zone is: " << UTM_zone << endl;
-
+  //cout << endl << endl << "Line 714 in LSDFlowInfo, UTM zone is: " << UTM_zone;
+  //if(is_North)
+  //{
+  //  cout << " North" << endl;
+  //}
+  //else
+  //{
+  //  cout << " South" << endl;
+  //}
 
   if(UTM_zone == NoDataValue)
   {
@@ -1401,6 +1408,9 @@ LSDRaster LSDFlowInfo::remove_nodes_influneced_by_edge(LSDRaster& topography)
   return new_topography;
 
 }
+
+
+
 
 
 LSDRaster LSDFlowInfo::find_nodes_not_influenced_by_edge_draining_to_nodelist(vector<int> node_list,LSDRaster& topography)
@@ -2524,6 +2534,39 @@ vector<int> LSDFlowInfo::Ingest_Channel_Heads_OS(string csv_filename)
   return Sources;
 }
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//
+// Get the tips of the channel network
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+LSDIndexRaster LSDFlowInfo::get_channel_tip_raster(vector<int> sources,int n_pixels_in_tips)
+{
+  Array2D<int> tips(NRows,NCols,NoDataValue);
+
+  int curr_row, curr_col, this_node;
+  int receiver_node;
+  int n_sources = int(sources.size());
+  for (int i = 0; i<n_sources; i++)
+  {
+    this_node = sources[i];
+    retrieve_current_row_and_col(sources[i],curr_row,curr_col);
+    // tag the source
+    tips[curr_row][curr_col]= 1;
+
+    // now go down the tip the appropriate number of nodes
+    for (int t = 0 ; t<n_pixels_in_tips-1; t++)
+    {
+      retrieve_receiver_information(this_node,receiver_node,curr_row,curr_col);  
+      tips[curr_row][curr_col]= 1;
+      this_node = receiver_node;    
+    }
+
+  }
+  LSDIndexRaster temp_tips(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,tips,GeoReferencingStrings);
+  return temp_tips;
+}
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // this prints the flownet information
 //
@@ -2623,7 +2666,7 @@ LSDIndexRaster LSDFlowInfo::write_FlowLengthCode_to_LSDIndexRaster()
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //
-// This function writes an LSDIndesxRaster given a list of node indices
+// This function writes an LSDIndexRaster given a list of node indices
 //
 //
 // SMM 01/06/2012
@@ -4783,6 +4826,113 @@ vector<int> LSDFlowInfo::get_flow_path(int ni)
   }
   return node_list;
 }
+
+
+float LSDFlowInfo::calculate_nci(int start_node, int end_node, LSDRaster& elevation, LSDRaster& distance_from_outlet)
+{
+  vector<float> elevations;
+  vector<float> distances;
+
+  int this_node = start_node;
+  int receiver_node;
+  int this_row, this_col;
+  float this_elevation; 
+  float this_distance;
+  
+  this_row = RowIndex[this_node];
+  this_col = ColIndex[this_node];
+  this_elevation = elevation.get_data_element(this_row,this_col);
+  this_distance = distance_from_outlet.get_data_element(this_row,this_col);
+
+  elevations.push_back(this_elevation);
+  distances.push_back(this_distance);
+
+  bool not_found_baselevel = true;
+  do
+  {
+    retrieve_receiver_information(this_node,receiver_node);
+    if(this_node == receiver_node)
+    {
+      not_found_baselevel = false;
+    }
+    else
+    {
+      this_node = receiver_node;
+
+      this_row = RowIndex[this_node];
+      this_col = ColIndex[this_node]; 
+      this_elevation = elevation.get_data_element(this_row,this_col);
+      this_distance = distance_from_outlet.get_data_element(this_row,this_col);
+      elevations.push_back(this_elevation);
+      distances.push_back(this_distance);
+    }
+  } while ( this_node != end_node && not_found_baselevel);
+
+  int n_elevations = int(elevations.size());
+  
+  float min_elevation = elevations[n_elevations-1];
+  float max_elevation = elevations[0];
+  float min_distance = distances[n_elevations-1];
+  float max_distance = distances[0];
+  float slope = (max_elevation-min_elevation)/(max_distance-min_distance);
+  float intercept = max_elevation-slope*max_distance;
+
+  vector<float> norm_delta_z;
+  float dz;
+  for(int i = 0; i< n_elevations; i++)
+  {
+    dz =  elevations[i] - (slope*distances[i]+intercept);
+    norm_delta_z.push_back( dz/(max_elevation - min_elevation)  );
+  } 
+  float NDV = -9999;
+  float nci = get_median(norm_delta_z,NDV);
+  return nci;
+}
+
+
+void LSDFlowInfo::print_vector_of_nodeindices_to_csv_file_with_latlong(vector<int> rows,vector<int> cols,string path, string filename)
+{
+
+  // these are for extracting element-wise data from the channel profiles.
+  int this_node, row,col;
+  double latitude,longitude;
+  double x_loc,y_loc;
+  LSDCoordinateConverterLLandUTM Converter;
+
+  // find the number of nodes
+  int n_rows = int(rows.size());
+
+  if (rows.size() != cols.size())
+  {
+    cout << "You are trying to print a csv from a row and column list but the two vectors are not the same size" << endl;
+    cout << "Fatal error, exiting. " << endl;
+    exit(0);
+  }
+
+  // open the data file
+  ofstream chan_out;
+  string chan_fname = path+filename+"_nodes.csv";
+  chan_out.open(chan_fname.c_str());
+  chan_out << "nodeindex,row,column,latitude,longitude,x,y" << endl;
+
+  for (int n = 0; n<n_rows; n++)
+  {
+    this_node = get_NodeIndex_from_row_col(rows[n],cols[n]);
+    get_lat_and_long_locations(rows[n],cols[n], latitude, longitude, Converter);
+    get_x_and_y_locations(rows[n],cols[n], x_loc, y_loc);
+
+    chan_out << this_node << ","
+                   << rows[n] << ","
+                   << cols[n] << ",";
+    chan_out.precision(9);
+    chan_out << latitude << ","
+             << longitude << ",";
+    chan_out.precision(9);
+    chan_out << x_loc << "," << y_loc << endl;
+  }
+
+}
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Prints a node list
@@ -8967,7 +9117,7 @@ LSDIndexRaster LSDFlowInfo::tag_nodes_upstream_of_baselevel(LSDIndexRaster& tagg
 //
 // This function takes an integer raster that has nodata and classification
 // codes. These are then propagated upslope, so all upslope nodes have
-// this code. Nodes that have recieves a classification do not reclassify:
+// this code. Nodes that have recieved a classification do not reclassify:
 // the downstream node classification "wins"
 //
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -9044,7 +9194,52 @@ LSDIndexRaster LSDFlowInfo::tag_upstream_nodes(LSDIndexRaster& tagged_raster, fl
 }
 
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This is for replacing all values upstream (and including) and outlet node
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDFlowInfo::replace_upstream_pixels_with_value(LSDRaster& value_raster, int outlet_node, float value, bool overwrite)
+{
+  // We just double check if the dimensions are the same
+  int NRows_ir = value_raster.get_NRows();
+  int NCols_ir = value_raster.get_NCols();
+  float NDV = value_raster.get_NoDataValue();
 
+  int curr_row,curr_col,curr_node;
+  float this_value;
+
+  if ( (NRows_ir != NRows) || (NCols_ir != NCols) )
+  {
+    cout << "Fatal error. You are trying to make a tagged raster using LSDFlowInfo::tag_upslope_nodes" << endl;
+    cout << "but the raster and the flow info object do not have the same rows and columns." << endl;
+    exit(0);
+  }
+
+
+  vector<int> upslope_nodes;
+  upslope_nodes = get_upslope_nodes_include_outlet(outlet_node);
+
+  int n_nodes = int(upslope_nodes.size());
+  for(int n= 0; n<n_nodes; n++)
+  {
+    curr_node = upslope_nodes[n];
+    retrieve_current_row_and_col(curr_node,curr_row,curr_col);
+
+    if(overwrite)
+    {
+      value_raster.set_data_element(curr_row,curr_col,value);
+    }
+    else
+    {
+      this_value = value_raster.get_data_element(curr_row,curr_col);
+      if(this_value == NDV)
+      {
+        value_raster.set_data_element(curr_row,curr_col,value);
+      }
+    }   
+  }
+}
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
@@ -9130,8 +9325,54 @@ LSDIndexRaster LSDFlowInfo::tag_downstream_nodes(LSDIndexRaster& tagged_raster, 
 
 }
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This takes a node list and a category list and tags all upstream pixes of the 
+// *donors* to those tagged pixels. 
+// Used to tag pixels draining to a categorised channel
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDIndexRaster LSDFlowInfo::tag_donor_pixels_exclude_nodelist(vector<int> node_list, vector<int> categories)
+{
 
+  int current_node, row,col;
+  vector<int> donor_list;
+  int this_donor;
 
+  // create the data array
+  Array2D<int> new_tags(NRows,NCols,int(NoDataValue));
+
+  for(int node = 0; node < int(node_list.size()); node++)
+  {
+    donor_list = get_donor_nodes( node_list[node]);
+
+    for(int d = 0; d< int(donor_list.size()); d++)
+    {
+      this_donor = donor_list[d];
+      if(find(node_list.begin(), node_list.end(), this_donor) != node_list.end()) 
+      {
+        // The donor is in the channel. Do nothing
+      } 
+      else 
+      {
+        // The donor is not in the channel. Apply tag. 
+        retrieve_current_row_and_col(this_donor,row,col);
+        new_tags[row][col] = categories[node];
+      }
+    }
+  }
+
+  // Now you need to tag the upstream nodes
+  LSDIndexRaster temp_tagged(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,new_tags,GeoReferencingStrings);
+
+  temp_tagged.write_raster("temp_tagged","bil");
+
+  // Now tag these values
+  float crit_upslope_distance = 1000000000000;      // big number to get all pixels
+  LSDIndexRaster tagged_raster = tag_upstream_nodes(temp_tagged, crit_upslope_distance);
+  
+  return tagged_raster;  
+}
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //

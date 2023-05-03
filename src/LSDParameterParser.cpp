@@ -955,7 +955,7 @@ vector<int> LSDParameterParser::parse_int_vector(string key)
 }
 
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-// This parses a vector of ints
+// This parses a vector of floats
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 vector<float> LSDParameterParser::parse_float_vector(string key)
 {
@@ -988,6 +988,44 @@ vector<float> LSDParameterParser::parse_float_vector(string key)
   return this_float_vec;
 
 }
+
+
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// This parses a vector of floats
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+vector<double> LSDParameterParser::parse_double_vector(string key)
+{
+  cout << "I am going to parse a double vector for you!" << endl;
+  cout << "The striong to parse is: " << key << endl;
+
+  string this_string = string_parameters[key];
+
+  // reset the string vec
+  vector<double> this_double_vec;
+
+  // create a stringstream
+  stringstream ss(this_string);
+
+  // import the data, using a comma to separate
+  while( ss.good() )
+  {
+    string substr;
+    getline( ss, substr, ',' );
+
+    // remove the spaces
+    substr.erase(remove_if(substr.begin(), substr.end(), ::isspace), substr.end());
+
+    // remove control characters
+    substr.erase(remove_if(substr.begin(), substr.end(), ::iscntrl), substr.end());
+
+    // add the string to the string vec
+    this_double_vec.push_back( atof(substr.c_str()) );
+  }
+
+  return this_double_vec;
+
+}
+
 
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // This checks boundary conditions  for flow info

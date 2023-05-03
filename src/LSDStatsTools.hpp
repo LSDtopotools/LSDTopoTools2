@@ -440,6 +440,11 @@ void RemoveSmallBins(vector<float>&  MeanX_output, vector<float>& MeanY_output,
                       vector<float>& midpoints_output, vector<float>& StandardDeviationX_output, vector<float>& StandardDeviationY_output,
                       vector<float>& StandardErrorX_output, vector<float>& StandardErrorY_output, vector<int>& number_observations, float bin_threshold);
 
+// this reads in a vector of data and a vector of boundary values. 
+// the function sorts the boundary values and then assignes each of the data
+// points a value based on what is in the data vector
+vector<int> categorise(vector<double> data, vector<double> boundaries);
+
 // Load in a vector of data and convert into a histogram with a specified bin width
 // that is printed to file containing:
 //    Midpoint LowerLim UpperLim Count ProbabilityDensity
@@ -547,6 +552,19 @@ double rad(double degree);
 // conversion from radians to degrees
 float deg(float radians);
 double deg(double radians);
+
+// This returns a vector with 4 elements that has the equation of a plane based on three points
+vector<double> get_plane_coefficients_from_points(double x1, double y1, double z1, 
+                                                 double x2, double y2, double z2,
+                                                 double x3, double y3, double z3);
+
+// This uses the plane coefficients from the get_plane_coefficients_from_points function
+// and then calculates the z component of a point. 
+double get_z_coord_of_point_on_plane(double x1,double y1, vector<double> plane_coefficients);
+
+
+// This gets the cross product of two vectors
+vector<double> vector_cross_product(double i1, double j1, double k1, double i2, double j2, double k2); 
 
 // Get the angle between two vectors
 float angle_between_vectors(float x1, float y1, float x2, float y2);

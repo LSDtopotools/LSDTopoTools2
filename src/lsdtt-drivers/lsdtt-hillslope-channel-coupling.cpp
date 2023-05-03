@@ -81,7 +81,7 @@
 int main (int nNumberofArgs,char *argv[])
 {
 
-  string version_number = "0.7";
+  string version_number = "0.8";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -205,6 +205,9 @@ int main (int nNumberofArgs,char *argv[])
   // Channel extraction
   bool_default_map["print_wiener_channels"] = false;
   help_map["print_wiener_channels"] = {  "bool","false","Prints the channel network determined by the Wiener method which is a mashup of Passalacqua and Pelletier methods first reported by grieve et al 2016.","Output is a csv file."};
+
+  bool_default_map["print_perona_malik_channels"] = false;
+  help_map["print_perona_malik_channels"] = {  "bool","false","Prints the channel network determined by the Perona-Malik method (Passalacqua et al., 2010)","Output is a csv file."};
 
   float_default_map["pruning_drainage_area"] = 1000;
   help_map["pruning_drainage_area"] = {  "float","1000","In both driech and Wiener channels with less than this drainage area are removed during the pruning process.","In m^2."};
@@ -343,6 +346,10 @@ int main (int nNumberofArgs,char *argv[])
 
   bool_default_map["convert_csv_to_geojson"] = false;
   help_map["convert_csv_to_geojson"] = {  "bool","false","Converts csv files to geojson files","Makes csv output easier to read with a GIS. Warning: these files are much bigger than csv files."};
+
+  bool_default_map["print_channels_to_line_vector"] = false;
+  help_map["print_channels_to_line_vector"] = { "bool","true","If this is true print a geojson with the channel network as a polyline.","Used for more efficient visualisation of the channel network."};
+
 
   // These are the HFR printing flags
   bool_default_map["run_HFR_analysis"] = false;
@@ -847,6 +854,50 @@ int main (int nNumberofArgs,char *argv[])
       sources = FlowInfo.ProcessEndPointsToChannelHeads(Ends);
 
     }
+    if (this_bool_map["print_perona_malik_channels"])
+    {
+      cout << "I am calculating channels using a QQ threshold algorithm (doi:10.1029/2012WR012452)." << endl;
+      cout << "and a Perona-Malik filter similar to GeoNet (Passalacqua et al, 2010): " << endl;
+      cout << "doi:10.1029/2009JF001254" << endl;
+
+      // initiate the spectral raster
+      LSDRasterSpectral Spec_raster(topography_raster);
+
+      string QQ_fname = OUT_DIR+OUT_ID+"__qq.txt";
+
+      cout << "I am am getting the connected components using a weiner QQ filter." << endl;
+      cout << "Area threshold is: " << this_float_map["pruning_drainage_area"] << " window is: " <<  this_float_map["surface_fitting_radius"] << endl;
+
+      LSDIndexRaster connected_components = Spec_raster.IsolateChannelsPeronaMalikQQ(this_float_map["pruning_drainage_area"],
+                                                         this_float_map["surface_fitting_radius"], QQ_fname);
+
+      cout << "I am filtering by connected components" << endl;
+      LSDIndexRaster connected_components_filtered = connected_components.filter_by_connected_components(this_int_map["connected_components_threshold"]);
+      LSDIndexRaster CC_raster = connected_components_filtered.ConnectedComponents();
+
+      cout << "I am thinning the network to a skeleton." << endl;
+      LSDIndexRaster skeleton_raster = connected_components_filtered.thin_to_skeleton();
+
+      cout << "I am finding the finding end points" << endl;
+      LSDIndexRaster Ends = skeleton_raster.find_end_points();
+      Ends.remove_downstream_endpoints(CC_raster, Spec_raster);
+
+      //this processes the end points to only keep the upper extent of the channel network
+      cout << "getting channel heads" << endl;
+      vector<int> tmpsources = FlowInfo.ProcessEndPointsToChannelHeads(Ends);
+
+      cout << "got all the end points" << endl;
+
+      // we need a temp junction network to search for single pixel channels
+      LSDJunctionNetwork tmpJunctionNetwork(tmpsources, FlowInfo);
+      LSDIndexRaster tmpStreamNetwork = tmpJunctionNetwork.StreamOrderArray_to_LSDIndexRaster();
+
+      cout << "removing single px channels" << endl;
+      sources = FlowInfo.RemoveSinglePxChannels(tmpStreamNetwork, tmpsources);
+
+      //Now we have the final channel heads, so we can generate a channel network from them
+      //LSDJunctionNetwork ChanNetwork(FinalSources, FlowInfo);
+    }
     else
     {
       cout << "\t\tI'm calculating sources using a threshold area routine." << endl;
@@ -894,6 +945,7 @@ int main (int nNumberofArgs,char *argv[])
   // now get the junction network
   cout << "\t I am now getting the junction network..." << endl;
   LSDJunctionNetwork JunctionNetwork(sources, FlowInfo);
+  cout << "\t Got the junction network" << endl;
 
 
   // Print channels and junctions if you want them.
@@ -950,6 +1002,16 @@ int main (int nNumberofArgs,char *argv[])
       thiscsv.print_data_to_geojson(gjson_name);
     }
   }
+
+  // Print channel network to polyline
+  if (this_bool_map["print_channels_to_line_vector"])
+  {
+    string channel_geojson_name = OUT_DIR+OUT_ID+"_PM_CN_line";
+    cout << "I am going to print your channel network to a line geojson" << endl;
+    // distance from outlet
+    JunctionNetwork.PrintChannelNetworkToLineVector(FlowInfo, channel_geojson_name, filled_topography, DrainageArea, DistanceFromOutlet);
+  }
+
 
   // Print stream order rasters if you want them
   if (this_bool_map["print_stream_order_raster"])
@@ -1127,9 +1189,13 @@ int main (int nNumberofArgs,char *argv[])
   cout << "I have finished with the baselevel junctions. They are: " << endl;
   for (int i = 0; i<int(BaseLevelJunctions.size()); i++)
   {
-    cout << BaseLevelJunctions[i] << endl;
+    cout << BaseLevelJunctions[i] << "  ";
+    if (i%10==0)
+    {
+      cout << endl;
+    }
   }
-  cout << "======================================" << endl;
+  cout << endl << "======================================" << endl;
   cout << endl << endl << endl;
 
 
@@ -1628,9 +1694,10 @@ int main (int nNumberofArgs,char *argv[])
       }
 
     }
-    else
+    else            // Everything below here is the new version of the code
     {
       cout << "Calculating hilltop flow tracing." << endl;
+      cout << "I am using the new and refactored version of the routing code." << endl;
       auto t1 = std::chrono::high_resolution_clock::now();
       string ht_csv_full_fname = OUT_DIR+OUT_ID+"_RidgeData.csv";   // name of the ridgeline file
       FlowInfo.HilltopFlowRouting_TerrifyingRefactored(filled_topography, Surfaces[2], Surfaces[4], 

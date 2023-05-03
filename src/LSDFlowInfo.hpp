@@ -281,6 +281,8 @@ class LSDFlowInfo
     /// @date 26/04/2017
     void get_lat_and_long_from_current_node(int current_node, double& current_lat, double& current_long, LSDCoordinateConverterLLandUTM Converter);
 
+
+
     /// @brief This function takes a vector of node indices and prints a csv
     ///   file that can be read by arcmap
     /// @param nodeindex vec is a vector of nodeindices (which are ints)
@@ -307,6 +309,19 @@ class LSDFlowInfo
     /// @author SMM
     /// @date 20/05/16
     void print_vector_of_nodeindices_to_csv_file_with_latlong(vector<int>& nodeindex_vec, string outfilename, LSDRaster& add_value, string add_column_name);
+
+
+    /// @brief This function takes a vector of rows and columns and prints a csv
+    ///  file that can be read by arcmap: similar to above but also prints lat and long
+    /// @detail Adds an option for a path
+    /// @param rows a vector of row values (which are ints)
+    /// @param cols a vector of col values (which are ints)
+    /// @param path to the outfile
+    /// @param outfilename is a string of the filename
+    /// @author SMM
+    /// @date 17/12/22
+    void print_vector_of_nodeindices_to_csv_file_with_latlong(vector<int> rows, vector<int> cols,string path, string filename);
+
 
     /// @brief This function takes a vector of node indices and prints a csv
     ///  file that can be read by arcmap: similar to above but also prints lat and long
@@ -615,6 +630,15 @@ class LSDFlowInfo
     /// @date 28/11/16
     vector<int> Ingest_Channel_Heads_OS(string csv_filename);
 
+    /// @brief This goes through soureces and follows them down a set number of pixels
+    ///  so that we get a raster that has all the channel tips
+    /// @param sources the sources vector
+    /// @param n_pixels_in_tips the number of pixels to follow down the channel
+    /// @return A raster of channel tips
+    /// @author SMM
+    /// @date 18/02/2023
+    LSDIndexRaster get_channel_tip_raster(vector<int> sources,int n_pixels_in_tips);
+
     //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     // Minimalistic method to ingest the channel heads from vectors of x y coordinates
     // Using xy allows a "universal" method that can ingest external or internal data
@@ -753,6 +777,13 @@ class LSDFlowInfo
     /// @author FC
     /// @date 08/10/13
     int is_node_upstream(int current_node, int test_node);
+
+    /// @brief This function tests for nesting of a list of node indices
+    /// @param input_nodes a vector of nodes to be tested
+    /// @return nesting_map this is a dictionary that has each input node as a key and the value is a vector of nested nodes within that node
+    /// @author SMM
+    /// @date 30/04/2023
+    map<int, vector<int> > extract_nesting_map(vector<int> input_nodes);
 
     /// @brief This function tests whether a node is a base level node
     /// @param node
@@ -1101,6 +1132,16 @@ class LSDFlowInfo
     /// @date 12/03/2021
     vector<int> get_flow_path(int ni);
 
+    /// @brief Calculates the nci statistic using a start and end point
+    /// @param start_node the nodeindex of the starting point
+    /// @param end_node the nodeindex of the end point. It will go to a base level node if it does not stop here
+    /// @param elevation a raster containing the elevation
+    /// @param distance from outlet a raster of the distance from outlet, duh
+    /// @return The nci
+    /// @author SMM
+    /// @date 11/10/2022
+    float calculate_nci(int start_node, int end_node, LSDRaster& elevation, LSDRaster& distance_from_outlet);
+
 
     /// @brief Move the location of the channel head downslope by a user defined distance.
     /// @param Sources a vector of node indexes of the channel heads to be moved.
@@ -1410,6 +1451,17 @@ class LSDFlowInfo
     /// @date 11/11/2020
     LSDIndexRaster tag_upstream_nodes(LSDIndexRaster& tagged_raster, float crit_downslope_distance);
 
+    /// @brief This takes a node index and then replaces all upstream pixes with a value. 
+    ///  WARNING this overwrites the raster in place. 
+    /// @param value_raster the raster with values to be changed
+    /// @param outlet_node the outlet node of the basin
+    /// @param value the value for the upstream pixels to take
+    /// @param overwrite if true overwrites values, if false will only replace nodata
+    /// @return none but replaces values in value_raster
+    /// @author SMM
+    /// @date 02/05/2023
+    void replace_upstream_pixels_with_value(LSDRaster& value_raster, int outlet_node, float value, bool overwrite);
+
 
     /// @brief This function takes an integer raster that has some tags
     ///  and then tags all downstream nodes with that tag. It stops when you have got too far downstream
@@ -1421,6 +1473,16 @@ class LSDFlowInfo
     /// @date 11/12/2020
     LSDIndexRaster tag_downstream_nodes(LSDIndexRaster& tagged_raster, float crit_downslope_distance);
 
+    /// @brief This takes a node list and a list of the same length that has categories
+    ///  and tags upstream of all the *donor* pixels to the node list. 
+    ///  Used to tag pixels categorised in a channel. 
+    /// @param node_list the list of nodes from which we categorise the donors. 
+    /// @param categories The categories used in the tags
+    /// @return An index raster that has all pixels upstream of the tagged regions taking the tagged value
+    ///   within a flow distance window
+    /// @author SMM
+    /// @date 15/12/2022
+    LSDIndexRaster tag_donor_pixels_exclude_nodelist(vector<int> node_list, vector<int> categories);
 
     /// @brief This function returns all the values from a raster for a corresponding
     /// input vector of node indices.

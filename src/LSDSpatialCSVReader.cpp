@@ -391,6 +391,29 @@ void LSDSpatialCSVReader::load_csv_data(string filename)
 //==============================================================================
 
 
+void LSDSpatialCSVReader::add_placeholder_latitude_and_longitude()
+{
+  cout << "I am going to make some placeholder latitude and longitude columns." << endl;
+  cout << "You should only do this if you have x,y information but no latitude and longitude. " << endl;
+
+  // First get a data column
+  map<string, vector<string> >::iterator it = data_map.begin();
+
+  vector<string> first_column = it->second;
+  vector<double> temp_longitude;
+  vector<double> temp_latitude;
+
+  int n_rows = int(first_column.size());
+
+  for(int r = 0; r<n_rows; r++)
+  {
+    temp_longitude.push_back(0);
+    temp_latitude.push_back(0);
+  }
+
+  latitude = temp_latitude;
+  longitude = temp_longitude;
+}
 
 
 //==============================================================================
@@ -614,7 +637,14 @@ vector<float> LSDSpatialCSVReader::data_column_to_float(string column_name)
   int N_data_elements = string_vec.size();
   for(int i = 0; i<N_data_elements; i++)
   {
-    float_vec.push_back( atof(string_vec[i].c_str()));
+    if(string_vec[i]=="NaN")
+    {
+      float_vec.push_back(NoDataValue);
+    }
+    else
+    {
+      float_vec.push_back( atof(string_vec[i].c_str()));
+    }
   }
   return float_vec;
 }
@@ -652,6 +682,31 @@ vector<double> LSDSpatialCSVReader::data_column_to_double(string column_name)
   }
   return double_vec;
 }
+
+
+// Takes a data column and categorises it. 
+void LSDSpatialCSVReader::data_column_add_categorised(string column_name, string new_column_name, 
+                                                  vector<double> boundaries)
+{
+  vector<double> double_vals = data_column_to_double(column_name);
+  // the categorise function ceoms from LSDStatsTools.
+  vector<int> categorised = categorise(double_vals, boundaries);
+
+  vector<string> column_data;
+  string this_str;
+
+  // convert this column to strings
+  for (int i = 0; i< int(categorised.size()); i++)
+  {
+    this_str = itoa( categorised[i]);
+    column_data.push_back(this_str);
+  }
+
+  // add the column
+  add_data_column(new_column_name, column_data);
+
+}
+
 
 // Adds a float to a data column
 void LSDSpatialCSVReader::data_column_add_float(string column_name, float add_value)
@@ -1948,15 +2003,17 @@ void LSDSpatialCSVReader::interpolate_across_gap(LSDRaster& ThisRaster, string X
       ThisRaster.get_x_and_y_locations(row-1, col, s_x, s_y);
       ThisRaster.get_x_and_y_locations(row-1, col+1, se_x, se_y);
 
-      if((next_x == nw_x && next_y == nw_y)
-      || (next_x == n_x && next_y == n_y)
-      || (next_x == ne_x && next_y == ne_y)
-      || (next_x == e_x && next_y == e_y)
-      || (next_x == w_x && next_y == w_y)
-      || (next_x == sw_x && next_y == sw_y)
-      || (next_x == s_x && next_y == s_y)
-      || (next_x == se_x && next_y == se_y)
-      )
+      float tolerance = 0.0001;
+
+      // make sure the differences are less than the tolerance
+      if((fabs(next_x - nw_x) < tolerance && fabs(next_y - nw_y) < tolerance)
+      || (fabs(next_x - n_x) < tolerance  && fabs(next_y - n_y) < tolerance)
+      || (fabs(next_x - ne_x) < tolerance && fabs(next_y - ne_y) < tolerance)
+      || (fabs(next_x - e_x) < tolerance && fabs(next_y - e_y) < tolerance)
+      || (fabs(next_x - w_x) < tolerance && fabs(next_y - w_y) < tolerance)
+      || (fabs(next_x - sw_x) < tolerance && fabs(next_y - sw_y) < tolerance)
+      || (fabs(next_x - s_x) < tolerance && fabs(next_y - s_y) < tolerance)
+      || (fabs(next_x - se_x) < tolerance && fabs(next_y - se_y) < tolerance))
       {
         // cout << "We've got the next node, all good" << endl;
       }
@@ -1966,6 +2023,12 @@ void LSDSpatialCSVReader::interpolate_across_gap(LSDRaster& ThisRaster, string X
 
         cout << "There seems to be a gap." << endl;
         gap_counter = gap_counter +1;
+
+        //cout << "x locs: " << next_x << ", " << nw_x << ", " << n_x << ", " << ne_x << ", " << e_x << ", " << endl;
+        //cout << w_x << ", "<< sw_x << ", " << s_x << ", " << se_x << endl << endl;
+
+        //cout << "y locs: " << next_y << ", " << nw_y << ", " << n_y << ", " << ne_y << ", " << e_y << ", " << endl;
+        //cout << w_y << ", "<< sw_y << ", " << s_y << ", " << se_y << endl << endl;
 
         float diff_flowdist;
         cout << "Flow distance is " << flow_distance[i] << endl;
@@ -1979,7 +2042,10 @@ void LSDSpatialCSVReader::interpolate_across_gap(LSDRaster& ThisRaster, string X
         {
           cout << "I think we are at the head of a channel, let's ignore this point." << endl;
         }
-
+        else if( fabs(diff_flowdist) < tolerance)
+        {
+          cout << "The flowdistance difference is really small. I am ignoring this gap." << endl;
+        }
         else
         {
 

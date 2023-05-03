@@ -208,6 +208,14 @@ class LSDParameterParser
     /// @date 09/17/2016
     vector<float> parse_float_vector(string key);
 
+    /// @brief This function takes a parameter from the string map and parses it
+    ///  into a vector of doubles
+    /// @param key the string that is the key into the string map
+    /// @return A vector of doubles
+    /// @author SMM
+    /// @date 15/12/2022
+    vector<double> parse_double_vector(string key);
+
     /// @brief This forces the read and write extensions to bil
     /// @author SMM
     /// @date 02/11/16

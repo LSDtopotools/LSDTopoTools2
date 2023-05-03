@@ -138,6 +138,13 @@ class LSDSpatialCSVReader
     /// @date 14/03/2017
     bool check_if_latitude_and_longitude_exist();
 
+    /// @brief If you have x,y, data but no latitude and longitude this will make 
+    ///  0 latitude and longitude columns so you can use the x,y, data to overwite them with a call to 
+    ///  get_latlong_from_x_and_y
+    /// @author SMM
+    /// @date 03/11/2022
+    void add_placeholder_latitude_and_longitude();
+
     /// @brief This tests to see if  all the data columns are the same length
     ///  as the latitude and longitude data columns
     /// @return all_data_columns_exist This is true if the data columns are the
@@ -186,7 +193,7 @@ class LSDSpatialCSVReader
       string long_column_name, vector<float>& UTME,vector<float>& UTMN);
 
     /// @brief This takes the X and Y columns in a csv, assumes they are UTM, and converts to
-    ///  latitude and loingitude in WGS84
+    ///  latitude and longitude in WGS84
     /// @param X_column_name Name of the column in the csv with X coordinate (easting)
     /// @param Y_column_name Name of the column in the csv with Y coordinate (northing)
     /// @author SMM
@@ -250,6 +257,16 @@ class LSDSpatialCSVReader
     /// @author SMM
     /// @date 17/02/2017
     vector<string> get_data_column(string column_name);
+
+    /// @brief  This function takes a column, converts to double, and then categorises it based on
+    ///    boundary vales
+    /// @param column_name The name of the column you want to categorise
+    /// @param new_column_name The name of the new categorised column
+    /// @param boundaries Values used to separate the data column into categories
+    /// @author SMM
+    /// @date 15/12/2022
+    void data_column_add_categorised(string column_name, string new_column_name, 
+                                                  vector<double> boundaries);
 
     /// @brief This gets a data column from the csv file, and converts it to a
     ///   float vector

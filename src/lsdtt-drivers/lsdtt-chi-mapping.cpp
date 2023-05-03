@@ -80,7 +80,7 @@
 int main (int nNumberofArgs,char *argv[])
 {
 
-  string version_number = "0.7";
+  string version_number = "0.8";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -540,6 +540,10 @@ int main (int nNumberofArgs,char *argv[])
   help_map["precipitation_fname"] = {  "string","NULL","Raster prefix of the precipitation raster you will use to accumulate into discharge. Do not include extension","This is used when use_precipitation_raster_for_chi is true."};
 
 
+  // Some parameters for NCI calculations
+  bool_default_map["calculate_NCI"] = false;  
+  help_map["calculate_NCI"] = {  "bool","false","Calculates the NCI from Chen et al","This also gives the data fro a slope-area analysis and extracting the hack exponent of the longest channel."};
+ 
   // These give unique IDs to each segment and then add this information to the
   // MChi and also semgent raster. We use this to map segments to other landscape
   // properties such as various hillslope metrics
@@ -553,15 +557,12 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["print_litho_info"] = false;
   help_map["print_litho_info"] = {  "bool","false","If this is true takes a lithology raster and adds the lithology code to the chi data maps.","Use litho_raster to assign the raster name."};
 
-
   string_default_map["litho_raster"] = "NULL";
   help_map["litho_raster"] = {  "string","NULL","Raster prefix of the lithology raster you will use. It adds lithology information to the chi data maps. Do not include extension","This is used when print_litho_info is true."};
-
 
   // network routines
   bool_default_map["create_network"] = false;
   help_map["create_network"] = {  "bool","false"," This will sample the channel network to get nodes with a target spacing. Can be used to create networks e.g. for use with Landlab NST.","Set parameter link_length to define target spacing. Nodes will always be assigned at channel heads and trib junctions."};
-
 
   int_default_map["link_length"] = 100;
   help_map["link_length"] = { "int", "100","Length of the links","This defines the target node spacing for the network using the create_network function."};
@@ -814,6 +815,17 @@ int main (int nNumberofArgs,char *argv[])
   int minimum_basin_size_pixels = this_int_map["minimum_basin_size_pixels"];
   int basic_Mchi_regression_nodes = this_int_map["basic_Mchi_regression_nodes"];
 
+
+
+  //========================================================================
+  //
+  //.##.......####....####...#####...........#####....####...######...####..
+  //.##......##..##..##..##..##..##..........##..##..##..##....##....##..##.
+  //.##......##..##..######..##..##..........##..##..######....##....######.
+  //.##......##..##..##..##..##..##..........##..##..##..##....##....##..##.
+  //.######...####...##..##..#####...........#####...##..##....##....##..##.
+  //
+  //========================================================================
   // load the  DEM
   LSDRaster topography_raster;
   if (this_bool_map["remove_seas"])
@@ -1022,6 +1034,18 @@ int main (int nNumberofArgs,char *argv[])
     filled_topography.write_raster(filled_raster_name,raster_ext);
   }
 
+
+  //============================================================================
+  //
+  //.##..##..######..##......##.......####...##..##...####...#####...######.
+  //.##..##....##....##......##......##......##..##..##..##..##..##..##.....
+  //.######....##....##......##.......####...######..######..##..##..####...
+  //.##..##....##....##......##..........##..##..##..##..##..##..##..##.....
+  //.##..##..######..######..######...####...##..##..##..##..#####...######.
+  //
+  //============================================================================
+  // Compute hillshade and print
+  //============================================================================
   if (this_bool_map["write_hillshade"])
   {
     cout << "Let me print the hillshade for you. " << endl;
@@ -1034,7 +1058,15 @@ int main (int nNumberofArgs,char *argv[])
     hs_raster.write_raster(hs_fname,raster_ext);
   }
 
-
+  //============================================================================
+  //
+  //.######..##.......####...##...##..........#####....####...##..##..######..######..##..##...####..
+  //.##......##......##..##..##...##..........##..##..##..##..##..##....##......##....###.##..##.....
+  //.####....##......##..##..##.#.##..........#####...##..##..##..##....##......##....##.###..##.###.
+  //.##......##......##..##..#######..........##..##..##..##..##..##....##......##....##..##..##..##.
+  //.##......######...####....##.##...........##..##...####....####.....##....######..##..##...####..
+  //
+  //============================================================================
   cout << "\t Flow routing..." << endl;
   // get a flow info object
   LSDFlowInfo FlowInfo(boundary_conditions,filled_topography);
@@ -1056,6 +1088,19 @@ int main (int nNumberofArgs,char *argv[])
   cout << "\t Calculating flow distance..." << endl;
   LSDRaster DistanceFromOutlet = FlowInfo.distance_from_outlet();
 
+
+
+  //=================================================================
+  //==============================================================
+  //
+  //..####....####...##..##..#####....####...######...####..
+  //.##......##..##..##..##..##..##..##..##..##......##.....
+  //..####...##..##..##..##..#####...##......####.....####..
+  //.....##..##..##..##..##..##..##..##..##..##..........##.
+  //..####....####....####...##..##...####...######...####..
+  //
+  //==============================================================
+  //=================================================================
   cout << "\t Loading Sources..." << endl;
   cout << "\t Source file is... " << CHeads_file << endl;
 
@@ -1077,6 +1122,16 @@ int main (int nNumberofArgs,char *argv[])
     cout << "\t Got sources!" << endl;
   }
 
+
+  //==========================================================================
+  //
+  //.######..##..##..##..##...####...######..######...####...##..##...####..
+  //.....##..##..##..###.##..##..##....##......##....##..##..###.##..##.....
+  //.....##..##..##..##.###..##........##......##....##..##..##.###...####..
+  //.##..##..##..##..##..##..##..##....##......##....##..##..##..##......##.
+  //..####....####...##..##...####.....##....######...####...##..##...####..
+  //
+  //==========================================================================  
   // now get the junction network
   LSDJunctionNetwork JunctionNetwork(sources, FlowInfo);
 
@@ -1176,6 +1231,16 @@ int main (int nNumberofArgs,char *argv[])
   vector< int > BaseLevelJunctions;
   vector< int > BaseLevelJunctions_Initial;
 
+
+  //=================================================================================
+  //
+  //.#####....####....####...######..##..##...####..
+  //.##..##..##..##..##........##....###.##..##.....
+  //.#####...######...####.....##....##.###...####..
+  //.##..##..##..##......##....##....##..##......##.
+  //.#####...##..##...####...######..##..##...####..
+  //
+  //=================================================================================     
   if(this_bool_map["force_all_basins"] == false )
   {
     //Check to see if a list of junctions for extraction exists
@@ -1363,14 +1428,15 @@ int main (int nNumberofArgs,char *argv[])
   
 
 
-  // This is for debugging
-  //for (int BN = 0; BN< N_BaseLevelJuncs; BN++)
-  //{
-  //  cout << "BL junc is: " << BaseLevelJunctions[BN] << " node is: " << JunctionNetwork.get_Node_of_Junction(BaseLevelJunctions[BN]) << endl;
-  //  vector<int> UPSN = FlowInfo.get_upslope_nodes(JunctionNetwork.get_Node_of_Junction(BaseLevelJunctions[BN]));
-  //  cout << "Pixels for that node are: " << UPSN.size() << endl;
-  //}
-
+  //====================================================================================
+  //
+  //..####...##..##..######..........######..##..##..######..#####....####....####...######..######...####...##..##.
+  //.##..##..##..##....##............##.......####.....##....##..##..##..##..##..##....##......##....##..##..###.##.
+  //.##......######....##............####......##......##....#####...######..##........##......##....##..##..##.###.
+  //.##..##..##..##....##............##.......####.....##....##..##..##..##..##..##....##......##....##..##..##..##.
+  //..####...##..##..######..........######..##..##....##....##..##..##..##...####.....##....######...####...##..##.
+  //
+  //====================================================================================
   //============================================================================
   // THE CHI STUFF STARTS HERE
   // now use a ChiTool object to print the chi tree to csv
@@ -1524,7 +1590,15 @@ int main (int nNumberofArgs,char *argv[])
     }
   }
 
-
+  //============================================================================
+  //
+  //..####...##..##..######...........####...######...####...##...##..######..##..##..######...####...######..######...####...##..##.
+  //.##..##..##..##....##............##......##......##......###.###..##......###.##....##....##..##....##......##....##..##..###.##.
+  //.##......######....##.............####...####....##.###..##.#.##..####....##.###....##....######....##......##....##..##..##.###.
+  //.##..##..##..##....##................##..##......##..##..##...##..##......##..##....##....##..##....##......##....##..##..##..##.
+  //..####...##..##..######...........####...######...####...##...##..######..##..##....##....##..##....##....######...####...##..##.
+  //
+  //============================================================================  
   // now source and outlet nodes for segmentation and other operations.
   vector<int> source_nodes;
   vector<int> outlet_nodes;
@@ -1972,8 +2046,15 @@ int main (int nNumberofArgs,char *argv[])
   }
   //============================================================================
 
-
-
+  //============================================================================
+  //
+  //..####....####...##..##...####....####...##..##..######..######..##..##..........######..##..##..#####...######..##..##.
+  //.##..##..##..##..###.##..##..##..##..##..##..##....##......##.....####.............##....###.##..##..##..##.......####..
+  //.##......##..##..##.###..##......######..##..##....##......##......##..............##....##.###..##..##..####......##...
+  //.##..##..##..##..##..##..##..##..##..##...####.....##......##......##..............##....##..##..##..##..##.......####..
+  //..####....####...##..##...####...##..##....##....######....##......##............######..##..##..#####...######..##..##.
+  //
+  //============================================================================
   // This was an attempt to use a monte carlo markov chain method to calculate uncertainty
   // but it doesn't really work: very computationally expensive and to get the correct 
   // acceptance rate on the metropolis algorithm (25-33%) you need a sigma value so high that it
@@ -2244,8 +2325,15 @@ int main (int nNumberofArgs,char *argv[])
 
 
 
-
-
+  //=================================================================================================================================
+  //
+  //..####...##..##..######..........#####...#####....####...######..######..##......######..........#####...#####...######..##..##..######.
+  //.##..##..##..##....##............##..##..##..##..##..##..##........##....##......##..............##..##..##..##....##....###.##....##...
+  //.##......######....##............#####...#####...##..##..####......##....##......####............#####...#####.....##....##.###....##...
+  //.##..##..##..##....##............##......##..##..##..##..##........##....##......##..............##......##..##....##....##..##....##...
+  //..####...##..##..######..........##......##..##...####...##......######..######..######..........##......##..##..######..##..##....##...
+  //
+  //=================================================================================================================================
   if(this_bool_map["print_profiles_fxn_movern_csv"] )
   {
     cout << endl << "Let me loop through m/n values and print the profiles to a single csv." << endl;
@@ -2348,6 +2436,15 @@ int main (int nNumberofArgs,char *argv[])
     }
   }
 
+  //==================================================================================
+  //
+  //..####...##.......####...#####...######...........####...#####...######...####..
+  //.##......##......##..##..##..##..##..............##..##..##..##..##......##..##.
+  //..####...##......##..##..#####...####....######..######..#####...####....######.
+  //.....##..##......##..##..##......##..............##..##..##..##..##......##..##.
+  //..####...######...####...##......######..........##..##..##..##..######..##..##.
+  //
+  //==================================================================================  
   if (this_bool_map["print_slope_area_data"])
   {
     cout << "I am going to calculate slope-area data for you. " << endl;
@@ -2451,6 +2548,103 @@ int main (int nNumberofArgs,char *argv[])
     }
   }
 
+  //=========================================================================================
+  //
+  //.##..##...####...######.
+  //.###.##..##..##....##...
+  //.##.###..##........##...
+  //.##..##..##..##....##...
+  //.##..##...####...######.
+  //
+  //=========================================================================================
+  if(this_bool_map["calculate_NCI"])
+  {
+    chi_coordinate = FlowInfo.get_upslope_chi_from_all_baselevel_nodes(movern,this_float_map["force_A0_knickpoint_analysis"],thresh_area_for_chi);
+
+    JunctionNetwork.get_longest_channels(FlowInfo, BaseLevelJunctions, DistanceFromOutlet,
+                                    source_nodes,outlet_nodes,baselevel_node_of_each_basin,n_nodes_to_visit);
+
+    LSDChiTools ChiTool_SA(FlowInfo);
+    ChiTool_SA.chi_map_automator_chi_only(FlowInfo, source_nodes, outlet_nodes, baselevel_node_of_each_basin,
+                            filled_topography, DistanceFromOutlet,
+                            DrainageArea, chi_coordinate);
+    cout << "Got the data into the data maps." << endl; 
+
+    // Calculate the NCI values for each basin and print
+    string csv_nci_fname = OUT_DIR+OUT_ID+"_nci.csv";
+    ofstream nci_out(csv_nci_fname.c_str());
+    nci_out << "latitude,longitude,basin_key,nci"<< endl;
+    nci_out.precision(9);
+    LSDCoordinateConverterLLandUTM Converter;
+    double this_lat,this_long;
+    vector<float> nci_values;
+    float this_nci;
+    for(int b_index = 0; b_index< int(outlet_nodes.size()); b_index++)
+    {
+      this_nci = FlowInfo.calculate_nci(source_nodes[b_index], outlet_nodes[b_index], filled_topography, DistanceFromOutlet);
+      nci_values.push_back(this_nci);
+
+      FlowInfo.get_lat_and_long_from_current_node(outlet_nodes[b_index], this_lat, this_long, Converter);
+      nci_out << this_lat << "," << this_long << "," << ChiTool_SA.get_basin_key_from_outlet_node(outlet_nodes[b_index]) << "," << this_nci << endl;
+    }
+    nci_out.close();
+
+    // Now print the data maps
+    string csv_full_fname = OUT_DIR+OUT_ID+"_ChiMap.csv";
+    ChiTool_SA.print_chi_data_map_to_csv(FlowInfo, csv_full_fname);
+
+    // We calculate the S-A information below
+    float vertical_interval = this_float_map["SA_vertical_interval"];
+    string filename_SA = OUT_DIR+OUT_ID+"_SAvertical.csv";
+    string filename_binned = OUT_DIR+OUT_ID+"_SAbinned.csv";
+
+    vector<int> SA_midpoint_nodes;
+    vector<float> SA_slopes;
+    ChiTool_SA.get_slope_area_data(FlowInfo, vertical_interval,
+                                   SA_midpoint_nodes,SA_slopes);
+
+    cout << "Printing raw S-A data." << endl;
+    ChiTool_SA.print_slope_area_data_to_csv(FlowInfo, SA_midpoint_nodes, SA_slopes, filename_SA);
+
+    cout << "Printing binned S-A data." << endl;
+    ChiTool_SA.bin_slope_area_data(FlowInfo, SA_midpoint_nodes, SA_slopes, this_float_map["log_A_bin_width"],filename_binned);
+
+    if (this_bool_map["bootstrap_SA_data"])
+    {
+      cout << "I am going to bootstrap the S-A data for you." << endl;
+      string filename_SAbootstrap = OUT_DIR+OUT_ID+"_SABootstrap.csv";
+      ChiTool_SA.bootstrap_slope_area_data(FlowInfo, SA_midpoint_nodes, SA_slopes,
+                                           this_int_map["N_SA_bootstrap_iterations"],
+                                           this_float_map["SA_bootstrap_retain_node_prbability"],
+                                           filename_SAbootstrap);
+    }
+
+
+    if (this_bool_map["segment_slope_area_data"])
+    {
+      cout << "I am going to segment the S-A data from the main stem channel for you." << endl;
+      string filename_SAseg = OUT_DIR+OUT_ID+"_SAsegmented.csv";
+      ChiTool_SA.segment_binned_slope_area_data(FlowInfo, SA_midpoint_nodes, SA_slopes,
+                                  this_float_map["log_A_bin_width"],
+                                  this_int_map["slope_area_minimum_segment_length"],
+                                  filename_SAseg);
+    }
+
+
+  }
+
+
+
+
+  //=========================================================================================
+  //
+  //.##..##..##..##..######...####...##..##..#####....####...######..##..##..######...####..
+  //.##.##...###.##....##....##..##..##.##...##..##..##..##....##....###.##....##....##.....
+  //.####....##.###....##....##......####....#####...##..##....##....##.###....##.....####..
+  //.##.##...##..##....##....##..##..##.##...##......##..##....##....##..##....##........##.
+  //.##..##..##..##..######...####...##..##..##.......####...######..##..##....##.....####..
+  //
+  //=========================================================================================  
   if(this_bool_map["ksn_knickpoint_analysis"])
   {
     cout << "I am beginning the knickpoint detection and quantification: my first step is too use Mudd et al., 2014 segmentation algorithm" << endl;

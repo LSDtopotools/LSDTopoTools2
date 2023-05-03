@@ -74,7 +74,7 @@ int main (int nNumberofArgs,char *argv[])
   //start the clock
   clock_t begin = clock();
 
-  string version_number = "0.7";
+  string version_number = "0.8";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -161,6 +161,9 @@ int main (int nNumberofArgs,char *argv[])
   bool_default_map["extract_all_channels"] = false;
   help_map["extract_all_channels"] = {  "bool","false","This extracts the whole channel network. Use to get a width network for the whole DEM.","Used for imposing baselevel in various simulations."};
 
+  bool_default_map["extract_longest_channel"] = false;
+  help_map["extract_longest_channel"] = { "bool", "false","This extracts the centreline from the longest channel in the provided DEM.","Used for imposing baselevel in various simulations."};
+
   int_default_map["search_radius_nodes"] = 8;
   help_map["search_radius_nodes"] = {  "int","8","A parameter for snapping to the nearest channel. It will search for the largest channel (by stream order) within the pixel window.","You will want smaller pixel numbers if you have a dense channel network."};
  
@@ -220,6 +223,8 @@ int main (int nNumberofArgs,char *argv[])
   float_default_map["QQ_threshold"] = 0.005;
   help_map["QQ_threshold"] = {  "float","0.005","Once the QQ plot is fitted, this determines the level below which a floodplain is identified. Higher numbers give you more floodplain or terrace pixels.","See Clubb et al ESURF 2017."};
 
+  bool_default_map["print_nearest_channel_raster"] = false;
+  help_map["print_nearest_channel_raster"] = { "bool", "false", "Prints out a raster of the nearest channel node to each valley pixel.", "Use if you want to connect valleys to the nearest channel."};
 
   // choice for absolute thresholds
   bool_default_map["use_absolute_thresholds"] = false;
@@ -753,6 +758,63 @@ int main (int nNumberofArgs,char *argv[])
     }
   }
 
+//-------------------------------------------------------------------------//
+//  __        ______   .__   __.   _______  _______     _______.___________.   
+// |  |      /  __  \  |  \ |  |  /  _____||   ____|   /       |           |   
+// |  |     |  |  |  | |   \|  | |  |  __  |  |__     |   (----`---|  |----`   
+// |  |     |  |  |  | |  . `  | |  | |_ | |   __|     \   \       |  |        
+// |  `----.|  `--'  | |  |\   | |  |__| | |  |____.----)   |      |  |        
+// |_______| \______/  |__| \__|  \______| |_______|_______/       |__|        
+                                                                            
+//   ______  __    __       ___      .__   __. .__   __.  _______  __          
+//  /      ||  |  |  |     /   \     |  \ |  | |  \ |  | |   ____||  |         
+// |  ,----'|  |__|  |    /  ^  \    |   \|  | |   \|  | |  |__   |  |         
+// |  |     |   __   |   /  /_\  \   |  . `  | |  . `  | |   __|  |  |         
+// |  `----.|  |  |  |  /  _____  \  |  |\   | |  |\   | |  |____ |  `----.    
+//  \______||__|  |__| /__/     \__\ |__| \__| |__| \__| |_______||_______| 
+//-------------------------------------------------------------------------//
+  if(this_bool_map["extract_longest_channel"])
+  {
+    cout << "I am going to extract the longest channel in the DEM." << endl;
+    cout << "To do this I need to get the flow info object, which will take a little while." << endl;
+
+    // get the baselevel node with the largest drainage area
+    vector<int> BaseLevelJunctions_Initial = ChanNetwork.get_BaseLevelJunctions();
+    vector<int> BaseLevelJunctions = ChanNetwork.Prune_Junctions_Largest(BaseLevelJunctions_Initial,
+                                              FlowInfo, FlowAcc);
+    int baselevel_junction = BaseLevelJunctions.front();
+    cout << " BL Junction: " << baselevel_junction << endl;
+
+    // get the source of this baselevel node
+    LSDIndexChannel LongestChan = ChanNetwork.generate_longest_index_channel_in_basin(baselevel_junction, FlowInfo,
+                                        DistanceFromOutlet);
+    
+    // write the whole channel to a CSV
+    string out_filename = OUT_ID+"_longest_channel";
+    LongestChan.write_channel_to_csv(OUT_DIR, out_filename, FlowInfo, DistanceFromOutlet, filled_topography);
+
+    // just write the starting and ending nodes to a csv
+    ofstream source_out;
+    string source_out_fname = OUT_DIR+OUT_ID+"_longest_channel_source_points.csv";
+    source_out.open(source_out_fname.c_str());
+    source_out << "id,latitude,longitude" << endl;
+
+    // get lat and longitude of source and outlet nodes
+    LSDCoordinateConverterLLandUTM Converter;
+    vector<double> X_coords, Y_coords;
+    double lat, lon;
+    LongestChan.get_coordinates_of_channel_nodes(X_coords, Y_coords, FlowInfo);
+    // source node
+    FlowInfo.get_lat_and_long_locations(X_coords.front(), Y_coords.front(), lat, lon, Converter);
+    source_out << "1," << lat << "," << lon << endl;
+    // outlet node
+    FlowInfo.get_lat_and_long_locations(X_coords.back(), Y_coords.back(), lat, lon, Converter);
+    source_out << "2," << lat << "," << lon << endl;
+
+    source_out.close();
+
+  }
+
   //=========================================================================
   //
   // o      'O         o  o                      Oo                   o
@@ -880,6 +942,22 @@ int main (int nNumberofArgs,char *argv[])
   string bin_ext = "_valley";
   BinaryRaster.write_raster((OUT_DIR+OUT_ID+bin_ext), DEM_extension);
 
+  if(this_bool_map["print_nearest_channel_raster"])
+  {
+    cout << "Printing rasters of the nearest channel node" << endl;
+    // set the threshold stream order for mapping to the channel. Just set to find the nearest channel no matter the order.
+    int threshold_SO = 1;
+    Floodplain.Get_Relief_of_Nearest_Channel(ChanNetwork, FlowInfo, filled_topography, DistanceFromOutlet, threshold_SO);
+    LSDIndexRaster NearestChannelRaster = Floodplain.print_NearestChannelNode_to_Raster();
+    string nearest_chan_ext = "_nearest_chan";
+    NearestChannelRaster.write_raster((OUT_DIR+OUT_ID+nearest_chan_ext), DEM_extension);
+
+    // print the raster of upstream distance 
+    LSDRaster UpstreamDistRaster = Floodplain.print_UpstreamDistance_to_Raster();
+    string upstream_dist_ext = "_nearest_chan_dist";
+    UpstreamDistRaster.write_raster((OUT_DIR+OUT_ID+upstream_dist_ext), DEM_extension);
+  }
+
   cout << "Finished with the floodplain extraction" << endl;
   cout << "=========================================================" << endl << endl;
 
@@ -1002,7 +1080,7 @@ int main (int nNumberofArgs,char *argv[])
       int start_NI, downstream_NI;
       bool end_node_in_csv = false;
       vector<int> NI_of_points;
-      if (this_bool_map["extract_single_channel"])
+      if (this_bool_map["extract_single_channel"] || this_bool_map["extract_longest_channel"])
       {
         cout << "I am reading points from the file: "+ this_string_map["channel_source_fname"] << endl;
         LSDSpatialCSVReader CSVFile( RI, (DATA_DIR+this_string_map["channel_source_fname"]) );
@@ -1143,7 +1221,7 @@ int main (int nNumberofArgs,char *argv[])
         // now get the valley widths
         string bearing_fname =  OUT_DIR+OUT_ID+"_bearings_"+itoa(i)+".csv";
         string outfilename = OUT_DIR+OUT_ID+"_valley_widths_"+itoa(i);
-        vector<vector<float>> valley_widths = Floodplain.calculate_valley_widths(ThisCSVFile, FlowInfo, DistanceFromOutlet, 
+        vector<vector<float>> valley_widths = Floodplain.calculate_valley_widths(ThisCSVFile, FlowInfo, DistanceFromOutlet, DA_d8, filled_topography,
                             this_int_map["width_node_spacing"], this_bool_map["print_bearings"], bearing_fname, this_int_map["valley_banks_search_radius"], outfilename, nodes_to_remove);
 
       }
@@ -1181,6 +1259,13 @@ int main (int nNumberofArgs,char *argv[])
         cout << "Your valley_points_csv filename." << endl;
         this_string_map["valley_points_csv"] = OUT_DIR+OUT_ID+"_swath_channel_nodes.csv";
       }
+      if (this_bool_map["extract_longest_channel"])
+      {
+        cout << "You chose to extract the longest channel earlier in this routine." << endl;
+        cout << "I am assuming you want to use that channel so I am overriding" << endl;
+        cout << "Your valley_points_csv filename." << endl;
+        this_string_map["valley_points_csv"] = OUT_DIR+OUT_ID+"_longest_channel_index_chan.csv";
+      }
       if (this_bool_map["get_valley_centreline"])
       {
         cout << "You also chose to extract a valley centreline in this routine." << endl;
@@ -1202,7 +1287,7 @@ int main (int nNumberofArgs,char *argv[])
       // now get the valley widths
       string bearing_fname =  OUT_DIR+OUT_ID+"_bearings.csv";
       string outfilename = OUT_DIR+OUT_ID+"_valley_widths";
-      vector<vector<float>> valley_widths = Floodplain.calculate_valley_widths(CSVFile, FlowInfo, DistanceFromOutlet, 
+      vector<vector<float>> valley_widths = Floodplain.calculate_valley_widths(CSVFile, FlowInfo, DistanceFromOutlet, DA_d8, filled_topography,
                           this_int_map["width_node_spacing"], this_bool_map["print_bearings"], bearing_fname, this_int_map["valley_banks_search_radius"], outfilename, nodes_to_remove);
     }
   }

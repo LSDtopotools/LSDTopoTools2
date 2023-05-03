@@ -51,6 +51,8 @@
 #include <math.h>
 #include <iostream>
 #include <vector>
+#include <utility>
+#include <algorithm>
 #include "LSDStatsTools.hpp"
 #include "LSDCRNParameters.hpp"
 #include "LSDParticle.hpp"
@@ -70,7 +72,7 @@ void LSDParticleColumn::create()
    NodeIndex = 0;
    SoilThickness = 0;
    
-   RockDensity = 2000;
+   RockDensity = 2650;
    SoilDensity = 1300;
    
    UseDenstyProfile = false;
@@ -134,6 +136,51 @@ LSDParticleColumn& LSDParticleColumn::operator=(LSDParticleColumn& rhs)
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This resets the scaling of the CRN particle which is required since the 
+// snow and self shielding alter the scaling values
+// The scaling is updated within the object which is passed by reference
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDParticleColumn::reset_scaling(LSDCRNParameters& LSDCRNP, string Muon_scaling)
+{
+  if (Muon_scaling == "Schaller" )
+  {
+    LSDCRNP.set_Schaller_parameters();
+  }
+  else if (Muon_scaling == "Braucher" )
+  {
+    LSDCRNP.set_Braucher_parameters();
+  }
+  else if (Muon_scaling == "BraucherBorchers" )
+  {
+    LSDCRNP.set_BraucherBorchers_parameters();
+  }
+  else if (Muon_scaling == "Granger" )
+  {
+    LSDCRNP.set_Granger_parameters();
+  }
+  else if (Muon_scaling == "newCRONUS" )
+  {
+    LSDCRNP.set_newCRONUS_parameters();
+  }
+  else
+  {
+    cout << "You didn't set the muon scaling." << endl
+         << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
+         << "You chose: " << Muon_scaling << endl
+         << "Defaulting to Braucher et al (2009) scaling" << endl;
+    LSDCRNP.set_Braucher_parameters();
+  }
+}
+
+
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This creates a column with particles at constant depth spacing and
 // wit SS cosmo concentration
@@ -195,7 +242,349 @@ void LSDParticleColumn::initiate_SS_cosmo_column_3CRN(int start_type,
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
 
 
-	      
+
+
+void LSDParticleColumn::read_erosion_time_series(string filename)
+{
+  string line_from_file;
+  vector<string> empty_string_vec;
+  vector<string> this_string_vec;
+  string temp_string;
+
+  vector<float> this_time_vec;
+  vector<float> this_rate_vec;
+  vector<float> this_removal_vec;
+  
+  // make sure the filename works
+  ifstream ifs(filename.c_str());
+  if( ifs.fail() )
+  {
+    cout << "\nFATAL ERROR: Trying to load csv data file, but the file" << filename
+         << " doesn't exist;  LSDSpatialCSVReader::load_csv_data" << endl;
+    exit(EXIT_FAILURE);
+  }
+
+  // get the headers from the first line
+  getline(ifs, line_from_file);
+
+  // now loop through the rest of the lines, getting the data.
+  while( getline(ifs, line_from_file))
+  {
+    //cout << "Getting line, it is: " << line_from_file << endl;
+    // reset the string vec
+    this_string_vec = empty_string_vec;
+
+    // create a stringstream
+    stringstream ss(line_from_file);
+
+    while( ss.good() )
+    {
+      string substr;
+      getline( ss, substr, ',' );
+
+      // remove the spaces
+      substr.erase(remove_if(substr.begin(), substr.end(), ::isspace), substr.end());
+
+      // remove control characters
+      substr.erase(remove_if(substr.begin(), substr.end(), ::iscntrl), substr.end());
+
+      // add the string to the string vec
+      this_string_vec.push_back( substr );
+    }
+
+    //cout << "Yoyoma! size of the string vec: " <<  this_string_vec.size() << endl;
+    if ( int(this_string_vec.size()) <= 0)
+    {
+      cout << "Hey there, I am trying to load your csv data but you seem not to have" << endl;
+      cout << "enough columns in your file. I am ignoring a line" << endl;
+    }
+    else if (int(this_string_vec.size()) == 3)
+    {
+      this_time_vec.push_back( atof(this_string_vec[0].c_str()) );
+      this_rate_vec.push_back( atof(this_string_vec[1].c_str()) );
+      this_removal_vec.push_back( atof(this_string_vec[2].c_str()) );
+
+    }
+    else
+    {
+      cout << "I am trying to read an erosion/deposition history but you have the wrong number of columns." << endl;
+      cout << "There should be three columns: time,rate,removal" << endl;
+      exit(0);
+    }
+
+  }
+
+  rate_vec = this_rate_vec;
+  time_vec = this_time_vec;
+  removal_vec = this_removal_vec;
+
+  check_erosion_time_series();
+
+}
+
+
+void LSDParticleColumn::check_erosion_time_series()
+{
+  int n_inputs = int(rate_vec.size());
+  if (n_inputs == 0)
+  {
+    cout << "There does not seem to be any time series information. Exiting. " << endl;
+    exit(0);
+  }
+  else if (time_vec[n_inputs-1] != -9999)
+  {
+    cout << "Error, the last time must be -9999" << endl;
+    cout << "This indicates the long-term erosion rate." << endl;
+    cout << "Check your time series and ensure you have a long term erosion rate." << endl;
+  }
+  else if (rate_vec[n_inputs-1] <= 0)
+  {
+    cout << "The final row must contain an erosion rate greater than zero which is the background erosion rate." << endl;
+    cout << "This is not the case here so exiting." << endl;
+    exit(0);
+  }
+  else
+  {
+    // first do the first step. Check if this is a removal or erosion step
+    if (rate_vec[0] == 0)
+    {
+      if (time_vec[0] != 0)
+      {
+        cout << "You cannot have the first removal at a nonzero time, exiting." << endl;
+        exit(0);
+      }
+    }
+    else
+    {
+      if (removal_vec[0] != 0)
+      {
+        cout << "You cannot have a nonzero removal and a nonzero erosion at the same time, exiting." << endl;
+        exit(0);
+      }
+    }
+
+    // now loop through the rest
+    for (int i = 1; i<n_inputs-1; i++)
+    {
+      if (removal_vec[i] != 0 && rate_vec[i] != 0)
+      {
+        cout << "You cannot have a nonzero removal and a nonzero erosion at the same time, exiting." << endl;
+        exit(0);
+      }
+      if (removal_vec[i] != 0)
+      {
+        if (time_vec[i] != time_vec[i-1])
+        {
+          cout << "I have a removal but it must be at the same time the previous step ended. Exiting." << endl;
+          exit(0);
+        }
+      }
+    }
+  }
+}
+
+// This just reads the erosion timeseries and calculates how much depth must be added
+// to te sampling location to get the start of the time series. 
+float LSDParticleColumn::calculate_increase_in_depth_from_erosion_timeseries()
+{
+  int n_inputs = int(time_vec.size());
+
+  float d_change = 0;
+
+  // the first input must be a rate 
+  d_change+= rate_vec[0]*time_vec[0];
+
+  // Loop through the inputs, removing/depositing and eroding as you go along. 
+  // we ignore the last input since that is the background rate
+  for (int i = 1; i<n_inputs-1; i++)
+  {
+    if (rate_vec[i] != 0)
+    {
+      d_change+= rate_vec[i]*(time_vec[i]-time_vec[i-1]);
+    }
+    else
+    {
+      d_change+= removal_vec[i];
+    }
+  }
+
+  return d_change;
+}
+
+
+
+void LSDParticleColumn::calculate_CRN_conc_from_erosion_timeseries(vector<float> sampling_depths, float d_change, 
+                                  double latitude, double longitude, double elevation,
+                                  string Muon_scaling, string path_to_atmospheric_data)
+{
+
+  // Deal with some cosmogenic parameters first
+  LSDCRNParameters LSDCRNP;  
+  // set up the scaling
+  if (Muon_scaling == "Schaller" )
+  {
+    LSDCRNP.set_Schaller_parameters();
+  }
+  else if (Muon_scaling == "Braucher" )
+  {
+    LSDCRNP.set_Braucher_parameters();
+  }
+  else if (Muon_scaling == "BraucherBorchers" )
+  {
+    LSDCRNP.set_BraucherBorchers_parameters();
+  }
+  else if (Muon_scaling == "Granger" )
+  {
+    LSDCRNP.set_Granger_parameters();
+  }
+  else if (Muon_scaling == "newCRONUS" )
+  {
+    LSDCRNP.set_newCRONUS_parameters();
+  }
+  else
+  {
+    cout << "You didn't set the muon scaling." << endl
+        << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
+        << "You chose: " << Muon_scaling << endl
+        << "Defaulting to Braucher et al (2009) scaling" << endl;
+    LSDCRNP.set_Braucher_parameters();
+  }
+
+  // get the atmospheric parameters
+  LSDCRNP.load_parameters_for_atmospheric_scaling(path_to_atmospheric_data);
+  LSDCRNP.set_CRONUS_data_maps();
+  
+  // a function for scaling stone production, defaults to 1
+  double Fsp = 1.0;
+
+    // now the pressure
+  double this_pressure = LSDCRNP.NCEPatm_2(latitude, longitude,elevation);
+
+  // get the production
+  double prod_scaling = LSDCRNP.stone2000sp(latitude,this_pressure, Fsp); 
+
+
+  // ONLY DO THIS FOR TESTING
+  //cout << "Prod scaling of this test is: " << prod_scaling << endl;
+  //cout << "For testing I am changing this to 1" << endl;
+  //prod_scaling = 1;
+
+  // First we get the initial depths and convert these to effective depths
+  vector<double> initial_depths;
+  vector<double> initial_effective_depths;
+  int n_samples = int(sampling_depths.size());
+  for (int s = 0; s< n_samples; s++)
+  {
+    initial_depths.push_back(sampling_depths[s]+d_change);
+    initial_effective_depths.push_back( (sampling_depths[s]+d_change)*RockDensity*0.1 );
+    //cout << "Insert depth is: " << sampling_depths[s]+d_change << " and effective depth: " << (sampling_depths[s]+d_change)*RockDensity*0.1 << endl;
+  }
+
+  // now insert these particles. 
+  // for the time being we have default variables for x,y,z but this will need to change if we are to get
+  // actual cosmo concentrations.
+  double startx = 0;
+  double starty = 0;
+  double startz = elevation;
+  int starttype = 0;
+
+  vector<bool> nuclide_scaling_switches(4,false);
+  nuclide_scaling_switches[0] = true;   // 10Be
+  nuclide_scaling_switches[1] = true;   // 26Al
+  nuclide_scaling_switches[3] = true;   // 14C
+
+  // reset the scaling for this particular location
+  // Then calculate the F values. 
+  reset_scaling(LSDCRNP, Muon_scaling);
+  LSDCRNP.scale_F_values(prod_scaling,nuclide_scaling_switches);
+
+
+  int n_time_steps = int(time_vec.size());
+  double ss_rate = rate_vec[n_time_steps-1];
+  double eff_ss_rate = ss_rate*RockDensity*0.1;
+
+  float dt;
+  double removal_depth;
+  double effective_erate;
+
+  // now loop through the particles and calculate the concentrations
+  // We are going to do the concentrations of 10Be, 26Al, and 14C
+  for (int s = 0; s< n_samples; s++)
+  {
+    
+    // Initiate the particle. 
+    // It has a start depth and initial starting depth that is the sampling depth plus the change
+    // induced by the erosion history. 
+    LSDCRNParticle CRN_tp(starttype,startx,starty,initial_depths[s],initial_effective_depths[s],startz);
+
+
+    CRN_tp.update_10Be_SSfull(eff_ss_rate, LSDCRNP);
+    CRN_tp.update_26Al_SSfull(eff_ss_rate, LSDCRNP);
+    CRN_tp.update_14C_SSfull(eff_ss_rate, LSDCRNP);
+
+    //cout << "Getting initial concentration, eff depth is: " <<  initial_effective_depths[s] << " initial eff rate is: " 
+    //     <<   eff_ss_rate << " initial conc is: " << CRN_tp.getConc_10Be() << endl;
+
+    // now we loop through the erosion record.
+    // We do the penultimate time last, and then work our
+    // way forward in time
+    // you need a different logic for the last step
+    for (int ts = n_time_steps-2; ts >= 1; ts --)
+    {
+
+      // check if this is a removal or erosion step
+      if (rate_vec[ts]==0)
+      {
+        // this is a removal step
+        removal_depth = removal_vec[ts];
+
+        CRN_tp.remove_mass_one_layer(removal_depth , RockDensity);
+        // we don't need to update time or anything since the removal depth is instantaneous
+      }
+      else
+      {
+        
+        
+        // get the time interval
+        dt = time_vec[ts]-time_vec[ts-1];
+
+        // get the effective erosion rate
+        effective_erate = rate_vec[ts]*RockDensity*0.1;
+
+        CRN_tp.update_10Be_conc(dt,effective_erate, LSDCRNP);
+        CRN_tp.update_26Al_conc(dt,effective_erate, LSDCRNP);
+        CRN_tp.update_14C_conc(dt,effective_erate, LSDCRNP);
+
+        // now update the depths by removing the mass
+        CRN_tp.remove_mass_one_layer(rate_vec[ts]*dt , RockDensity);
+
+        //cout << "This is a change in erosion rate step" << endl;
+        //cout << "dt: " << dt << " and eff erosion rate is: " << effective_erate << endl; 
+        //cout << "removed " << rate_vec[ts]*dt << " m of material" << endl;       
+      }     
+    }
+    // now we need to do the last step
+    dt = time_vec[0];
+    // get the effective erosion rate
+    effective_erate = rate_vec[0]*RockDensity*0.1;
+
+    CRN_tp.update_10Be_conc(dt,effective_erate, LSDCRNP);
+    CRN_tp.update_26Al_conc(dt,effective_erate, LSDCRNP);
+    CRN_tp.update_14C_conc(dt,effective_erate, LSDCRNP);
+    CRN_tp.remove_mass_one_layer(rate_vec[0]*dt , RockDensity);
+
+    //cout << "This is the last step" << endl;
+    //cout << "dt: " << dt << " and eff erosion rate is: " << effective_erate << endl; 
+    //cout << "removed " << rate_vec[0]*dt << " m of material" << endl;    
+
+    CRNParticleList.push_back(CRN_tp);
+  }   // end particle, return loop to next particle.
+
+
+  cout << "I've finished your transient history." << endl;  
+
+}
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // update_list
@@ -421,6 +810,44 @@ vector<double> LSDParticleColumn::calculate_app_erosion_3CRN_neutron_rock_only(
 
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function is for bug checking. It prints out the particles, and their
+// properties to screen
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDParticleColumn::print_particle_properties_3CRN(string csv_outname)
+{
+
+  ofstream outfile;
+
+  // make sure the file has the csv extension
+  string ext_str = ".csv";
+  if (csv_outname.find(ext_str) == std::string::npos) 
+  {
+    csv_outname = csv_outname + ext_str;
+  }
+  outfile.open(csv_outname.c_str());
+
+  outfile << "depth,effective_depth, C_10Be, C_26Al, C_14C" << endl;
+
+  list<LSDCRNParticle>::iterator part_iter;
+  part_iter = CRNParticleList.begin();
+  while(part_iter != CRNParticleList.end())
+  {
+    // get the zeta location
+    double d_loc =   ( *part_iter ).getdLoc();
+    double effD =  ( *part_iter ).geteffective_dLoc();
+    double conc10Be = ( *part_iter ).getConc_10Be();
+    double conc26Al = ( *part_iter ).getConc_26Al();    
+    double conc14C = ( *part_iter ).getConc_14C();
+
+    outfile << d_loc << "," << effD << "," << conc10Be << "," << conc26Al << "," << conc14C << endl;
+
+    part_iter++;
+  }
+}
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This function is for bug checking. It prints out the particles, and their

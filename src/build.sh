@@ -32,7 +32,6 @@ if [ -d $fulllibdir ]
 fi
 
 
-
 cmake -DCMAKE_INSTALL_PREFIX=$PREFIX $SRC_DIR -DCMAKE_INSTALL_BINDIR=$fullbindir -DCMAKE_INSTALL_LIBDIR=$fullbindir
 
 make

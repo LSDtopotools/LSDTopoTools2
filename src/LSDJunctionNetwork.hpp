@@ -477,6 +477,18 @@ class LSDJunctionNetwork
                                                                     LSDRaster& Values, int thinning_factor,
                                                                     string value_column_name);
 
+  /// @brief This prints a stream network to a geojson polyline vector in WGS84. 
+  /// @param FlowInfo the flow info object which translates node indices to actual points
+  /// @param fname_prefix The prefix of the file to write, if no path is included it will write to the current directory.
+  ///  The geojson extension is added automatically.
+  /// @param Elevation A raster with elevation values
+  /// @param DrainageArea raster of drainage areas
+  /// @param DistanceFromOutlet raster of distance from the outlet
+  /// @author FJC
+  /// @date 18/04/2023
+  void PrintChannelNetworkToLineVector(LSDFlowInfo& flowinfo, string fname_prefix, LSDRaster& Elevation, LSDRaster& DrainageArea, LSDRaster &DistanceFromOutlet);
+
+
   /// @brief This sends the JunctionArray to a LSDIndexRaster.
   /// @return LSDIndexRaster of JunctionArray.
   /// @author SMM
@@ -2123,6 +2135,7 @@ double min_DA, double max_DA);
                                 vector<int>& source_nodes, vector<int>& outlet_nodes,
                                 int n_nodes_to_visit);
 
+
   /// @detail This overwrites two vecotrs that give all of the starting and
   ///  finishing nodes of channels in a basin
   /// @param FlowInfo an LSDFlowInfo object
@@ -2141,6 +2154,30 @@ double min_DA, double max_DA);
                                 vector<int>& source_nodes, vector<int>& outlet_nodes,
                                 vector<int>& baselevel_nodes,
                                 int n_nodes_to_visit);
+
+
+  /// @detail This overwrites two vecotrs that give all of the starting and
+  ///  finishing nodes of channels in a basin. This version ONLY GETS THE LONGEST CHANNEL
+  ///  The outputs from this go into the chi map automator
+  /// @param FlowInfo an LSDFlowInfo object
+  /// @param BaseLevel_Junctions an integer vector that contains the base level junctions
+  /// @param DistanceFromOutlet an LSDRaster with the flow distance
+  /// @param source_nodes a vector continaing the sorted sorce nodes (by flow distance)
+  ///  THIS GETS OVERWRITTEN
+  /// @param outlet_nodes a vector continaing the outlet nodes
+  ///  THIS GETS OVERWRITTEN
+  /// @param baselevel_nodes a vector continaing the baselevel nodes (i.e. the node of the outlet of the basin)
+  ///  THIS GETS OVERWRITTEN
+  /// @author SMM
+  /// @date 11/10/2022
+  void get_longest_channels(LSDFlowInfo& FlowInfo,
+                                    vector<int> BaseLevel_Junctions,
+                                    LSDRaster& DistanceFromOutlet,
+                                    vector<int>& source_nodes,
+                                    vector<int>& outlet_nodes,
+                                    vector<int>& baselevel_nodes,
+                                    int n_nodes_to_visit);
+
 
   /// @detail This overwrites two vectors that give all of the starting and
   ///  finishing nodes of channels in a basin continuing downstream from the selected junction to its outlet

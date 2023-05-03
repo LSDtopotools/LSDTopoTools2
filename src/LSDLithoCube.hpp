@@ -261,6 +261,16 @@ class LSDLithoCube
     void print_K_and_Sc_maps_to_screen();
 
 
+    /// @brief Creates a file that converts K values given for four erodibility classes
+    ///  into a file with the lithocodes. 
+    ///  the codeing is determined by details provided by Andreas Ludwig that are detailed in
+    ///  the two hardcode_fill_strati functions below
+    /// @param K_values the four K values form the four erodibility classes. 
+    /// @param EC_to_K_outfile name of outfile with path and extension
+    /// @author SMM
+    /// @date 07/10/2022
+    void convert_EC_to_K_file(vector<float> K_values, string EC_to_K_outfile);
+
     /// @brief Fills a map with stratigraphy code (key) and corresponding K (value)
     /// @author ELSG
     /// @date 30/01/2020

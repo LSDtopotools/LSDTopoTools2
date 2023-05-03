@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.6 FATAL_ERROR)
+cmake_minimum_required(VERSION 2.8.12 FATAL_ERROR)
 project(LSDTopoTools)
 
 # Dependencies
@@ -38,6 +38,7 @@ if(OpenCV_FOUND)
     LSDMostLikelyPartitionsFinder.hpp
     LSDParameterParser.hpp
     LSDParticle.hpp
+    LSDParticleColumn.hpp
     LSDRaster.hpp
     LSDRasterAggregator.hpp
     LSDRasterInfo.hpp
@@ -106,6 +107,7 @@ else()
     LSDMostLikelyPartitionsFinder.hpp
     LSDParameterParser.hpp
     LSDParticle.hpp
+    LSDParticleColumn.hpp
     LSDRaster.hpp
     LSDRasterAggregator.hpp
     LSDRasterInfo.hpp

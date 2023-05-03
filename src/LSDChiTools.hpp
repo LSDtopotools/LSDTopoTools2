@@ -1084,6 +1084,14 @@ class LSDChiTools
     LSDIndexRaster get_basin_raster(LSDFlowInfo& FlowInfo, LSDJunctionNetwork& JunctionNetwork,
                                vector<int> Juntions);
 
+
+    /// @brief This gets the basin key given an outlet node
+    /// @param outlet_node 
+    /// @return The basin key
+    /// @author SMM
+    /// @date 12/10/2022
+    int get_basin_key_from_outlet_node(int outlet_node);
+
     /// @brief This return a map with the basin ID as key, and map of the count of the different lithology as key/value.
     /// @param FlowInfo
     /// @param JunctionNetwork

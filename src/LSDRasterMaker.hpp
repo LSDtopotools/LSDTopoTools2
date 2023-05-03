@@ -22,6 +22,7 @@
 #include <string>
 #include "TNT/tnt.h"
 #include "LSDRaster.hpp"
+#include "LSDRasterInfo.hpp"
 #include "LSDSpatialCSVReader.hpp"
 using namespace std;
 using namespace TNT;
@@ -58,6 +59,13 @@ class LSDRasterMaker: public LSDRaster
     }
 
 
+    /// @brief Constructor. Create an LSDRasterMaker from an LSDRaster.
+    /// @return LSDRasterMaker
+    /// @param RI LSDRasterInfo object.
+    LSDRasterMaker(LSDRasterInfo& RI)
+    {
+      create(RI);
+    }
 
     /// @brief Constructor. Create an LSDRasterMaker from a file.
     /// Uses a filename and file extension
@@ -84,11 +92,7 @@ class LSDRasterMaker: public LSDRaster
     /// @date 01/09/2017
     LSDRaster return_as_raster();
 
-    /// @brief This resizes the LSDRasterModel, resetting some flags in the process,
-    /// as well as setting many of the Array2D data members to be empty arrays
-    /// The raster data in the end is a random surface (determined by the noise
-    /// data member)
-    /// This overloaded version also changes the data resolution
+    /// @brief This resizes the LSDRasterMaker
     /// @param new_rows the new number of rows
     /// @param new_cols the new number of columns
     /// @param new_resolution the new data resolution
@@ -96,6 +100,12 @@ class LSDRasterMaker: public LSDRaster
     /// @author SMM
     /// @date 01/09/2017
     void resize_and_reset( int new_rows, int new_cols, float new_resolution, float new_value );
+
+    /// @brief This uses a raster to reset the data members
+    /// @param new_raster the new raster
+    /// @author SMM
+    /// @date 23/12/2022
+    void resize_and_reset( LSDRaster& new_raster );
 
     /// @brief Gets the row and column of a point in the raster
     /// @param X_coordinate the x location of the point
@@ -193,6 +203,100 @@ class LSDRasterMaker: public LSDRaster
     /// @date 03/09/2017
     void smooth(int boundary_type);
 
+    /// @brief this raises the raster so the lowest point is zero and also fills the raster
+    /// @param min_slope_for_fill the minimum slope for the filling algorithm
+    /// @author SMM
+    /// @date 22/12/2022
+    void raise_and_fill_raster(float min_slope_for_fill);
+
+    /// @brief this fills the raster
+    /// @param min_slope_for_fill the minimum slope for the filling algorithm
+    /// @author SMM
+    /// @date 22/12/2022
+    void fill_raster(float min_slope_for_fill);
+
+    /// @brief Makes a random initial surface using the diamond square algorithm
+    /// @param diamond_square_feature_order The feature order in the DS algorithm
+    /// @param desired_relief relief of the random surface
+    /// @param noise_relief relief of the random noise step
+    /// @param parabola_relief the relief of the parabolic surface. Higher numbers mean more elongation of basins
+    ///   but also less chance of internally drained basins
+    /// @param min_slope_for_fill the minimum slope for the filling algorithm
+    /// @param seed_pointer pointer to the seed. Allows a random surface but will reproduce exactly the same surface 
+    ///  if the same seed is used. 
+    /// @author SMM
+    /// @date 22/12/2022
+    void create_diamond_square_surface(int diamond_square_feature_order, float desired_relief, 
+                                       float noise_relief, float parabola_relief, float minimum_slope_for_fill, 
+                                       long *seed_pointer);
+
+
+    /// @brief This method snaps to steady with spatially variable uplift and erodibility fields
+    /// @param U uplift in m/yr
+    /// @param desired_relief the desired fluvial relief in m of the highest chi value
+    /// @param m_exp the m exponent
+    /// @param n_exp the n exponent
+    /// @param carve_before_fill if true, run the carving algorithm before the filling algorithm
+    /// @param min_slope_for_fill the minimum slope for snapping
+    /// @param threshold_area_for_hillslopes the threshold area below which you get a hillslope
+    /// @author SMM
+    /// @date 21/12/2022
+    float tune_K_for_relief(float U, float desired_relief,
+                          float m_exp, float n_exp,
+                          bool carve_before_fill, 
+                          float min_slope_for_fill,
+                          float threshold_area_for_hillslopes);
+
+    /// @brief This method snaps to steady with spatially variable uplift and erodibility fields
+    /// @param K_values a raster of erodiblity using SI units
+    /// @param U_values a raster of uplift in m/yr
+    /// @param Sc_values a raster of dimensionless critical slopes for hillslope component
+    /// @param m the m exponent
+    /// @param n the n exponent
+    /// @param 
+    /// @param carve_before_fill if true, run the carving algorithm before the filling algorithm
+    /// @param min_slope_for_fill the minimum slope for snapping
+    /// @param threshold_area_for_hillslopes the threshold area below which you get a hillslope
+    /// @author SMM
+    /// @date 21/12/2022
+    void snap_to_steady(LSDRaster& K_values, 
+                        LSDRaster& U_values, LSDRaster& Sc_values, 
+                        float m, float n,
+                        bool carve_before_fill, 
+                        float min_slope_for_fill,
+                        float threshold_area_for_hillslopes);
+
+    /// @brief This method snaps to steady overloaded so it has only one U, K, and Sc
+    /// @param K erodiblity using SI units
+    /// @param U uplift in m/yr
+    /// @param Sc_values dimensionless critical slopes for hillslope component
+    /// @param m the m exponent
+    /// @param n the n exponent
+    /// @param 
+    /// @param carve_before_fill if true, run the carving algorithm before the filling algorithm
+    /// @param min_slope_for_fill the minimum slope for snapping
+    /// @param threshold_area_for_hillslopes the threshold area below which you get a hillslope
+    /// @author SMM
+    /// @date 21/12/2022
+    void snap_to_steady(float K_values, 
+                        float U_values, float Sc_values, 
+                        float m, float n,
+                        bool carve_before_fill, 
+                        float min_slope_for_fill,
+                        float threshold_area_for_hillslopes);
+
+    /// @brief This method snaps to steady with a single K and U value
+    /// @param K erodiblity using SI units
+    /// @param U uplift in m/yr
+    /// @param carve_before_fill if true, run the carving algorithm before the filling algorithm
+    /// @param min_slope_for_fill the minimum slope for snapping
+    /// @author SMM
+    /// @date 21/12/2022
+    void fluvial_snap_to_steady(float K, float U, 
+                                bool carve_before_fill, 
+                                float min_slope_for_fill);
+
+
     /// @brief Caps elevations using the initial raster
     ///  WARNING no testing if the raster is the correct shape!
     /// @param InitialRaster The initial raster above which the new surface cannot rise.
@@ -225,6 +329,37 @@ class LSDRasterMaker: public LSDRaster
     /// @author SMM
     /// @date 30/07/2019
     void random_values(float minimum_value, float maximum_value);
+
+    /// @brief This function makes some random values
+    /// @param new_minimum does what it says on the tin.
+    /// @param new_maxuimum does what it says on the tin
+    /// @param seed a seed for the random number generator
+    /// @author SMM
+    /// @date 30/07/2019
+    void random_values(float minimum_value, float maximum_value, long* seed_pointer);
+
+    /// @brief This function adds
+    /// @param range the range of the random number. Add all noise for -0.5*range to 0.5*range
+    /// @param seed a seed for the random number generator
+    /// @author SMM
+    /// @date 30/07/2019
+    void add_random_moise(float range, long* seed_pointer);
+
+    /// @brief This function makes a tilted plane based on some plane coefficients
+    ///   The plane coefficients come from the LSDStatsTools function
+    ///   get_plane_coefficients_from_points
+    /// @param plane_coefficients A 4 element vector with the coefficients for a plane
+    /// @author SMM
+    /// @date 07/10/2022
+    void tilted_plane(vector<double> plane_coefficients);
+
+    /// @brief Adds a parabolic surface to the DEM. Used to try and avoid
+    ///  large areas of fill from the fractal initiation steps
+    /// @param peak_elev The peak elevation in metres. Is in the middle of the
+    /// model domain
+    /// @author SMM
+    /// @date 11/8/2017
+    void superimpose_parabolic_surface(float peak_elev);
 
     /// @brief This returns a clipped raster that has the same dimensions as the
     ///  smaller raster
@@ -303,6 +438,9 @@ class LSDRasterMaker: public LSDRaster
 
     /// @brief Make a rastermaker from another raster
     void create(LSDRaster& An_LSDRaster);
+
+    /// @brief Make a rastermaker from a rasterinfo
+    void create(LSDRasterInfo& RI);
 
     /// @brief create a raster from NRows and NCols information
     void create(int NRows, int NCols);

@@ -57,6 +57,7 @@
 #include <chrono>  // for high_resolution_clock
 #include <string>
 #include <vector>
+#include <list>
 #include <ctime>
 #include <sys/time.h>
 #include <fstream>
@@ -76,6 +77,7 @@
 #include "../LSDStrahlerLinks.hpp"
 #include "../LSDBasin.hpp"
 #include "../LSDParticle.hpp"
+#include "../LSDParticleColumn.hpp"
 #include "../LSDCRNParameters.hpp"
 #include "../LSDShapeTools.hpp"
 #include "../LSDCosmoData.hpp"
@@ -86,7 +88,7 @@
 int main (int nNumberofArgs,char *argv[])
 {
 
-  string version_number = "0.7";
+  string version_number = "0.8";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -314,25 +316,63 @@ int main (int nNumberofArgs,char *argv[])
   string_default_map["column_mode"] = "void";
   help_map["column_mode"] = {  "string","void", "Sets the method of the transient column.","Options are step_change:full_transient:steady_state"};
 
+  string_default_map["transient_history_file"] = "NULL";
+  help_map["transient_history_file"] = {  "string","NULL", "Name without directory of transient erosion history file. Must include csv extension.","Has three columns with headers: time rate and removal. For erosion rates each column is the time in the past of an erosion rate. The last row is the erosion rate as the background and must have a time of -9999"};
+
+  string_default_map["transient_particle_data_file"] = "NULL";
+  help_map["transient_particle_data_file"] = {  "string","NULL", "Name of the csv to which the transient column concentrations will be printed.","Has depths effective depths and 10Be 14C 26Al concentrations"};
+
+
   float_default_map["effective_erosion_rate_new"] = 0.01;
   help_map["effective_erosion_rate_new"] = {  "float","0.01", "Used for forward modelling of cosmogenic concentrations in the transient mode. This is the rate after the step change. Units are g/cm^2/yr.","To convert to mm/kyr you multiply by 10^7/(density in kg/m^3)  0.01 g/cm^2/yr is ~ 37 mm/kyr  0.1 g/cm^2/yr is ~ 370 mm/kyr or 0.37 mm/yr"};
    
-  float_default_map["time_since_step"] = 0;
+  float_default_map["time_since_step"] = 0.0;
   help_map["time_since_step"] = {  "float","0", "Used for testing of the particle column. Time since step change.","Can also be used to make a step change raster"};
  
   float_default_map["total_shielding_test"] = 1;
   help_map["total_shielding_test"] = {  "float","1", "The total shielding value for testing the CRN concentrations of particles.","This is used so you don't have to test shielding."};
 
-  float_default_map["transient_effective_depth_test_top"] = 0;
+  float_default_map["transient_effective_depth_test_top"] = 0.0;
   help_map["transient_effective_depth_test_top"] = {  "float","0", "For testing particle concentrations. This is the top depth for depth integrated calculations.","In g/cm^2."};
 
-  float_default_map["transient_effective_depth_test_bottom"] = 0;
+  float_default_map["transient_effective_depth_test_bottom"] = 0.0;
   help_map["transient_effective_depth_test_bottom"] = {  "float","0", "For testing particle concentrations. This is the bottom depth for depth integrated calculations.","In g/cm^2."};
 
   float_default_map["transient_effective_depth_test"] = 0;
   help_map["transient_effective_depth_test"] = {  "float","0", "For testing the particle concentrations. This is the effective depth for the test.","In g/cm^2."};
 
+  float_default_map["transient_CRN_response_end_time"] = 200000;
+  help_map["transient_CRN_response_end_time"] = {  "float","200000", "For looking at how CRN concentrations of eroded particles evolve through time.","This was developed to make one figure for a paper but maybe others will find it useful."};
 
+  bool_default_map["CRN_adjustment_timeseries"] = false;
+  help_map["transient_column_calculator"] = {  "bool","false", "A tool that allows calculation of CRN concentrations through time.","Used for making a figure."};
+
+  string_default_map["CRN_adjustment_data_file"] = "CRN_adjustment_data_out.csv";
+  help_map["CRN_adjustment_data_file"] = {  "string","CRN_adjustment_data_out.csv", "Name of the csv to which the adjustment timescales will be printed.","Has various metrics of how concentrations evolve through time."};
+
+
+  float_default_map["transient_column_latitude"] = 0.0;
+  help_map["transient_column_latitude"] = {  "float","0.0", "For the transient column component. Used to calculate production rates","In decimal degrees."};
+
+  float_default_map["transient_column_longitude"] = 0.0;
+  help_map["transient_column_longitude"] = {  "float","0.0", "For the transient column component. Used to calculate production rates","In decimal degrees."};
+
+  float_default_map["transient_column_elevation"] = 0.0;
+  help_map["transient_column_elevation"] = {  "float","0.0", "For the transient column component. Used to calculate production rates","In metres."};
+
+  int_default_map["transient_column_n_samples"] = 2;
+  help_map["ttransient_column_n_samples"] = {  "int","2", "For the transient column component. This is the number of depth samples in a full transient column","Values not checked but if not a positive integer will crash."};
+
+  float_default_map["transient_column_sample_spacing"] = 0.5;
+  help_map["transient_column_elevation"] = {  "float","0.5", "For the transient column component. This is the interval of the depth samplng. Starts at 0 depth.","In metres."};
+
+
+
+  // .#####...#####....####...#####...........#####....####....####...######..######..#####..
+  // .##..##..##..##..##..##..##..##..........##..##..##..##..##........##....##......##..##.
+  // .#####...#####...##..##..##..##..........#####...######...####.....##....####....#####..
+  // .##......##..##..##..##..##..##..........##..##..##..##......##....##....##......##..##.
+  // .##......##..##...####...#####...........##..##..##..##...####.....##....######..##..##.
   // Some names for shielding and production rasters
   string_default_map["self_shielding_raster_prefix"] = "NULL";
   help_map["self_shielding_raster_prefix"] = {  "string","NULL", "Self shielding effective depth raster prefix. Used for forward modelling of cosmogenic concentrations and the new erosion calculations. Units are g/cm^2/yr.","If this is set to NULL then the value will be taken from self_shield_eff_thickness"};
@@ -768,15 +808,28 @@ int main (int nNumberofArgs,char *argv[])
       this_bool_map["make_shielding_rasters"] ||
       this_bool_map["calculate_nested_erosion_rates"] ||
       this_bool_map["calculate_soil_erosion_rates"] ||
-      this_bool_map["calculate_erosion_rates"])
+      this_bool_map["calculate_erosion_rates"] ||
+      this_bool_map["print_production_raster"] ||
+      this_bool_map["print_pressure_raster"])
   {
     cout << "You have asked for an analysis that requires cosmogenic data input." << endl;
+    cout << "You are using the analysis that reproduces the CAIRN approach." << endl;
+    cout << "Mudd et al ESURF 2016 https://doi.org/10.5194/esurf-4-655-2016" << endl;
     cout << "I am now going to try to load cosmogenic data." << endl;
     if (this_string_map["cosmo_parameter_prefix"] == "NULL")
     {
       cout << "You have not specified a cosmogenic parameter prefix. " << endl;
       cout << "I'm afraid I can't do any cosmogenic computations without this information." << endl;
       cout << "Make sure you designate the cosmo_parameter_prefix in the parameter file." << endl;
+
+      cout << "I can still print a production raste or a pressure raster from here though." << endl;
+      cout << "I am switching off the other analyses." << endl;
+      this_bool_map["check_cosmo_basins"] = false;
+      this_bool_map["spawn_cosmo_basins"] = false;
+      this_bool_map["make_shielding_rasters"] = false;
+      this_bool_map["calculate_nested_erosion_rates"] = false;
+      this_bool_map["calculate_soil_erosion_rates"] = false;
+      this_bool_map["calculate_erosion_rates"] = false;
     }
     else
     {
@@ -815,7 +868,11 @@ int main (int nNumberofArgs,char *argv[])
           cout << "Note that if you want spawned basins you will need to run the spawning routine first." << endl;
           cout << "use  spawn_cosmo_basins: true" << endl;
           cout << "to activate spawning." << endl;
+          cout << "This will add the shielding raster in this analysis." << endl;
+          cout << "It will also generate a new set of parameter files with *shield* in the filename" << endl;
+          cout << "So you can run the analysis again without recalculating shielding." << endl; 
           CosmoData.RunShielding(DATA_DIR,this_string_map["cosmo_parameter_prefix"]);
+          CosmoData.add_shielding_fnames_to_raster_vecvec();
         }      
         else
         {
@@ -824,7 +881,13 @@ int main (int nNumberofArgs,char *argv[])
           cout << "Note that if you want spawned basins you will need to run the spawning routine first." << endl;
           cout << "use  spawn_cosmo_basins: true" << endl;
           cout << "to activate spawning." << endl;
+          cout << "However spawning was introduced to reduce computational expense of shielding, so if you" << endl;
+          cout << "have turned topographic shielding off you probably don't need to use spawning." << endl;
+          cout << "This will add the shielding raster in this analysis." << endl;
+          cout << "It will also generate a new set of parameter files with *shield* in the filename" << endl;
+          cout << "So you can run the analysis again without recalculating shielding." << endl; 
           CosmoData.RunShielding_Unshielded(DATA_DIR,this_string_map["cosmo_parameter_prefix"]);
+          CosmoData.add_shielding_fnames_to_raster_vecvec();
         }
       }
        
@@ -835,8 +898,16 @@ int main (int nNumberofArgs,char *argv[])
         cout << "This starts with the smallest nested basin and then" << endl;
         cout << "progressively calculates the erosion rates from the proportions" << endl;
         cout << "of the basin remaining. " << endl;
-        CosmoData.calculate_nested_erosion_rates();
-        CosmoData.print_results();
+
+
+        // first let me get the nesting order of the catchments
+        // we need to get flowinfo from this 
+        map<int,list<int>> nesting_map = CosmoData.calculate_nesting_map();
+        CosmoData.print_nesting_map_to_screen(nesting_map);
+
+        // now we need to enter the nesting loop
+        CosmoData.cosmogenic_analysis_nested_build_erosion_rasters(nesting_map, OUT_DIR,OUT_ID);
+
       } 
 
       // This calculates erosion rates based on discrete locations in the landscape.
@@ -937,6 +1008,166 @@ int main (int nNumberofArgs,char *argv[])
 
   }
 
+
+  //=================================================================================================================
+  //
+  //..####...#####...######..##..##...####...######..##...##..######..##..##..######..........######..######..##...##..######.
+  //.##..##..##..##......##..##..##..##........##....###.###..##......###.##....##..............##......##....###.###..##.....
+  //.######..##..##......##..##..##...####.....##....##.#.##..####....##.###....##..............##......##....##.#.##..####...
+  //.##..##..##..##..##..##..##..##......##....##....##...##..##......##..##....##..............##......##....##...##..##.....
+  //.##..##..#####....####....####....####.....##....##...##..######..##..##....##..............##....######..##...##..######.
+  //
+  //=================================================================================================================
+  if(this_bool_map["CRN_adjustment_timeseries"])
+  {
+    cout << "Hello, I am going to go through some steady scenarios and transient scenarios for you. " << endl;
+
+    string path_to_atmospheric_data = "./";  
+    string Muon_scaling = this_string_map["muon_scheme_for_prediction"]; 
+
+
+    // the total shielding. A product of snow, topographic and production scaling
+    double total_shielding = this_float_map["total_shielding_test"];
+
+    double test_top_effective_depth = double(this_float_map["transient_effective_depth_test_top"]);
+    double test_bottom_effective_depth = double(this_float_map["transient_effective_depth_test_bottom"]); 
+
+    // initiate a particle. We'll just repeatedly call this particle
+    // for the sample.
+    int startType = 0;
+    double Xloc = 0;
+    double Yloc = 0;
+    double  startdLoc = 0.0;
+    double  start_effdloc = double(this_float_map["transient_effective_depth_test"]);
+    double startzLoc = 0.0;
+
+    // create a particle at zero depth
+    LSDCRNParticle eroded_particle(startType, Xloc, Yloc,
+                                startdLoc, start_effdloc, startzLoc);
+
+    // now create the CRN parameters object
+    LSDCRNParameters LSDCRNP;
+
+    // set up the scaling
+    if (Muon_scaling == "Schaller" )
+    {
+      LSDCRNP.set_Schaller_parameters();
+    }
+    else if (Muon_scaling == "Braucher" )
+    {
+      LSDCRNP.set_Braucher_parameters();
+    }
+    else if (Muon_scaling == "BraucherBorchers" )
+    {
+      LSDCRNP.set_BraucherBorchers_parameters();
+    }
+    else if (Muon_scaling == "Granger" )
+    {
+      LSDCRNP.set_Granger_parameters();
+    }
+    else if (Muon_scaling == "newCRONUS" )
+    {
+      LSDCRNP.set_newCRONUS_parameters();
+    }
+    else
+    {
+      cout << "You didn't set the muon scaling." << endl
+          << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
+          << "You chose: " << Muon_scaling << endl
+          << "Defaulting to Braucher et al (2009) scaling" << endl;
+      LSDCRNP.set_Braucher_parameters();
+    }
+
+    // set the scaling vector
+    // This is for 10Be, 26Al, 14C
+    vector<bool> nuclide_scaling_switches(4,false);
+    nuclide_scaling_switches[0] = true;
+    nuclide_scaling_switches[1] = true;
+    nuclide_scaling_switches[3] = true;
+
+    // Scale the F values
+    LSDCRNP.scale_F_values(total_shielding,nuclide_scaling_switches);
+
+    // Now loop through time times and get the concentrations
+    float end_time = this_float_map["transient_CRN_response_end_time"];
+    float delta_end_time = end_time/500.0;
+    float this_time;
+    float C10Be, C26Al, C14C;
+    float C10Be_SSnew, C26Al_SSnew, C14C_SSnew;
+    float C10Be_SSold, C26Al_SSold, C14C_SSold;
+    float norm_C10Be, norm_C26Al, norm_C14C;
+    float app_eros_10Be, app_eros_26Al, app_eros_14C;
+    double rho = 2650;
+
+    eroded_particle.update_10Be_SSfull(this_float_map["effective_erosion_rate"], LSDCRNP);
+    C10Be_SSold = eroded_particle.getConc_10Be(); 
+    eroded_particle.update_26Al_SSfull(this_float_map["effective_erosion_rate"], LSDCRNP);
+    C26Al_SSold = eroded_particle.getConc_26Al(); 
+    eroded_particle.update_14C_SSfull(this_float_map["effective_erosion_rate"], LSDCRNP);
+    C14C_SSold = eroded_particle.getConc_14C(); 
+
+    eroded_particle.update_10Be_SSfull(this_float_map["effective_erosion_rate_new"], LSDCRNP);
+    C10Be_SSnew = eroded_particle.getConc_10Be(); 
+    eroded_particle.update_26Al_SSfull(this_float_map["effective_erosion_rate_new"], LSDCRNP);
+    C26Al_SSnew = eroded_particle.getConc_26Al(); 
+    eroded_particle.update_14C_SSfull(this_float_map["effective_erosion_rate_new"], LSDCRNP);
+    C14C_SSnew = eroded_particle.getConc_14C(); 
+
+
+    //cout << "Steady concentrations, 10Be, 26Al, 14C, respectively:" << endl;
+    //cout << "old erosion rate: " << C10Be_SSold << ", " <<C26Al_SSold << ", " << C14C_SSold << endl;
+    //cout << "new erosion rate: " << C10Be_SSnew << ", " <<C26Al_SSnew << ", " << C14C_SSnew << endl;
+
+    string out_dfile = OUT_DIR+this_string_map["CRN_adjustment_data_file"];
+    ofstream adjust_out;
+    adjust_out.open(out_dfile.c_str());
+    adjust_out << "time,conc_10Be,conc_26Al,conc_14C,normalised_conc_10Be,normalised_conc_26Al,normalised_conc_14C,app_eros_10Be,app_eros_26Al,app_eros_14C,app_eros_ratio_14C_10Be,app_eros_ratio_14C_26Al" << endl;
+
+    vector<double> temp_vec;
+
+    //LSDCRNP.print_F_values_to_screen(nuclide_scaling_switches);
+
+    for(int i = 0; i<= 500; i++)
+    {
+      this_time = float(i)*delta_end_time;
+      eroded_particle.update_10Be_step_change(this_float_map["effective_erosion_rate"], 
+                                              this_float_map["effective_erosion_rate_new"], 
+                                              this_time, LSDCRNP);
+      C10Be=eroded_particle.getConc_10Be();  
+      norm_C10Be = (C10Be-C10Be_SSold)/(C10Be_SSnew-C10Be_SSold);
+      temp_vec = eroded_particle.apparent_erosion_10Be_COSMOCALC_prescaled(rho, LSDCRNP, 0, 0);
+      app_eros_10Be = temp_vec[0];
+
+      eroded_particle.update_26Al_step_change(this_float_map["effective_erosion_rate"], 
+                                              this_float_map["effective_erosion_rate_new"], 
+                                              this_time, LSDCRNP);
+      C26Al=eroded_particle.getConc_26Al();  
+      norm_C26Al = (C26Al-C26Al_SSold)/(C26Al_SSnew-C26Al_SSold);
+      temp_vec = eroded_particle.apparent_erosion_26Al_COSMOCALC_prescaled(rho, LSDCRNP, 0, 0);
+      app_eros_26Al = temp_vec[0];
+
+
+      eroded_particle.update_14C_step_change(this_float_map["effective_erosion_rate"], 
+                                              this_float_map["effective_erosion_rate_new"], 
+                                              this_time, LSDCRNP);
+      C14C=eroded_particle.getConc_14C();  
+      norm_C14C = (C14C-C14C_SSold)/(C14C_SSnew-C14C_SSold);    
+      temp_vec = eroded_particle.apparent_erosion_14C_COSMOCALC_prescaled(rho, LSDCRNP, 0, 0);
+      app_eros_14C = temp_vec[0];
+
+      adjust_out << this_time << "," << C10Be << "," << C26Al << "," << C14C << ","
+                 << norm_C10Be << "," << norm_C26Al << "," << norm_C14C << ","
+                 << app_eros_10Be << "," << app_eros_26Al << "," << app_eros_14C << "," 
+                 << app_eros_14C/app_eros_10Be << "," << app_eros_14C/app_eros_26Al << endl;
+
+      //cout << "F values at iteration: " << i << endl;
+      //LSDCRNP.print_F_values_to_screen(nuclide_scaling_switches);
+    }
+
+    adjust_out.close();
+    cout << "I'm all done calculating the adjustment response of various nuclides to a step change." << endl;
+  }
+
   //============================================================================  
   //
   //..####...#####...##..##...........####....####...##......##..##..##...##..##..##...####..
@@ -945,11 +1176,13 @@ int main (int nNumberofArgs,char *argv[])
   //.##..##..##..##..##..##..........##..##..##..##..##......##..##..##...##..##..##......##.
   //..####...##..##..##..##...........####....####...######...####...##...##..##..##...####..
   //
-  //============================================================================  
+  //============================================================================
   if(this_bool_map["transient_column_calculator"])
   {
     cout << "Let me make a column for you to test some concentrations." << endl;
     double this_conc  = -99;
+
+    string path_to_atmospheric_data = "./";
 
     // Later this will need to be updated to get the nuclide on other factors from input to the program
     string Nuclide = this_string_map["nuclide_for_prediction"];
@@ -1138,8 +1371,43 @@ int main (int nNumberofArgs,char *argv[])
     }
     else if(this_string_map["column_mode"] == "full_transient")
     {
-      cout << "I haven't implemented the full transient run yet, exiting" << endl;
+      cout << endl << endl << endl << "==========================" << endl;
+      cout << "I am implementing a transient column. " << endl;
+      cout << "This requires a transient erosion file." << endl;
+      cout << "See the help file for the format of this file." << endl;
+
+      LSDParticleColumn PartCol;
+
+      // read the timeseries.
+      string eros_filename = DATA_DIR+this_string_map["transient_history_file"];    
+      PartCol.read_erosion_time_series(eros_filename);
+
+      // Now get the depth of the particle.
+      float start_depth_change = PartCol.calculate_increase_in_depth_from_erosion_timeseries();
+      cout << "The change in the starting depth is: " << start_depth_change << endl;
+
+      // Now we solve the concentations for these particles
+      double latitude = double(this_float_map["transient_column_latitude"]);
+      double longitude = double(this_float_map["transient_column_longitude"]);
+      double elevation = double(this_float_map["transient_column_elevation"]);
+
+      vector<float> sampling_depths; 
+
+      for (int i = 0; i < this_int_map["transient_column_n_samples"]; i++)
+      {
+        sampling_depths.push_back( float(i)*this_float_map["transient_column_sample_spacing"]);
+      }
+
+      PartCol.calculate_CRN_conc_from_erosion_timeseries(sampling_depths, start_depth_change, 
+                                  latitude, longitude, elevation,
+                                  Muon_scaling, path_to_atmospheric_data);
+
+      string out_dfile = OUT_DIR+this_string_map["transient_particle_data_file"];
+      PartCol.print_particle_properties_3CRN(out_dfile);
+      cout << "Okay, folks, I am quitting now, I'm exhausted." << endl;
       exit(0);
+
+
     }
     else if(this_string_map["column_mode"] == "steady_state")
     {

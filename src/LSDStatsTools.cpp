@@ -1630,8 +1630,6 @@ vector<float> orthogonal_linear_regression( vector<float>& x_data, vector<float>
   //SS_yy = SS_yy/(n_nodes-1);
   //SS_xy = SS_xy/(n_nodes-1);
 
-  float sqrt_term = (SS_yy-SS_xx)*(SS_yy-SS_xx)+ 4*SS_xy*SS_xy;
-
   // Some logic for flat lines
   if (SS_xx == 0)
   {
@@ -5084,6 +5082,61 @@ void RemoveSmallBins(vector<float>& MeanX_output, vector<float>& MeanY_output, v
 
 }
 
+
+
+
+
+// This categorises data into classes separated by value boundaries. 
+// the boundaries data needs to be in increasing order, but this is accomplished via a sort 
+// function. 
+vector<int> categorise(vector<double> data, vector<double> boundaries)
+{
+  // Sort the boundaries
+  std::sort (boundaries.begin(), boundaries.end());
+
+  // now make a map of the values that is used for the categorisation
+  map<double,int> category_map;
+  vector<int> categories;
+  double this_ub;
+  int this_cat;
+
+
+  for(int i = 0; i< int(boundaries.size()); i++)
+  { 
+    category_map[boundaries[i]] = i;
+  }
+
+  // Now loop through the values getting the upper bounds
+  vector<double>::iterator it;
+  for(int i = 0; i< int(data.size()); i++)
+  {
+    if(data[i]<boundaries[0])
+    {
+      categories.push_back(0);
+    }
+    else if(data[i]>boundaries[  boundaries.size()-1 ])
+    {
+      categories.push_back( int(boundaries.size()));
+    }
+    else
+    {
+      it = lower_bound(boundaries.begin(), boundaries.end(), data[i]);
+      this_ub = *it;
+      this_cat = category_map[this_ub];
+      categories.push_back( this_cat);
+    }
+  }
+
+  return categories;
+
+}
+
+
+
+
+
+
+
 //
 // //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // // calculate_histogram
@@ -5876,7 +5929,7 @@ vector< pair<float,float> > evenly_spaced_points_along_polyline(vector<float> x1
   float current_x, current_y;
   int n_points = int(x1.size());
   float sxs, sys,sxe,sye;
-  float this_segment_distance,current_distance_along_segment,next_distance_along_segment;
+  float this_segment_distance,next_distance_along_segment;
   float leftover_distance;
   if(n_points > 1)
   {
@@ -5945,7 +5998,7 @@ void evenly_spaced_points_along_polyline(vector<float> x1, vector<float> y1, flo
   float current_x, current_y, current_distance;
   int n_points = int(x1.size());
   float sxs, sys,sxe,sye;
-  float this_segment_distance,current_distance_along_segment,next_distance_along_segment;
+  float this_segment_distance,next_distance_along_segment;
   float leftover_distance;
   if(n_points > 1)
   {
@@ -6098,6 +6151,80 @@ double deg(double radians)
   float deg = 180.0;
   return (radians/M_PI)*deg;
 }
+
+
+// This returns a vector with 4 elements that has the equation of a plane based on three points
+vector<double> get_plane_coefficients_from_points(double x1, double y1, double z1, 
+                                                 double x2, double y2, double z2,
+                                                 double x3, double y3, double z3)
+{
+  // first get the two vector components
+  double i1,j1,k1,i2,j2,k2;
+  i1 = x2-x1;
+  j1 = y2-y1;
+  k1 = z2-z1;
+
+  i2 = x3-x1;
+  j2 = y3-y1;
+  k2 = z3-z1;  
+
+  cout << "Vector elements: " << endl;
+  cout << i1 << ", " << j1 << ", " << k1 << endl;
+  cout << i2 << ", " << j2 << ", " << k2 << endl;
+
+  // now get the orthogonal vector
+  vector<double> oth_vec = vector_cross_product(i1,j1,k1,i2,j2,k2);
+
+
+
+  // now get the intercept
+  double d = -(oth_vec[0]*x1+oth_vec[1]*y1+oth_vec[2]*z1);
+
+  double d2, d3;
+  d2 = -(oth_vec[0]*x2+oth_vec[1]*y2+oth_vec[2]*z2);
+  d3 = -(oth_vec[0]*x3+oth_vec[1]*y3+oth_vec[2]*z3);
+
+  cout << "Checking d value, the values from the 3 points are: " << endl;
+  cout << d << ", " << d2 << ", " << d3 << endl;
+
+  oth_vec.push_back(d);
+
+  cout << "plane coeficcients: " << endl;
+  cout << oth_vec[0] << ", " << oth_vec[1] << ", " << oth_vec[2] << ", " << oth_vec[3] << endl;
+
+
+  // now check z value
+  double test_z = get_z_coord_of_point_on_plane(x1,y1,oth_vec);
+  cout << "z is: " << z1 << " and calc: " << test_z << endl;
+
+  return oth_vec;
+}
+
+// This uses the plane coefficients from the get_plane_coefficients_from_points function
+// and then calculates the z component of a point. 
+double get_z_coord_of_point_on_plane(double x1,double y1, vector<double> plane_coefficients)
+{
+  //cout << "Top: " << -(plane_coefficients[0]*x1+plane_coefficients[1]*y1+plane_coefficients[3]) << endl;
+  //cout << "Div: " << plane_coefficients[2] << endl;
+  float z_coord = -(plane_coefficients[0]*x1+plane_coefficients[1]*y1+plane_coefficients[3])/plane_coefficients[2];
+  return z_coord;
+}
+
+// This gets the cross product of two vectors
+vector<double> vector_cross_product(double i1, double j1, double k1, 
+                                    double i2, double j2, double k2)
+{
+  double element_1 = j1*k2-k1*j2;
+  double element_2 = k1*i2-i1*k2;
+  double element_3 = i1*j2-j1*i2;
+
+  vector<double> vec_elements;
+  vec_elements.push_back(element_1);
+  vec_elements.push_back(element_2);
+  vec_elements.push_back(element_3);
+  return vec_elements;
+}
+
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -6331,7 +6458,7 @@ Array2D<int> make_template_for_vector_bearing(float bearing, int scale)
   int dim = 2*scale+1;
   Array2D<int> bearing_template(dim,dim,0);
 
-  float max_extent = float(scale)*0.5+float(scale);
+  //float max_extent = float(scale)*0.5+float(scale);
 
   //Declare parameters
   int r,c;
@@ -6340,7 +6467,7 @@ Array2D<int> make_template_for_vector_bearing(float bearing, int scale)
   // This is the index of the starting node
   int a = 0;
   int b = 0;
-  float degs, degs_new, theta;
+  float degs, degs_new;
   float xo, yo, xi, yi, temp_yo1, temp_yo2, temp_xo1, temp_xo2;
 
   degs = bearing;
@@ -6846,17 +6973,17 @@ void get_distribution_stats(vector<float>& y_data, float& mean, float& median, f
     UpperQuartile = y_data[point75];
     LowerQuartile = y_data[point25];
   }
-  if (n_data_points % 4 == 1);
+  if (n_data_points % 4 == 1)
   {
     UpperQuartile = 0.25*y_data[point75]+0.75*y_data[point75+1];
     LowerQuartile = 0.75*y_data[point25]+0.25*y_data[point25+1];
   }
-  if (n_data_points % 4 == 2);
+  if (n_data_points % 4 == 2)
   {
     UpperQuartile = (y_data[point75]+y_data[point75+1])/2;
     LowerQuartile = (y_data[point25]+y_data[point25+1])/2;
   }
-  if (n_data_points % 4 == 3);
+  if (n_data_points % 4 == 3)
   {
     UpperQuartile = 0.75*y_data[point75]+0.25*y_data[point75+1];
     LowerQuartile = 0.25*y_data[point25]+0.75*y_data[point25+1];

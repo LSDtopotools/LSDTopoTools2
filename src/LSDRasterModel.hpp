@@ -1056,6 +1056,24 @@ class LSDRasterModel: public LSDRasterSpectral
                                             float min_slope_for_fill, 
                                             vector<int>& test_nodes_rows, vector<int>& test_nodes_cols);
 
+  /// @brief This gets some points that are used for divide migration tests. 
+  ///  The number of contributing pixels will be determinged from these points
+  ///  and compared between snaps or timesteps
+  ///  This version prints the points to a file
+  /// @param threshold_pixels_for_dm_test Number of accumulated pixels to generate a point
+  /// @param carve_before_fill if true, run the carving algorithm before the filling algorithm
+  /// @param min_slope_for_fill the minimum slope for snapping
+  /// @param test_nodes_rows a vector holding the rows of the test points. Will be updated in the function
+  /// @param test_nodes_cols a vector holding the rows of the test points. Will be updated in the function
+  /// @param DataDirectory directory where you print the point file
+  /// @param fname_prefix prefix of the point file to be printed
+  /// @author SMM
+  /// @date 17/12/2022
+  void get_points_for_divide_migration_test(int threshold_pixels_for_dm_test, bool carve_before_fill,
+                                            float min_slope_for_fill, 
+                                            vector<int>& test_nodes_rows, vector<int>& test_nodes_cols,
+                                            string DataDirectory,string fname_prefix);
+
 
   /// @brief Gets the contriibuting pixels from a series of points designated by their rows and columns
   ///  we use rows and columsn since we compare changing DEMs so the node index can change

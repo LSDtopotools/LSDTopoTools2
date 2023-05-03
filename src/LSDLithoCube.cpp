@@ -1138,6 +1138,36 @@ void LSDLithoCube::print_K_and_Sc_maps_to_screen()
 
 }
 
+// This is used after ingesting erodibility classes and K values
+// from Wolfgang Schwanghart's simulations
+// in order to calculate the K values from read erodibility codes
+void LSDLithoCube::convert_EC_to_K_file(vector<float> K_values, string EC_to_K_outfile)
+{
+  ofstream EC_to_K_out(EC_to_K_outfile.c_str());
+
+  EC_to_K_out << "Strati,K" << endl;
+
+  EC_to_K_out << "0," << K_values[0] << endl; 
+  EC_to_K_out << "1," << K_values[0] << endl; 
+  EC_to_K_out << "2," << K_values[1] << endl; 
+  EC_to_K_out << "3," << K_values[1] << endl; 
+  EC_to_K_out << "4," << K_values[1] << endl; 
+  EC_to_K_out << "5," << K_values[3] << endl; 
+  EC_to_K_out << "6," << K_values[2] << endl; 
+  EC_to_K_out << "7," << K_values[2] << endl; 
+  EC_to_K_out << "8," << K_values[3] << endl; 
+  EC_to_K_out << "9," << K_values[1] << endl; 
+  EC_to_K_out << "10," << K_values[2] << endl; 
+  EC_to_K_out << "11," << K_values[1] << endl; 
+  EC_to_K_out << "12," << K_values[1] << endl; 
+  EC_to_K_out << "13," << K_values[3] << endl; 
+  EC_to_K_out << "14," << K_values[2] << endl; 
+  EC_to_K_out << "15," << K_values[3] << endl; 
+  EC_to_K_out << "-9999," << K_values[2] << endl; 
+  
+  EC_to_K_out.close();
+}
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
 // Fills a map with stratigraphy codes and corresponding K value

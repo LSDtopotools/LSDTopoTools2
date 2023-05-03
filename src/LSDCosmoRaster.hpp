@@ -141,7 +141,7 @@ class LSDCosmoRaster: public LSDRaster
     /// @date 3/7/2015
     vector<float> get_XY_MinMax();
   
-    /// @ brief This resets scaling of the CRN parameters object
+    /// @brief This resets scaling of the CRN parameters object
     /// @param LSDCRNP an LSDCRNParameters object. Is passed by refernce and reset in the function
     /// @param muon scaling. A string. Options are: Schaller, Braucher, Granger, newCRONUS.
     ///    the default is Braucher but it will spit out a warning if you don't assign this. 

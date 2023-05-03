@@ -2217,6 +2217,24 @@ void LSDRaster::rewrite_with_random_values(float range)
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// rewrite_with_random_values
+// This overwrites existing data with random values
+// You can give it a seed for this one (which means the numbers are "random")
+// but reproducible
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDRaster::rewrite_with_random_values(float range, long seed)
+{
+  for(int row = 0; row<NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      RasterData[row][col] = ran3(&seed)*range;
+    }
+  }
+}
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // Create a raster of nodata values in the shape of the input
 // FJC 07/04/17
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -2511,7 +2529,6 @@ int LSDRaster::find_n_different_pixels(LSDRaster& compare_raster)
   int tot_pix = 0;
   float raster_val1, raster_val2;
 
-  float average_difference;
   // first, compare the raster dimensions
   if(does_raster_have_same_dimensions(compare_raster))
   {
@@ -2551,7 +2568,6 @@ int LSDRaster::find_n_different_pixels(LSDRaster& compare_raster, float threshol
   int n = 0;
   float raster_val1, raster_val2;
 
-  float average_difference;
   // first, compare the raster dimensions
   if(does_raster_have_same_dimensions(compare_raster))
   {
@@ -2640,6 +2656,32 @@ LSDRaster LSDRaster::MapAlgebra_multiply(LSDRaster& M_raster)
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDRaster LSDRaster::MapAlgebra_multiply(float multiplier)
+{
+
+  //create an array
+  Array2D<float> New_array(NRows,NCols,NoDataValue);
+
+  for(int row = 0; row< NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      if (RasterData[row][col] != NoDataValue)
+      {
+        New_array[row][col] = RasterData[row][col]*multiplier;
+      }
+    }
+  }
+  //create LSDRaster object
+  LSDRaster NewRaster(NRows, NCols, XMinimum, YMinimum, DataResolution,
+                              NoDataValue, New_array, GeoReferencingStrings);
+  return NewRaster;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 LSDRaster LSDRaster::MapAlgebra_divide(LSDRaster& M_raster)
 {
   // first check if rasters are the same size
@@ -2674,6 +2716,33 @@ LSDRaster LSDRaster::MapAlgebra_divide(LSDRaster& M_raster)
   }
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDRaster LSDRaster::MapAlgebra_divide(float multiplier)
+{
+
+  //create an array
+  Array2D<float> New_array(NRows,NCols,NoDataValue);
+
+  for(int row = 0; row< NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      if (RasterData[row][col] != NoDataValue)
+      {
+        New_array[row][col] = RasterData[row][col]/multiplier;
+      }
+    }
+  }
+  //create LSDRaster object
+  LSDRaster NewRaster(NRows, NCols, XMinimum, YMinimum, DataResolution,
+                              NoDataValue, New_array, GeoReferencingStrings);
+  return NewRaster;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -2712,6 +2781,33 @@ LSDRaster LSDRaster::MapAlgebra_add(LSDRaster& M_raster)
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDRaster LSDRaster::MapAlgebra_add(float adjuster)
+{
+
+  //create an array
+  Array2D<float> New_array(NRows,NCols,NoDataValue);
+
+  for(int row = 0; row< NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      if (RasterData[row][col] != NoDataValue)
+      {
+        New_array[row][col] = RasterData[row][col]+adjuster;
+      }
+    }
+  }
+  //create LSDRaster object
+  LSDRaster NewRaster(NRows, NCols, XMinimum, YMinimum, DataResolution,
+                              NoDataValue, New_array, GeoReferencingStrings);
+  return NewRaster;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 LSDRaster LSDRaster::MapAlgebra_subtract(LSDRaster& M_raster)
 {
@@ -2747,6 +2843,33 @@ LSDRaster LSDRaster::MapAlgebra_subtract(LSDRaster& M_raster)
   }
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDRaster LSDRaster::MapAlgebra_subtract(float adjuster)
+{
+
+  //create an array
+  Array2D<float> New_array(NRows,NCols,NoDataValue);
+
+  for(int row = 0; row< NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      if (RasterData[row][col] != NoDataValue)
+      {
+        New_array[row][col] = RasterData[row][col]-adjuster;
+      }
+    }
+  }
+  //create LSDRaster object
+  LSDRaster NewRaster(NRows, NCols, XMinimum, YMinimum, DataResolution,
+                              NoDataValue, New_array, GeoReferencingStrings);
+  return NewRaster;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDRaster::AdjustElevation(float elevation_change)
@@ -2859,6 +2982,21 @@ void LSDRaster::DSSetFeatureCorners(int featuresize, float scale)
     }
   }
   //cout << "Set the feature corners" << endl;
+}
+
+// same as above but you pass the seed
+void LSDRaster::DSSetFeatureCorners(int featuresize, float scale, long* seed_pointer)
+{
+  // the function starts from -featuresize since in the diamond square step
+  // of the algorithm it wraps from row and column 0
+  for (int row = 0; row < NRows; row+= featuresize)
+  {
+    for (int col = 0; col<NCols; col+= featuresize)
+    {
+      float randn = (ran3(seed_pointer)-0.5)*scale;
+      SetWrapSample(row,col,randn);
+    }
+  }
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -2988,6 +3126,43 @@ void LSDRaster::DiamondSquare_SampleStep(int stepsize, float scale)
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+// same as above but in this version you set the seed
+void LSDRaster::DiamondSquare_SampleStep(int stepsize, float scale, long* seed)
+{
+    int halfstep = stepsize / 2;
+
+  // first do the square step. This gets the sqare for the node
+  // at the half distance between the starting points
+  for (int row = -halfstep; row < NRows+halfstep; row += stepsize)
+  {
+    for (int col = -halfstep; col < NCols + halfstep; col += stepsize)
+    {
+      //cout << "SS row and col: " << row << " " << col << endl;
+      DSSampleSquare(row, col, stepsize, ((ran3(seed)-0.5) * scale));
+    }
+  }
+
+  // now the DiamondStep.
+  // The first diamond gets the point halfway below the first column
+  // Second diamond gets the column halfway past the first row.
+  // That means for col 0 and row 0 it will wrap to the other side
+  // This means these values will need to be wrapped in the inital
+  // set corners stage!
+  for (int row = -stepsize; row < NRows; row += stepsize)
+  {
+    for (int col = -stepsize; col < NCols; col += stepsize)
+    {
+      //cout << "DS row and col: " << row << " " << col << endl;
+      DSSampleDiamond(row + halfstep, col, stepsize, ((ran3(seed)-0.5) * scale));
+      DSSampleDiamond(row, col + halfstep, stepsize, ((ran3(seed)-0.5) * scale));
+    }
+  }
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // this is the diamond square algorithm
 // it creates a resized diamond square pseudo-fractal raster
@@ -3060,6 +3235,81 @@ LSDRaster LSDRaster::DiamondSquare(int feature_order, float scale)
     return DSRaster;
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// this is the diamond square algorithm
+// it creates a resized diamond square pseudo-fractal raster
+// it has the same xllcorner and yllcorner as the original raster,
+// but is resized so the NRows and NCols are to the closed power of 2
+//
+// Believe it or not I lifted this algorithm from Notch, the creator of Minecraft,
+// who posted it online and then had it modified by Charles Randall
+// https://www.bluh.org/code-the-diamond-square-algorithm/
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDRaster LSDRaster::DiamondSquare(int feature_order, float scale, long* seed_pointer)
+{
+
+    // determine the size of the padded array:
+    int PaddedRows = int(pow(2,ceil(log(NRows)/log(2))));
+    int PaddedCols = int(pow(2,ceil(log(NCols)/log(2))));
+
+    // now get the maximum feature size. This will be the  minimum
+    // power of 2 in the x or y direction
+    int max_feature_size;
+    if (PaddedRows >= PaddedCols)
+    {
+      max_feature_size = PaddedCols;
+    }
+    else
+    {
+      max_feature_size = PaddedRows;
+    }
+
+    cout << "NRows: " << NRows << " and PaddedRows: " << PaddedRows << endl;
+    cout << "NCols: " << NCols << " and PaddedCols: " << PaddedCols << endl;
+    cout << "max_feature_size: " << max_feature_size << endl;
+
+    //create an array
+    Array2D<float> DSRaster_array(PaddedRows,PaddedCols,NoDataValue);
+
+    //create LSDRaster diamond square object
+    LSDRaster DSRaster(PaddedRows, PaddedCols, XMinimum, YMinimum, DataResolution,
+                               NoDataValue, DSRaster_array, GeoReferencingStrings);
+
+    // get the feature size: it must be a power of 2.
+    int featuresize = pow(2,feature_order);
+    if (featuresize > max_feature_size)
+    {
+      cout << "Your featuresize is too big for the DEM. Changing to max feature size" << endl;
+    }
+
+    cout << "feature size is: " << featuresize << endl;
+
+    // now initialize the raster over some feature scale
+    DSRaster.DSSetFeatureCorners(featuresize, scale,seed_pointer);
+
+    // now loop through the features, running the diamond square algorithm.
+    int samplesize = featuresize;
+    scale = scale/2;
+
+    cout << "Starting diamond square algorithm, samplesize is: " << samplesize << endl;
+
+    while (samplesize > 1)
+    {
+      cout << "Running Diamond square, samplesize: " << samplesize << endl;
+
+      DSRaster.DiamondSquare_SampleStep(samplesize,scale,seed_pointer);
+
+      // halve the sample size and scale
+      samplesize = samplesize/2;
+      scale = scale/2;
+    }
+
+    return DSRaster;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -10897,6 +11147,7 @@ vector< LSDRaster > LSDRaster::find_nearest_point_from_list_of_points_with_relie
   // Now we loop through all pixels in the raster
   cout << "I am going to find the closest point in a list of points to every pixel in your raster." << endl;
   int point_row,point_col;
+  this_relief = NoDataValue;
   for(int row = 0; row<NRows; row++)
   {
     if(row%10 == 0)
@@ -10911,6 +11162,7 @@ vector< LSDRaster > LSDRaster::find_nearest_point_from_list_of_points_with_relie
         this_min_distance = 10000000000;
         this_value = NoDataValue;
         this_node = NoDataValue;
+        
 
         // now loop through all the points getting the minimum point
         x_0 = raster_eastings[col];
@@ -10941,7 +11193,7 @@ vector< LSDRaster > LSDRaster::find_nearest_point_from_list_of_points_with_relie
         //cout << "r: " << row << ", c: "<< col << " min dist: " << this_min_distance << endl;
 
         // Finished looping through node, update the data
-        // only record the nodes that are withing the swath width
+        // only record the nodes that are within the swath width
         if (this_min_distance<0.5*swath_width)
         {
           Distances[row][col] = this_min_distance;
@@ -14143,6 +14395,7 @@ LSDIndexRaster LSDRaster::IsolateChannelsQuantileQuantile(string q_q_filename)
   if(ofs.fail())
   {
     cout << "\nFATAL ERROR: unable to write output_file" << endl;
+    cout << "The name of the file is: " << q_q_filename << endl;
     exit(EXIT_FAILURE);
   }
   ofs << "normal_variate value\n";

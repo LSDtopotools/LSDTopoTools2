@@ -2163,6 +2163,29 @@ LSDIndexRaster LSDChiTools::get_basin_raster(LSDFlowInfo& FlowInfo, LSDJunctionN
 
 }
 
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Get the basin key given a outlet node 
+// SMM 12/10/2022
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+int LSDChiTools::get_basin_key_from_outlet_node(int outlet_node)
+{
+  // This uses the baselevel_keys_map, where the key is the node index of a baselevel node and the
+  // value is the baselevel index
+  int basin_key;
+  if ( baselevel_keys_map.find(outlet_node) == baselevel_keys_map.end() )
+  {
+    basin_key = NoDataValue;
+  }
+  else
+  {
+    basin_key = baselevel_keys_map[outlet_node];
+  }
+  return basin_key;
+
+}
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // extract lithology data per basins from a litho map, a FlowInfo and a junction networks
 // ongoing work
@@ -2882,7 +2905,7 @@ LSDRaster LSDChiTools::prefilter_river_topography(LSDRaster& filled_topography, 
 
     // Going through the vector of nodes
     size_t rit_a = vecnode.size() - 1;
-    int last_node; 
+    //int last_node; 
     float last_elev;
     for(vector<int>::reverse_iterator ti2 = vecnode.rbegin(); ti2 != vecnode.rend(); ++ti2)
     {
@@ -2903,7 +2926,7 @@ LSDRaster LSDChiTools::prefilter_river_topography(LSDRaster& filled_topography, 
         // cout << "D:" << detrend[rit_a] << endl;
         // cout << "LE:" << last_elev << endl;
       }
-      last_node = this_node;
+      //last_node = this_node;
       last_elev = filled_topography.get_data_element(row,col);
       rit_a--;
     }
@@ -2925,7 +2948,7 @@ LSDRaster LSDChiTools::prefilter_river_topography(LSDRaster& filled_topography, 
     for(int rit_b = int(vecnode.size()) - 1 ; rit_b >= 0; --rit_b)
     {
 
-      if(rit_b == vecnode.size() - 1)
+      if(rit_b == int(vecnode.size()) - 1)
       {
         // cout << "Premier node: " << this_base_elevation << endl;
         int tnode = vecnode[rit_b], trow=0,tcol=0;
@@ -4032,7 +4055,7 @@ void  LSDChiTools::TVD_on_segelev(LSDFlowInfo& Flowinfo)
 
 
         // Now I just have to save the results into global maps
-        int last_node = -9999; // forcing segfault in case it happens 
+        //int last_node = -9999; // forcing segfault in case it happens 
         for(pferd=0; pferd<this_vec.size(); pferd++)
         {
           int this_node = this_vec[pferd];
@@ -4599,7 +4622,7 @@ void LSDChiTools::print_bandwidth_ksn_knickpoint(string filename)
   file_out << "source_key,basin_key,length,chi" << endl;
 
   int this_source_key, this_basin_key, this_node = 0;
-  float this_bandwidth = 0;
+  float this_bandwidth;
   map<int,vector<int> >::iterator OL;
 
   for(OL = map_node_source_key.begin(); OL !=  map_node_source_key.end() ; OL++)
@@ -4966,9 +4989,9 @@ void LSDChiTools::generate_knickpoint_overview(LSDFlowInfo& FlowInfo, LSDRaster&
   Array2D<float> tCx_TVD_map(NRows,NCols,NoDataValue);
   Array2D<float> tMx_TVD_map(NRows,NCols,NoDataValue);
 
-  for(size_t h=0;h<NRows;h++)
+  for(int h=0;h<NRows;h++)
   {
-    for(size_t g=0;g<NCols;g++)
+    for(int g=0;g<NCols;g++)
     {
       if(Elevation.get_data_element(h,g) != NoDataValue)
       {

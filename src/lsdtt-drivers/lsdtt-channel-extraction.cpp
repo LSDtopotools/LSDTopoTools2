@@ -85,7 +85,7 @@ int main (int nNumberofArgs,char *argv[])
   //start the clock
   clock_t begin = clock();
 
-  string version_number = "0.7";
+  string version_number = "0.8";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -281,6 +281,9 @@ int main (int nNumberofArgs,char *argv[])
 
   bool_default_map["use_extended_channel_data"] = false;
   help_map["use_extended_channel_data"] = {  "bool","false","If this is true you get more data columns in your channel network csv.","I will tell you what these columns are one day."};
+
+  bool_default_map["print_channels_to_line_vector"] = true;
+  help_map["print_channels_to_line_vector"] = { "bool","true","If this is true print a geojson with the channel network as a polyline.","Used for more efficient visualisation of the channel network."};
 
   bool_default_map["print_junctions_to_csv"] = false;
   help_map["print_junctions_to_csv"] = {  "bool","false","Prints a csv with the locations and numbers of the junctions.","This is better to use than the raster version."};
@@ -644,6 +647,14 @@ int main (int nNumberofArgs,char *argv[])
         thiscsv.print_data_to_geojson(gjson_name);
       }
     }
+
+    if (this_bool_map["print_channels_to_line_vector"])
+    {
+      string channel_geojson_name = OUT_DIR+OUT_ID+"_AT_CN_line";
+      cout << "I am going to print your channel network to a line geojson" << endl;
+      LSDRaster DA = FlowInfo.write_DrainageArea_to_LSDRaster();
+      ChanNetwork.PrintChannelNetworkToLineVector(FlowInfo, channel_geojson_name, filled_topography, DA, DistanceFromOutlet);
+    }
   }
 
   //===============================================================
@@ -777,6 +788,14 @@ int main (int nNumberofArgs,char *argv[])
         LSDSpatialCSVReader thiscsv(channel_csv_name);
         thiscsv.print_data_to_geojson(gjson_name);
       }
+    }
+
+    if (this_bool_map["print_channels_to_line_vector"])
+    {
+      string channel_geojson_name = OUT_DIR+OUT_ID+"_D_CN_line";
+      cout << "I am going to print your channel network to a line geojson" << endl;
+      LSDRaster DA = FlowInfo.write_DrainageArea_to_LSDRaster();
+      NewChanNetwork.PrintChannelNetworkToLineVector(FlowInfo, channel_geojson_name, filled_topography, DA, DistanceFromOutlet);
     }
 
   }
@@ -947,6 +966,14 @@ int main (int nNumberofArgs,char *argv[])
       }
     }
 
+    if (this_bool_map["print_channels_to_line_vector"])
+    {
+      string channel_geojson_name = OUT_DIR+OUT_ID+"_P_CN_line";
+      cout << "I am going to print your channel network to a line geojson" << endl;
+      LSDRaster DA = FlowInfo.write_DrainageArea_to_LSDRaster();
+      NewChanNetwork.PrintChannelNetworkToLineVector(FlowInfo, channel_geojson_name, filled_topography, DA, DistanceFromOutlet);
+    }
+
   }
 
   //===============================================================
@@ -1070,10 +1097,20 @@ int main (int nNumberofArgs,char *argv[])
       }
     }
 
+    if (this_bool_map["print_channels_to_line_vector"])
+    {
+      string channel_geojson_name = OUT_DIR+OUT_ID+"_W_CN_line";
+      cout << "I am going to print your channel network to a line geojson" << endl;
+      // distance from outlet
+      LSDRaster DistanceFromOutlet = FlowInfo.distance_from_outlet();
+      LSDRaster DA = FlowInfo.write_DrainageArea_to_LSDRaster();
+      ChanNetwork.PrintChannelNetworkToLineVector(FlowInfo, channel_geojson_name, filled_topography, DA, DistanceFromOutlet);
+    }
+
   }
 
-    //===============================================================
-  // WIENER
+  //===============================================================
+  // PERONA-MALIK
   //===============================================================
   if (this_bool_map["print_perona_malik_channels"])
   {
@@ -1189,6 +1226,16 @@ int main (int nNumberofArgs,char *argv[])
         LSDSpatialCSVReader thiscsv(channel_csv_name);
         thiscsv.print_data_to_geojson(gjson_name);
       }
+    }
+
+    if (this_bool_map["print_channels_to_line_vector"])
+    {
+      string channel_geojson_name = OUT_DIR+OUT_ID+"_PM_CN_line";
+      cout << "I am going to print your channel network to a line geojson" << endl;
+      // distance from outlet
+      LSDRaster DistanceFromOutlet = FlowInfo.distance_from_outlet();
+      LSDRaster DA = FlowInfo.write_DrainageArea_to_LSDRaster();
+      ChanNetwork.PrintChannelNetworkToLineVector(FlowInfo, channel_geojson_name, filled_topography, DA, DistanceFromOutlet);
     }
 
   }

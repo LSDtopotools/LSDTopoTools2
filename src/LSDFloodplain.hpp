@@ -110,7 +110,7 @@ class LSDFloodplain
 	/// @param nodes_to_remove vector of nodes to remove
 	/// @author FJC
 	/// @date 31/01/21
-  vector<vector<float>> calculate_valley_widths(LSDSpatialCSVReader channel_csv, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet,
+  vector<vector<float>> calculate_valley_widths(LSDSpatialCSVReader channel_csv, LSDFlowInfo& FlowInfo, LSDRaster& DistanceFromOutlet, LSDRaster& DrainageArea, LSDRaster& Elevation,
                                                 int channel_bearing_node__spacing, bool print_bearings, string bearing_fname, int template_scale, string outfilename, vector<int> nodes_to_remove);
 
   void calculate_valley_widths_multiple_channels(vector<int> basin_junctions, LSDFlowInfo& FlowInfo, LSDJunctionNetwork& ChanNetwork, LSDRaster& DistanceFromOutlet, LSDRaster& DrainageArea, LSDRaster& Elevation,
@@ -184,6 +184,12 @@ class LSDFloodplain
 	/// @author FJC
 	/// @date 19/10/16
 	LSDRaster print_UpstreamDistance_to_Raster();
+
+	/// @brief This function prints the nearest channel node for every floodplain pixel to a raster
+	/// @return LSDRaster of nearest channel nodes
+	/// @author FJC
+	/// @date 19/01/23
+	LSDIndexRaster print_NearestChannelNode_to_Raster();
 
 	/// @brief This function prints the flow lengths to the nearest main stem to a raster
 	/// @return Flow Lengths LSDRaster of flow length

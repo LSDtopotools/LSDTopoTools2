@@ -271,8 +271,8 @@ void LSDCRNParameters::load_parameters_for_atmospheric_scaling(string path_to_da
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// This function sets a number of paramters that are used for acalucaltion
-// of scaling and error propigation
+// This function sets a number of paramters that are used for calculation
+// of scaling and error propagation
 //
 // They are constants used in the CRONUS caluclator, and have been ported
 // from make_al_be_consts_v22.m written by Greg Balco
@@ -1152,6 +1152,10 @@ void LSDCRNParameters::set_BraucherBorchers_parameters()
 {
   //S_t = 1;
 
+  // Notes:
+  // The F values for 10Be, 26Al and 36Cl come from Braucher et al EPSL 309 1-9 (2011)
+  //
+
   // from Vermeesh 2007
   // 10Be from Chmeleff/Korschinek 10Be decay constant;
   lambda_10Be = 500e-9;    // in yr-1
@@ -1161,13 +1165,19 @@ void LSDCRNParameters::set_BraucherBorchers_parameters()
 
   // from the Braucher and Borchers papers
   // data compiled by Mirjam Schaller in personal communication
-  //
-  // All but 10Be are calibrated to the Stone scaling
+  // for 10Be and 26Al
+  // These come from dividing the Borchers et al 2016 stone spallation
+  // number by F0, the spallation production from the Braucher 2011 paper
+  // I did this myself for 36C
+  // All are calibrated to the Stone scaling
+  // The 14C uses the lupker spallation scaling and the Borchers stone spallation
+  // 12.24/0.788
   // Also linked to the nishizumii standards
+  // 
   P0_10Be = 4.061;          // in a/g/yr
   P0_26Al = 28.851;         // in a/g/yr
-  P0_14C = 15.21;          // in a/g/yr
-  P0_36Cl = 58.95;         // in a/g/yr
+  P0_14C = 15.533;          // in a/g/yr
+  P0_36Cl = 55.705;         // in a/g/yr
   P0_21Ne = 18.23;         // in a/g/yr
   P0_3He = 121.59;         // in a/g/yr
 
@@ -1190,16 +1200,19 @@ void LSDCRNParameters::set_BraucherBorchers_parameters()
   F_26Al[3] = 0.0028;
 
   // dimensionless
-  F_14C[0] = 0.83;
-  F_14C[1] = 0.15;
+  // This data comes from the Lupker et al QG 28 80-87 2015 paper
+  // There are no fast muons in that paper (F[3])
+  F_14C[0] = 0.788;
+  F_14C[1] = 0.212;
   F_14C[2] = 0.0;
-  F_14C[3] = 0.02;
+  F_14C[3] = 0.0;
 
   // dimensionless
-  F_36Cl[0] = 0.9456;
-  F_36Cl[1] = 0.0324;
+  // calculated from table 5 in Borchers et al 2011
+  F_36Cl[0] = 0.9396;
+  F_36Cl[1] = 0.0369;
   F_36Cl[2] = 0.00;
-  F_36Cl[3] = 0.022;
+  F_36Cl[3] = 0.0235;
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 

@@ -949,6 +949,21 @@ class LSDCRNParticle: public LSDParticle
                                     double top_eff_depth, double bottom_eff_depth);
 
   /// @brief This returns the 'apparent' erosion rate that one would calcualte
+  /// based on an assumed density above the sampling depth and for full muon 
+  /// production based on COSMOCALC scaling. the parameters are pre-scaled
+  /// @param rho the density in kg/m^3 above the 'sampling' point
+  /// @param top_eff_depth the effective depth g/cm^2 at the top of the
+  ///  section being depth-integrated
+  /// @param bottom_eff_depth the effective depth g/cm^2 at the bottom of the
+  ///  section being depth-integrated
+  /// @return the apparent erosion rate in g/cm^2/yr and m/yr
+  /// @author SMM
+  /// @date 19/11/2022 
+  vector<double> apparent_erosion_10Be_COSMOCALC_prescaled(double rho, LSDCRNParameters& CRNp,
+                                    double top_eff_depth, double bottom_eff_depth);
+
+
+  /// @brief This returns the 'apparent' erosion rate that one would calcualte
   /// based on an assumed density above the sampling depth and if the
   /// production was assumed to be from neutrons only for 10Be
   /// @param rho the density in kg/m^3 above the 'sampling' point
@@ -975,6 +990,21 @@ class LSDCRNParticle: public LSDParticle
   vector<double> apparent_erosion_26Al_COSMOCALC(double rho, LSDCRNParameters& CRNp,
                                     double scaling_factor, string Muon_scaling,
                                     double top_eff_depth, double bottom_eff_depth);
+
+  /// @brief This returns the 'apparent' erosion rate that one would calcualte
+  /// based on an assumed density above the sampling depth and for full muon 
+  /// production based on COSMOCALC scaling. Parameters are pre-scaled via the parameter object
+  /// @param rho the density in kg/m^3 above the 'sampling' point
+  /// @param top_eff_depth the effective depth g/cm^2 at the top of the
+  ///  section being depth-integrated
+  /// @param bottom_eff_depth the effective depth g/cm^2 at the bottom of the
+  ///  section being depth-integrated
+  /// @return the apparent erosion rate in g/cm^2/yr and m/yr
+  /// @author SMM
+  /// @date 19/11/2022 
+  vector<double> apparent_erosion_26Al_COSMOCALC_prescaled(double rho, LSDCRNParameters& CRNp,
+                                    double top_eff_depth, double bottom_eff_depth);
+
 
 
   /// @brief This returns the 'apparent' erosion rate that one would calcualte
@@ -1014,6 +1044,22 @@ class LSDCRNParticle: public LSDParticle
   vector<double> apparent_erosion_14C_COSMOCALC(double rho, LSDCRNParameters& CRNp,
                                     double scaling_factor, string Muon_scaling,
                                     double top_eff_depth, double bottom_eff_depth);
+
+  /// @brief This returns the 'apparent' erosion rate that one would calcualte
+  /// based on an assumed density above the sampling depth and for full muon 
+  /// production based on COSMOCALC scaling. Pramaeters are pre-scaled and passed through
+  /// the parameter object.
+  /// @param rho the density in kg/m^3 above the 'sampling' point
+  /// @param top_eff_depth the effective depth g/cm^2 at the top of the
+  ///  section being depth-integrated
+  /// @param bottom_eff_depth the effective depth g/cm^2 at the bottom of the
+  ///  section being depth-integrated
+  /// @return the apparent erosion rate in g/cm^2/yr and m/yr
+  /// @author SMM
+  /// @date 19/11/2022 
+  vector<double> apparent_erosion_14C_COSMOCALC_prescaled(double rho, LSDCRNParameters& CRNp,
+                                    double top_eff_depth, double bottom_eff_depth);
+
 
   /// @brief This returns the 'apparent' erosion rate that one would calcualte
   /// based on an assumed density abouve the sampling depth and if the
@@ -1060,6 +1106,15 @@ class LSDCRNParticle: public LSDParticle
   /// @param delta_d the new depth (in metres)
   /// @param delta_ed the new effective depth in g/cm^2
   void update_depths(double delta_d, double delta_ed);
+
+  /// @brief This removes overlying mass of a depth d
+  ///  then updates the depth and effective depth. 
+  ///  if depth ends up less than zero you get a warning
+  /// @param d the depth of the particle in metres
+  /// @param rho the density of the material in kg/m^3
+  /// @author SMM
+  /// @date 15/11/2022
+  void remove_mass_one_layer(double d, double rho);
 
   /// @brief Updates the depth and calculates and updates the effective depth
   ///  for a one layer density model (that is, all material has the same density)
