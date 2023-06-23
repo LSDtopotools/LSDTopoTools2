@@ -80,7 +80,7 @@
 int main (int nNumberofArgs,char *argv[])
 {
 
-  string version_number = "0.8";
+  string version_number = "0.9";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;

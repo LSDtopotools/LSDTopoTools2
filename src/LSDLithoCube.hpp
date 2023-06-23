@@ -161,6 +161,11 @@ class LSDLithoCube
     /// @date 25/01/2020
     void ingest_stratigraphic_info(string filename);
 
+    /// @brief This counts and returns the number of pixels in the lithocube with each stratigraphic code
+    /// @author SMM
+    /// @param return a map holding the counts of each strategraphic code
+    /// @date 02/06/2023
+    map<int,int> get_strat_key_counts();
 
     /// @brief This gets the row and column of a particular point
     /// @param x_location the x location of a particular point in local coordinates

@@ -464,6 +464,12 @@ class LSDBasin
   /// @date 16/01/18
   vector<int> order_perimeter_nodes(LSDFlowInfo& FlowInfo);
 
+  /// @brief Orders perimeter nodes from the outlet. Uses a different approach
+  /// @param FlowInfo the LSDFlowInfo object
+  /// @author SMM
+  /// @date 29/05/23
+  vector<int> order_perimeter_nodes_SMM(LSDFlowInfo& FlowInfo);
+
   /// @brief Set the four different hillslope length measurements for the basin.
   /// @param FlowInfo Flowinfo object.
   /// @param HillslopeLengths LSDRaster of hillslope lengths from the hilltop flow routing method.

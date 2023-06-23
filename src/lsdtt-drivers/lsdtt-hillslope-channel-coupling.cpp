@@ -81,7 +81,7 @@
 int main (int nNumberofArgs,char *argv[])
 {
 
-  string version_number = "0.8";
+  string version_number = "0.9";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -218,7 +218,6 @@ int main (int nNumberofArgs,char *argv[])
   int_default_map["connected_components_threshold"] = 100;
   help_map["connected_components_threshold"] = {  "int","100","Number of connected pixels to classify as a channel.","Used in Pelletier and Wiener methods."};
 
-
    //Defining hilltops
 	int_default_map["StreamNetworkPadding"] = 0;
   help_map["StreamNetworkPadding"] = {  "int","0","Distance in pixels from channel network that can't be classed as a hilltop","Use if you want to remove hilltops near channels."};
@@ -334,6 +333,9 @@ int main (int nNumberofArgs,char *argv[])
 
   bool_default_map["print_channels_to_csv"] = false;
   help_map["print_channels_to_csv"] = {  "bool","false","Prints the channel network to a csv file.","This version produces smaller files than the raster version."};
+
+  bool_default_map["use_extended_channel_data"] = false;
+  help_map["use_extended_channel_data"] = {  "bool","false","If this is true you get more data columns in your channel network csv.","I will tell you what these columns are one day."};
 
   bool_default_map["print_junction_index_raster"] = false;
   help_map["print_junction_index_raster"] = {  "bool","false","Prints a raster with junctions and their number.","Makes big files. It is better to use the csv version."};
@@ -897,6 +899,7 @@ int main (int nNumberofArgs,char *argv[])
 
       //Now we have the final channel heads, so we can generate a channel network from them
       //LSDJunctionNetwork ChanNetwork(FinalSources, FlowInfo);
+
     }
     else
     {
@@ -953,7 +956,15 @@ int main (int nNumberofArgs,char *argv[])
   {
     cout << "\t\tprinting channels to csv..." << endl;
     string channel_csv_name = OUT_DIR+OUT_ID+"_CN";
-    JunctionNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
+    if ( this_bool_map["use_extended_channel_data"])
+    {
+      cout << "I am going to use the extended channel network data outputs." << endl;
+      JunctionNetwork.PrintChannelNetworkToCSV_WithElevation_WithDonorJunction(FlowInfo, channel_csv_name, topography_raster);
+    }
+    else
+    {
+      JunctionNetwork.PrintChannelNetworkToCSV(FlowInfo, channel_csv_name);
+    }
 
     // convert to geojson if that is what the user wants
 
@@ -997,7 +1008,7 @@ int main (int nNumberofArgs,char *argv[])
 
     if ( this_bool_map["convert_csv_to_geojson"])
     {
-      string gjson_name = OUT_DIR+OUT_ID+"_ATsources.geojson";
+      string gjson_name = OUT_DIR+OUT_ID+"_sources.geojson";
       LSDSpatialCSVReader thiscsv(sources_csv_name);
       thiscsv.print_data_to_geojson(gjson_name);
     }

@@ -74,7 +74,7 @@ int main (int nNumberofArgs,char *argv[])
   //start the clock
   clock_t begin = clock();
 
-  string version_number = "0.8";
+  string version_number = "0.9";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -288,6 +288,9 @@ int main (int nNumberofArgs,char *argv[])
   float_default_map["swath_width"] = 1000;
   help_map["swath_width"] = {  "float","1000","Width in metres of the swath along the channel that is used to find terraces","Make this wider if you want terraces far from the channel."};
 
+  float_default_map["swath_bin_spacing"] = 100;
+  help_map["swath_bin_spacing"] = {  "float","1000","The spacing of the bins in metres that are used to calculate statistics along the swath.","Should be at least a few times bigger than swath_point_spacing or the pixel size of the DEM."};
+
   bool_default_map["print_swath_raster"] = false;
   help_map["print_swath_raster"] = {  "bool","false","Prints the raster of the swath used to find terraces","Good for bug checking to make sure the correct river is being sampled"};
 
@@ -391,6 +394,7 @@ int main (int nNumberofArgs,char *argv[])
   //
   //=========================================================================
   // First we need to test for filtering
+  cout << endl << endl << endl;
   cout << "====================================================" << endl;
   cout << " I need to check for filtering. " << endl;
   string filtered_prefix = DATA_DIR+DEM_ID+"_filtered";
@@ -580,56 +584,77 @@ int main (int nNumberofArgs,char *argv[])
   //=========================================================================
   if ( this_bool_map["extract_single_channel"])
   {
+    cout << endl << endl << endl;
+    cout << "I am going to extract a channel before I get to the floodplain analysis." << endl;
+    cout << "If you chose this option you can use it to search along terraces. " << endl;
+    cout << endl << endl << endl;
+    
     string filename = OUT_DIR+OUT_ID+"_swath_channel_nodes.csv";
     ifstream test_single_chan(filename.c_str());
     if (test_single_chan)
     {
-      cout << "I found a channel file already. I'll just load that" << endl;
+      cout << "I found a channel file already. I'll just load that later when you need it." << endl;
+      cout << "If you updated information about the single channel" << endl;
+      cout << "YOU NEED TO DELETE THE FILE and run this again. " << endl;
     }
     else
     {
-      cout << "I am going to extract a channel. " << endl;
-      cout << "To do this I need to get the flow info object, which will take a little while." << endl;
-      cout << "Also I am assuming your first point is the upstream point" << endl;
-      cout << "and the second point is the downstream point." << endl;
-      cout << "If you don't have a downstream point" << endl;
-      cout << "I just use the first point as the source and follow it to" << endl;
-      cout << "the edge of the DEM." << endl;
+        int start_NI,downstream_NI;
+        bool end_node_in_csv = false;       
+        vector<int> NI_of_points;
 
-      cout << "I am reading points from the file: "+ this_string_map["channel_source_fname"] << endl;
-      LSDSpatialCSVReader CSVFile( RI, (DATA_DIR+this_string_map["channel_source_fname"]) );
+      if (this_string_map["channel_source_fname"] != "NULL")
+      {    
+        LSDRasterInfo this_RI(filled_topography);
+        cout << "I am reading points from the file: "+ this_string_map["channel_source_fname"] << endl;
+        LSDSpatialCSVReader CSVFile( this_RI, (DATA_DIR+this_string_map["channel_source_fname"]) );
 
-      // get the x and y locations of the points
-      vector<float> UTME;
-      vector<float> UTMN;
-      vector<double> latitudes = CSVFile.get_latitude();
-      vector<double> longitudes = CSVFile.get_longitude();
-      CSVFile.get_x_and_y_from_latlong(UTME,UTMN);
+        // get the x and y locations of the points
+        vector<float> UTME;
+        vector<float> UTMN;
+        vector<double> latitudes = CSVFile.get_latitude();
+        vector<double> longitudes = CSVFile.get_longitude();
 
-      int n_nodes = int(UTME.size());
-      bool end_node_in_csv = false;
-      if (n_nodes > 1)
+        CSVFile.get_x_and_y_from_latlong(UTME,UTMN);
+
+        NI_of_points =  CSVFile.get_nodeindices_from_lat_long(FlowInfo);
+
+        int n_nodes = NI_of_points.size();
+        if (n_nodes > 1)
+        {
+          end_node_in_csv = true;
+          cout << "You have given me a channel source file with a second node." << endl;
+          cout << "I am assuming this is an end node. " << endl;
+          cout << "I will search for this node." << endl;
+        }
+        // find the nearest channel to the starting node. This is necessary so that the start node is definitely in the centreline
+        // this is a bit of a pain because of the different flow infos...
+        int snapping_SO = 1;
+        int snapped_NI = ChanNetwork.find_nearest_downslope_channel(UTME[0], UTMN[0], snapping_SO, FlowInfo);
+        float snapped_UTME, snapped_UTMN;
+        FlowInfo.get_x_and_y_from_current_node(snapped_NI, snapped_UTME, snapped_UTMN);
+        start_NI = FlowInfo.get_node_index_of_coordinate_point(snapped_UTME, snapped_UTMN);
+        cout << "start ni " << start_NI << endl;
+        cout << snapped_UTME << " " << snapped_UTMN << endl;
+      }
+      else
       {
-        end_node_in_csv = true;
-        cout << "You have given me a channel source file with a second node." << endl;
-        cout << "I am assuming this is an end node. " << endl;
-        cout << "I will search for this node." << endl;
+        cout << "I didn't find a channel source, so I am going to route from the longest channel. " << endl;
+        // get the maximum elevation
+        int max_row,max_col;
+        float max_dist = DistanceFromOutlet.max_elevation(max_row,max_col);
+
+        start_NI = FlowInfo.get_NodeIndex_from_row_col(max_row,max_col);
       }
 
-      vector<int> NI_of_points =  CSVFile.get_nodeindices_from_lat_long(FlowInfo);
-
-      // flow path in NI
-      vector<int> final_channel_list;
-      vector<int> flow_path = FlowInfo.get_flow_path(UTME[0],UTMN[0]);
-      int downstream_NI;
+      vector<int> flow_path = FlowInfo.get_flow_path(start_NI);
+      cout << "n nodes " << int(flow_path.size()) << endl;
+      // loop through the flow path and find the node nearest to the end node (if one exists)
       if(end_node_in_csv)
       {
         // snap the lower point to a channel
         cout << "The search radius is: " << this_int_map["search_radius_nodes"] << endl;
-        downstream_NI = ChanNetwork.get_nodeindex_of_nearest_channel_for_specified_coordinates(UTME[1],UTMN[1],
-                            this_int_map["search_radius_nodes"],
-                            this_int_map["threshold_stream_order_for_snapping"],
-                            FlowInfo);
+        downstream_NI = FlowInfo.find_nearest_node_in_vector(NI_of_points[1], flow_path);
       }
       else
       {
@@ -640,6 +665,7 @@ int main (int nNumberofArgs,char *argv[])
 
       // travel down the flow path until you either reach the outlet node or
       // get to the end
+      vector<int> final_channel_list;
       for(int node = 0; node < int(flow_path.size()); node ++)
       {
         final_channel_list.push_back(flow_path[node]);
@@ -676,20 +702,21 @@ int main (int nNumberofArgs,char *argv[])
     }
   }
 
-//=========================================================================
-//                 .__   __  .__       .__                  
-//   _____  __ __|  |_/  |_|__|_____ |  |   ____          
-//  /     \|  |  \  |\   __\  \____ \|  | _/ __ \         
-// |  Y Y  \  |  /  |_|  | |  |  |_> >  |_\  ___/         
-// |__|_|  /____/|____/__| |__|   __/|____/\___  >        
-//       \/                   |__|             \/         
-//        .__                                .__          
-//   ____ |  |__ _____    ____   ____   ____ |  |   ______
-// _/ ___\|  |  \\__  \  /    \ /    \_/ __ \|  |  /  ___/
-// \  \___|   Y  \/ __ \|   |  \   |  \  ___/|  |__\___ \ 
-//  \___  >___|  (____  /___|  /___|  /\___  >____/____  >
-//      \/     \/     \/     \/     \/     \/          \/ 
-//=========================================================================
+  //=========================================================================
+  //
+  //.##...##..##..##..##......######..######..#####...##......######.
+  //.###.###..##..##..##........##......##....##..##..##......##.....
+  //.##.#.##..##..##..##........##......##....#####...##......####...
+  //.##...##..##..##..##........##......##....##......##......##.....
+  //.##...##...####...######....##....######..##......######..######.
+  //.................................................................
+  //..####...##..##...####...##..##..##..##..######..##.......####.. 
+  //.##..##..##..##..##..##..###.##..###.##..##......##......##..... 
+  //.##......######..######..##.###..##.###..####....##.......####.. 
+  //.##..##..##..##..##..##..##..##..##..##..##......##..........##. 
+  //..####...##..##..##..##..##..##..##..##..######..######...####..
+  //
+  //=========================================================================
   if(this_bool_map["extract_multiple_channels"])
   {
     cout << "I am going to extract multiple channels. " << endl;
@@ -758,21 +785,21 @@ int main (int nNumberofArgs,char *argv[])
     }
   }
 
-//-------------------------------------------------------------------------//
-//  __        ______   .__   __.   _______  _______     _______.___________.   
-// |  |      /  __  \  |  \ |  |  /  _____||   ____|   /       |           |   
-// |  |     |  |  |  | |   \|  | |  |  __  |  |__     |   (----`---|  |----`   
-// |  |     |  |  |  | |  . `  | |  | |_ | |   __|     \   \       |  |        
-// |  `----.|  `--'  | |  |\   | |  |__| | |  |____.----)   |      |  |        
-// |_______| \______/  |__| \__|  \______| |_______|_______/       |__|        
-                                                                            
-//   ______  __    __       ___      .__   __. .__   __.  _______  __          
-//  /      ||  |  |  |     /   \     |  \ |  | |  \ |  | |   ____||  |         
-// |  ,----'|  |__|  |    /  ^  \    |   \|  | |   \|  | |  |__   |  |         
-// |  |     |   __   |   /  /_\  \   |  . `  | |  . `  | |   __|  |  |         
-// |  `----.|  |  |  |  /  _____  \  |  |\   | |  |\   | |  |____ |  `----.    
-//  \______||__|  |__| /__/     \__\ |__| \__| |__| \__| |_______||_______| 
-//-------------------------------------------------------------------------//
+  //-------------------------------------------------------------------------//
+  //  __        ______   .__   __.   _______  _______     _______.___________.   
+  // |  |      /  __  \  |  \ |  |  /  _____||   ____|   /       |           |   
+  // |  |     |  |  |  | |   \|  | |  |  __  |  |__     |   (----`---|  |----`   
+  // |  |     |  |  |  | |  . `  | |  | |_ | |   __|     \   \       |  |        
+  // |  `----.|  `--'  | |  |\   | |  |__| | |  |____.----)   |      |  |        
+  // |_______| \______/  |__| \__|  \______| |_______|_______/       |__|        
+                                                                              
+  //   ______  __    __       ___      .__   __. .__   __.  _______  __          
+  //  /      ||  |  |  |     /   \     |  \ |  | |  \ |  | |   ____||  |         
+  // |  ,----'|  |__|  |    /  ^  \    |   \|  | |   \|  | |  |__   |  |         
+  // |  |     |   __   |   /  /_\  \   |  . `  | |  . `  | |   __|  |  |         
+  // |  `----.|  |  |  |  /  _____  \  |  |\   | |  |\   | |  |____ |  `----.    
+  //  \______||__|  |__| /__/     \__\ |__| \__| |__| \__| |_______||_______| 
+  //-------------------------------------------------------------------------//
   if(this_bool_map["extract_longest_channel"])
   {
     cout << "I am going to extract the longest channel in the DEM." << endl;
@@ -786,50 +813,62 @@ int main (int nNumberofArgs,char *argv[])
     cout << " BL Junction: " << baselevel_junction << endl;
 
     // get the source of this baselevel node
-    LSDIndexChannel LongestChan = ChanNetwork.generate_longest_index_channel_in_basin(baselevel_junction, FlowInfo,
-                                        DistanceFromOutlet);
-    
-    // write the whole channel to a CSV
-    string out_filename = OUT_ID+"_longest_channel";
-    LongestChan.write_channel_to_csv(OUT_DIR, out_filename, FlowInfo, DistanceFromOutlet, filled_topography);
+    vector<int> this_long_channel =  ChanNetwork.generate_longest_nodeindex_channel_in_basin(baselevel_junction, FlowInfo,
+            DistanceFromOutlet);
+
+    cout << "writing to a csv file" << endl;
+
+    string out_filename = OUT_ID+"_swath_channel_longest";
+    FlowInfo.print_vector_of_nodeindices_to_csv_file_with_latlong(this_long_channel,
+                      OUT_DIR, out_filename,filled_topography, DistanceFromOutlet,
+                      DA_d8);
+
+
+    if ( this_bool_map["convert_csv_to_geojson"])
+    {
+      string in_name = OUT_DIR+OUT_ID+"_swath_channel_longest_nodes.csv";
+      cout << "Printing the geojson of the swath channel." << endl;
+      string gjson_name = OUT_DIR+OUT_ID+"_swath_channel_longest.geojson";
+      LSDSpatialCSVReader thiscsv(in_name);
+      thiscsv.print_data_to_geojson(gjson_name);
+    }
+
 
     // just write the starting and ending nodes to a csv
-    ofstream source_out;
-    string source_out_fname = OUT_DIR+OUT_ID+"_longest_channel_source_points.csv";
-    source_out.open(source_out_fname.c_str());
-    source_out << "id,latitude,longitude" << endl;
-
+    //ofstream source_out;
+    //string source_out_fname = OUT_DIR+OUT_ID+"_longest_channel_source_points.csv";
+    //source_out.open(source_out_fname.c_str());
+    //source_out << "id,latitude,longitude" << endl;
     // get lat and longitude of source and outlet nodes
-    LSDCoordinateConverterLLandUTM Converter;
-    vector<double> X_coords, Y_coords;
-    double lat, lon;
-    LongestChan.get_coordinates_of_channel_nodes(X_coords, Y_coords, FlowInfo);
+    //LSDCoordinateConverterLLandUTM Converter;
+    //vector<double> X_coords, Y_coords;
+    //double lat, lon;
+    //LongestChan.get_coordinates_of_channel_nodes(X_coords, Y_coords, FlowInfo);
     // source node
-    FlowInfo.get_lat_and_long_locations(X_coords.front(), Y_coords.front(), lat, lon, Converter);
-    source_out << "1," << lat << "," << lon << endl;
+    //FlowInfo.get_lat_and_long_locations(X_coords.front(), Y_coords.front(), lat, lon, Converter);
+    //source_out << "1," << lat << "," << lon << endl;
     // outlet node
-    FlowInfo.get_lat_and_long_locations(X_coords.back(), Y_coords.back(), lat, lon, Converter);
-    source_out << "2," << lat << "," << lon << endl;
-
-    source_out.close();
+    //FlowInfo.get_lat_and_long_locations(X_coords.back(), Y_coords.back(), lat, lon, Converter);
+    //source_out << "2," << lat << "," << lon << endl;
+    //source_out.close();
 
   }
 
   //=========================================================================
   //
-  // o      'O         o  o                      Oo                   o
-  // O       o        O  O                      o  O                 O              o
-  // o       O        o  o                     O    o                o
-  // o       o        O  O                    oOooOoOo               O
-  // O      O' .oOoO' o  o  .oOo. O   o       o      O 'OoOo. .oOoO' o  O   o .oOo  O  .oOo
-  // `o    o   O   o  O  O  OooO' o   O       O      o  o   O O   o  O  o   O `Ooo. o  `Ooo.
-  //  `o  O    o   O  o  o  O     O   o       o      O  O   o o   O  o  O   o     O O      O
-  //   `o'     `OoO'o Oo Oo `OoO' `OoOO       O.     O  o   O `OoO'o Oo `OoOO `OoO' o' `OoO'
-  //                                  o                                     o
-  //                               OoO'                                  OoO'
+  //.######..##..##..######..#####....####....####...######.                        
+  //.##.......####.....##....##..##..##..##..##..##....##...                        
+  //.####......##......##....#####...######..##........##...                        
+  //.##.......####.....##....##..##..##..##..##..##....##...                        
+  //.######..##..##....##....##..##..##..##...####.....##...                        
+  //........................................................                        
+  //.######..##.......####....####...#####...#####...##.......####...######..##..##.
+  //.##......##......##..##..##..##..##..##..##..##..##......##..##....##....###.##.
+  //.####....##......##..##..##..##..##..##..#####...##......######....##....##.###.
+  //.##......##......##..##..##..##..##..##..##......##......##..##....##....##..##.
+  //.##......######...####....####...#####...##......######..##..##..######..##..##.
   //
   //=========================================================================
-
   cout << endl << endl << "=========================================================" << endl;
   cout << "In this analysis (lsdtt-valley-metrics) I automatically extract floodplains" << endl;
   cout << "I am going to extract several rasters for you." << endl;
@@ -891,8 +930,12 @@ int main (int nNumberofArgs,char *argv[])
 
     if(this_bool_map["use_absolute_thresholds"])
     {
+      cout << endl << endl << endl << "--------------------------------------------" << endl;
+      cout << "I am going to calculate the floodplain pixels using absolute thresholds for slope and relief." << endl;
       relief_threshold = this_int_map["relief_threshold"];
       slope_threshold = this_float_map["slope_threshold"];
+      cout << "Thresholds are R: " << relief_threshold << " S: " << slope_threshold << endl;
+      cout << "--------------------------------------------" << endl << endl << endl << endl;
     }
     else
     {
@@ -962,12 +1005,12 @@ int main (int nNumberofArgs,char *argv[])
   cout << "=========================================================" << endl << endl;
 
   //=============================================================================================
-  //                     _       _              _  _                                     _                        _       _                             
-  //   __ __   __ _     | |     | |     ___    | || |    o O O   __      ___    _ _     | |_      _ _    ___     | |     (_)    _ _      ___      o O O 
-  //   \ V /  / _` |    | |     | |    / -_)    \_, |   o       / _|    / -_)  | ' \    |  _|    | '_|  / -_)    | |     | |   | ' \    / -_)    o      
-  //   _\_/_  \__,_|   _|_|_   _|_|_   \___|   _|__/   TS__[O]  \__|_   \___|  |_||_|   _\__|   _|_|_   \___|   _|_|_   _|_|_  |_||_|   \___|   TS__[O] 
-  // _|"""""|_|"""""|_|"""""|_|"""""|_|"""""|_| """"| {======|_|"""""|_|"""""|_|"""""|_|"""""|_|"""""|_|"""""|_|"""""|_|"""""|_|"""""|_|"""""| {======| 
-  // "`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-'./o--000'"`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-'./o--000' 
+  //
+  //.##..##...####...##......##......######..##..##...........####...######..##..##..######..#####...######..##......######..##..##..######.
+  //.##..##..##..##..##......##......##.......####...........##..##..##......###.##....##....##..##..##......##........##....###.##..##.....
+  //.##..##..######..##......##......####......##............##......####....##.###....##....#####...####....##........##....##.###..####...
+  //..####...##..##..##......##......##........##............##..##..##......##..##....##....##..##..##......##........##....##..##..##.....
+  //...##....##..##..######..######..######....##.............####...######..##..##....##....##..##..######..######..######..##..##..######.
   //
   //=============================================================================================
   if(this_bool_map["get_valley_centreline"])
@@ -984,6 +1027,9 @@ int main (int nNumberofArgs,char *argv[])
     {
 
   	  cout << "I have not found a centreline file so I need to generate one." << endl;
+      cout << "This differs from a single channel in that it goes down the centre of the valley" << endl;
+      cout << "and not down the channel pathway. " << endl;
+      cout << "See Clubb et al 2022 ESURF https://doi.org/10.5194/esurf-10-437-2022 for details." << endl;
   	  cout << "First what I will do is take the floodplain and punch a nodata raster" << endl;
       LSDRaster Punched = Floodplain.get_NoData_FloodplainRaster(filled_topography);
       string punched_name = OUT_DIR+OUT_ID+"_Punched";
@@ -1030,24 +1076,8 @@ int main (int nNumberofArgs,char *argv[])
         river_path = river_path.MapAlgebra_subtract(trough);
         LSDRaster carved_topography = river_path.Breaching_Lindsay2016();
         river_path = carved_topography.fill(this_float_map["min_slope_for_fill"]);
-        
-        // We keep track of the trough additions so at the end we add these back on except for the last one
-        // this means that the depth of the middle of the trough should be set by the trough_scaling_factor
-        // and not related to the number of loops
-        // if (i < n_loops-2)
-        // {
-        //   add_trough = add_trough.MapAlgebra_add(trough);
-        // }
       }
 
-      //river_path = river_path.MapAlgebra_add(add_trough);
-      //river_path.AdjustElevation(this_float_map["river_depth"]);
-
-
-      // Now merge the rasters
-      //cout << "Combining rasters." << endl;
-      //LSDRaster topo_copy = topography_raster;
-      //topo_copy.OverwriteRaster(river_path);
 
       string imposedriver_R_name = OUT_DIR+OUT_ID+"_RiverTrough";
       //topo_copy.write_raster(imposedriver_R_name,DEM_extension); 
@@ -1065,78 +1095,118 @@ int main (int nNumberofArgs,char *argv[])
         hs_raster.write_raster(hs_fname,DEM_extension);
       }
 
-      // Now we need the flow path
+      // Now we need the flow path this is a new flow info object that includes 
+      // the trough topography. 
       cout << "\t Flow routing for centreline. Note this is memory intensive. If your DEM is very large you may get a segmentation fault here..." << endl;
       // get a flow info object
       LSDFlowInfo FI(boundary_conditions,river_path);
       cout << "Finished flow routing." << endl; 
 
       // get the junction network
-      int trough_threshold = 1;
-      LSDIndexRaster FA = FlowInfo.write_NContributingNodes_to_LSDIndexRaster();
+      //int trough_threshold = 1;
+      //LSDIndexRaster FA = FlowInfo.write_NContributingNodes_to_LSDIndexRaster();
+
+      cout << "I need to calculate the flow distance now." << endl;
+      LSDRaster FD = FI.distance_from_outlet();
+      LSDRaster DA = FI.write_DrainageArea_to_LSDRaster();
+      cout << "Got the dist from outlet and DA" << endl;
+
 
       // now get the starting node for the flow path from your csv file
-      // this is assuming you want a single channel
       int start_NI, downstream_NI;
       bool end_node_in_csv = false;
       vector<int> NI_of_points;
-      if (this_bool_map["extract_single_channel"] || this_bool_map["extract_longest_channel"])
+      vector<int> flow_path;
+      if (this_bool_map["extract_single_channel"])
       {
-        cout << "I am reading points from the file: "+ this_string_map["channel_source_fname"] << endl;
-        LSDSpatialCSVReader CSVFile( RI, (DATA_DIR+this_string_map["channel_source_fname"]) );
-
-        // get the x and y locations of the points
-        vector<float> UTME;
-        vector<float> UTMN;
-        vector<double> latitudes = CSVFile.get_latitude();
-        vector<double> longitudes = CSVFile.get_longitude();
-        CSVFile.get_x_and_y_from_latlong(UTME,UTMN);
-
-        NI_of_points =  CSVFile.get_nodeindices_from_lat_long(FI);
-
-        int n_nodes = NI_of_points.size();
-        if (n_nodes > 1)
+        if (this_string_map["channel_source_fname"] != "NULL")
         {
-          end_node_in_csv = true;
-          cout << "You have given me a channel source file with a second node." << endl;
-          cout << "I am assuming this is an end node. " << endl;
-          cout << "I will search for this node." << endl;
+          cout << "I am reading points from the file: "+ this_string_map["channel_source_fname"] << endl;
+          LSDSpatialCSVReader CSVFile( RI, (DATA_DIR+this_string_map["channel_source_fname"]) );
+
+          cout << "Because I am reading a channel source file, I am switching off the longest channel." << endl;
+          this_bool_map["extract_longest_channel"] = false;
+
+          // get the x and y locations of the points
+          vector<float> UTME;
+          vector<float> UTMN;
+          vector<double> latitudes = CSVFile.get_latitude();
+          vector<double> longitudes = CSVFile.get_longitude();
+          CSVFile.get_x_and_y_from_latlong(UTME,UTMN);
+
+          NI_of_points =  CSVFile.get_nodeindices_from_lat_long(FI);
+
+          int n_nodes = NI_of_points.size();
+          if (n_nodes > 1)
+          {
+            end_node_in_csv = true;
+            cout << "You have given me a channel source file with a second node." << endl;
+            cout << "I am assuming this is an end node. " << endl;
+            cout << "I will search for this node." << endl;
+          }
+          // find the nearest channel to the starting node. This is necessary so that the start node is definitely in the centreline
+          // this is a bit of a pain because of the different flow infos...
+          int snapping_SO = 1;
+          int snapped_NI = ChanNetwork.find_nearest_downslope_channel(UTME[0], UTMN[0], snapping_SO, FlowInfo);
+          float snapped_UTME, snapped_UTMN;
+          FlowInfo.get_x_and_y_from_current_node(snapped_NI, snapped_UTME, snapped_UTMN);
+          start_NI = FI.get_node_index_of_coordinate_point(snapped_UTME, snapped_UTMN);
+          cout << "start ni " << start_NI << endl;
+          cout << "easting: "<< snapped_UTME << " northing: " << snapped_UTMN << endl;
         }
-        // find the nearest channel to the starting node. This is necessary so that the start node is definitely in the centreline
-        // this is a bit of a pain because of the different flow infos...
-        int snapping_SO = 1;
-        int snapped_NI = ChanNetwork.find_nearest_downslope_channel(UTME[0], UTMN[0], snapping_SO, FlowInfo);
-        float snapped_UTME, snapped_UTMN;
-        FlowInfo.get_x_and_y_from_current_node(snapped_NI, snapped_UTME, snapped_UTMN);
-        start_NI = FI.get_node_index_of_coordinate_point(snapped_UTME, snapped_UTMN);
-        cout << "start ni " << start_NI << endl;
-        cout << snapped_UTME << " " << snapped_UTMN << endl;
-      }
-      else
-      {
-  		  cout << "I didn't find a channel source, so I am going to route from the highest elevation in the river path. " << endl;
-        // get the maximum elevation
-        int max_row,max_col;
-        float max_elev = river_path.max_elevation(max_row,max_col);
+        else if (this_bool_map["extract_longest_channel"])
+        {
+          cout << "You have chosen to extract the longest channel in the dataset. " << endl;       
+          int long_row, long_col;
+          float longest_dist = FD.max_elevation(long_row,long_col);
 
-        start_NI = FI.get_NodeIndex_from_row_col(max_row,max_col);
-      }
+          start_NI = FI.get_NodeIndex_from_row_col(long_row,long_col);
+          downstream_NI = -1;
+        }
+        else
+        {
+          cout << "I didn't find a channel source, so I am going to route from the longest channel in the river path. " << endl;
+          // get the maximum elevation
+          int long_row, long_col;
+          float longest_dist = FD.max_elevation(long_row,long_col);
 
-      vector<int> flow_path = FI.get_flow_path(start_NI);
-      cout << "n nodes " << int(flow_path.size()) << endl;
-      // loop through the flow path and find the node nearest to the end node (if one exists)
-      if(end_node_in_csv)
-      {
-        // snap the lower point to a channel
-        cout << "The search radius is: " << this_int_map["search_radius_nodes"] << endl;
-        downstream_NI = FI.find_nearest_node_in_vector(NI_of_points[1], flow_path);
-      }
-      else
-      {
-        // There is no end node in the csv so we set the end node to a pixel that does not exist
-        cout << "You didn't specify a downstream node, I'll follow down to the outlet" << endl;
-        downstream_NI = -1;
-      }
+          start_NI = FI.get_NodeIndex_from_row_col(long_row,long_col);
+          downstream_NI = -1;
+        }
+
+        flow_path = FI.get_flow_path(start_NI);
+        if( int(flow_path.size()) < 10)
+        {
+          cout << endl << endl << "======================================" << endl;
+          cout << "n nodes in the intitial flow path for the centreline is: " << int(flow_path.size()) << endl;
+          cout << "This is small and the routing through hte valley centre may have not worked" << endl;
+          cout << "You can try increasing the trough_scaling_factor to get a deeper channel trough" << endl;
+          cout << "Default is 0.1 but you can raise this to 0.25 or even 0.5 in extreme cases" << endl;
+          cout << "======================================" << endl << endl;
+        }
+        
+        // loop through the flow path and find the node nearest to the end node (if one exists)
+        if(end_node_in_csv)
+        {
+          // snap the lower point to a channel
+          cout << "The search radius is: " << this_int_map["search_radius_nodes"] << endl;
+          downstream_NI = FI.find_nearest_node_in_vector(NI_of_points[1], flow_path);
+          cout << "Found nearest downstream node. it is: " << downstream_NI << endl;
+          if (downstream_NI = -9999)
+          {
+            downstream_NI = -1;
+          }
+        }
+        else
+        {
+          // There is no end node in the csv so we set the end node to a pixel that does not exist
+          cout << "You didn't specify a downstream node, I'll follow down to the outlet" << endl;
+          downstream_NI = -1;
+        }
+      }  // end extract channel loop
+
+
+
 
       // travel down the flow path until you either reach the outlet node or
       // get to the end
@@ -1159,13 +1229,9 @@ int main (int nNumberofArgs,char *argv[])
         }
       }
 
-      cout << "I need to calculate the flow distance now." << endl;
-      LSDRaster FD = FI.distance_from_outlet();
-      LSDRaster DA = FI.write_DrainageArea_to_LSDRaster();
-      cout << "Got the dist from outlet and DA" << endl;
 
       string fname = OUT_ID+"_valley_centreline";
-      FI.print_vector_of_nodeindices_to_csv_file_with_latlong(flow_path,OUT_DIR, fname,
+      FI.print_vector_of_nodeindices_to_csv_file_with_latlong(final_channel_list,OUT_DIR, fname,
                                                               river_path, FD, DA);      
 
       if ( this_bool_map["convert_csv_to_geojson"])
@@ -1191,7 +1257,7 @@ int main (int nNumberofArgs,char *argv[])
     if (this_bool_map["extract_multiple_channels"])
     {
       cout << "You chose to extract multiple channels earlier in this routine." << endl;
-      cout << "I am assuming you want to use those channel so I am overriding" << endl;
+      cout << "I am assuming you want to use those channels so I am overriding" << endl;
       cout << "Your valley_points_csv filename." << endl;
 
       LSDSpatialCSVReader CSVFile( RI, (DATA_DIR+this_string_map["channel_source_fname"]) );
@@ -1226,7 +1292,7 @@ int main (int nNumberofArgs,char *argv[])
 
       }
     }
-    if (this_bool_map["extract_all_channels"])
+    else if (this_bool_map["extract_all_channels"])
     {
       cout << endl << endl << "=========================================================" << endl;
       cout << "I am going to calculate width for all channels in the DEM. This might be slow. " << endl;
@@ -1264,7 +1330,7 @@ int main (int nNumberofArgs,char *argv[])
         cout << "You chose to extract the longest channel earlier in this routine." << endl;
         cout << "I am assuming you want to use that channel so I am overriding" << endl;
         cout << "Your valley_points_csv filename." << endl;
-        this_string_map["valley_points_csv"] = OUT_DIR+OUT_ID+"_longest_channel_index_chan.csv";
+        this_string_map["valley_points_csv"] = OUT_DIR+OUT_ID+"_swath_channel_longest_nodes.csv";
       }
       if (this_bool_map["get_valley_centreline"])
       {
@@ -1306,19 +1372,44 @@ int main (int nNumberofArgs,char *argv[])
   //=========================================================================
   if (this_bool_map["get_terraces"])
   {
+    cout << endl << endl << endl << "===============================================" << endl;
+    cout << "Let me compute some terraces for you" << endl;
+    
     // Read in the channel
     if (this_bool_map["extract_single_channel"])
     {
       cout << "You chose to extract a single channel earier in this routine." << endl;
       cout << "I am assuming you want to use that channel so I am overriding" << endl;
       cout << "Your valley_points_csv filename." << endl;
+      cout << "I am also overriding instructions to extract the longest channel," << endl;
+      cout << "valley centreline, and a uder defined valley points csv" << endl;
+      cout << "That is, extract single channel takes precedence over other methods." << endl;
+      this_bool_map["extract_longest_channel"] = false; 
+      this_bool_map["get_valley_centreline"] = false;
+      this_bool_map["use_valley_csv_for_terraces"] = false;
       this_string_map["valley_points_csv"] = OUT_DIR+OUT_ID+"_swath_channel_nodes.csv";
+    }
+    else if (this_bool_map["extract_longest_channel"])
+    {
+      cout << "You chose to extract the longest channel earier in this routine." << endl;
+      cout << "I am assuming you want to use that channel so I am overriding" << endl;
+      cout << "options for the valley centreline and a valley csv." << endl;
+      this_bool_map["get_valley_centreline"] = false;
+      this_bool_map["use_valley_csv_for_terraces"] = false;
+      this_string_map["valley_points_csv"] = OUT_DIR+OUT_ID+"_swath_channel_longest_nodes.csv";      
+    }
+    else if (this_bool_map["get_valley_centreline"])
+    {
+      cout << "I am going to use the file designated by the valley centreline" << endl;
+      cout << "that you calculated previously to calculate relief. " << endl;
+      cout << "I am overriding instructions to use a valley csv" << endl;
+      this_bool_map["use_valley_csv_for_terraces"] = false;      
+      this_string_map["valley_points_csv"] = OUT_DIR+OUT_ID+"__valley_centreline_nodes.csv";
     }
     else if (this_bool_map["use_valley_csv_for_terraces"])
     {
-      cout << "I am going to use the file designated by valley_points_csv" << endl;
-      cout << "to calculate relief. " << endl;
-      cout << "This could just be a channel network." << endl;
+      cout << "I am going to use the file designated by the user suppied" << endl;
+      cout << "valley_points_csv, which is:  " << this_string_map["valley_points_csv"] << endl;
     }
     else
     {
@@ -1401,11 +1492,12 @@ int main (int nNumberofArgs,char *argv[])
     }
     else
     {
+      cout << endl << endl << "I am calculating the swath raster. This is computationally expensive and might take a while." << endl;
       vector< LSDRaster > swath_rasters = filled_topography.find_nearest_point_from_list_of_points_with_relief(spaced_eastings, spaced_northings, spaced_distances, this_float_map["swath_width"]);
 
       vector<int> channel_node_list = CSVFile.data_column_to_int("id");
       // now get the channel relief along the swath
-      LSDRaster swath_channel_relief = swath_rasters[3];
+      swath_channel_relief = swath_rasters[3];
 
       string relief_fname = "_swath_channel_relief";
       swath_channel_relief.write_raster(OUT_DIR+OUT_ID+relief_fname, DEM_extension);     
@@ -1416,7 +1508,7 @@ int main (int nNumberofArgs,char *argv[])
     // remove any stupid slope values
     LSDRaster Slope_new = Slope.mask_to_nodata_using_threshold(mask_threshold, below);
 
-    bool debug_terrace = true;
+    bool debug_terrace = false;
     if(debug_terrace)
     {
       LSDRasterInfo SC_RI(swath_channel_relief);
@@ -1427,8 +1519,13 @@ int main (int nNumberofArgs,char *argv[])
 
     }
     // get the terrace pixels
+    cout << endl << "-----------------" << endl;
     cout << "Printing the terraces tagged by their terrace number" << endl;
+    cout << "The minimum terrace height is the relief threshold plus user defined minimum_terrace_height, the latter of which is the height above the floodplain." << endl;
+    cout << "The floodplains are under: " << relief_threshold << " and the height_above_this is: " << this_float_map["minimum_terrace_height"] << endl;
+
     float terrace_relief_threshold = relief_threshold+this_float_map["minimum_terrace_height"];
+    cout << "So top of terraces will be at: " << terrace_relief_threshold << " m and bottom at: " << this_float_map["minimum_terrace_height"] << endl;
     LSDTerrace Terraces(swath_channel_relief, Slope_new, ChanNetwork, FlowInfo, terrace_relief_threshold, slope_threshold, this_int_map["minimum_patch_size"], this_int_map["threshold_SO"], this_float_map["minimum_terrace_height"]);
     LSDIndexRaster ConnectedComponents = Terraces.print_ConnectedComponents_to_Raster();
     string CC_ext = "_terraces";
@@ -1441,14 +1538,14 @@ int main (int nNumberofArgs,char *argv[])
     string R_ext = "_terrace_relief";
     TerraceRelief.write_raster((OUT_DIR+OUT_ID+R_ext), DEM_extension);
 
-    //cout << "\t Testing connected components" << endl;
-    //vector <vector <float> > CC_vector = TestSwath.get_connected_components_along_swath(ConnectedComponents, RasterTemplate, this_int_map["NormaliseToBaseline"]);
+    string swath_data_prefix = OUT_DIR+OUT_ID+"_categorised";
+    bool we_dont_need_to_do_this_again = false;
+    cout << "Making the final terrace swath" << endl;
+    TerraceRelief.make_swaths_from_categorised(spaced_eastings, spaced_northings,spaced_distances, this_float_map["swath_width"],
+                                this_float_map["swath_bin_spacing"], swath_data_prefix, we_dont_need_to_do_this_again,
+                                ConnectedComponents);
 
-    // print the terrace information to a csv
-    //string csv_fname = "_terrace_info.csv";
-    //string full_csv_name = DATA_DIR+DEM_ID+csv_fname;
-    //cout << "The full csv filename is: " << full_csv_name << endl;
-    //Terraces.print_TerraceInfo_to_csv(full_csv_name, filled_topography, swath_channel_relief, FlowInfo, TestSwath);
+
   }
 
   // Done, check how long it took

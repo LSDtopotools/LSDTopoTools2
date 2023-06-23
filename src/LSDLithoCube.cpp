@@ -441,9 +441,7 @@ void LSDLithoCube::ingest_litho_data(string filename)
   // get the header. Print and discard.
   string str;
   getline(data_in,str);
-  //getline(data_in,str);
   cout << "The header is: " << str << endl;
-  getline(data_in,str);
   cout << "Let me get the data for you." << endl;
   cout << "If this is a big file loading it will take a little time." << endl;
 
@@ -477,6 +475,42 @@ void LSDLithoCube::ingest_litho_data(string filename)
       }
     }
   }
+}
+
+
+// Get a count of all the strat keys in the lithocube. 
+map<int,int> LSDLithoCube::get_strat_key_counts()
+{
+
+  map<int,int> strat_map;
+  int this_strat;
+
+  // get the counts and put them in a map
+  for (int row = 0; row<NRows; row++)
+  {
+    for (int col = 0; col<NCols; col++)
+    {
+      for (int layer = 0; layer< NLayers; layer++)
+      {
+        this_strat = LithoLayers[layer][row][col];
+        if (strat_map.find(this_strat) == strat_map.end()) 
+        {
+          strat_map[this_strat] = 1;
+        } 
+        else 
+        {
+          strat_map[this_strat]++;
+        }
+      }
+    }
+  }
+
+  // print the counts to screen. 
+  for(std::map<int,int>::iterator it = strat_map.begin(); it != strat_map.end(); ++it) 
+  {
+    cout << "Strat_code: " << it->first << " with count: " << it->second << endl;
+  }  
+  return strat_map;
 }
 
 
@@ -1163,7 +1197,8 @@ void LSDLithoCube::convert_EC_to_K_file(vector<float> K_values, string EC_to_K_o
   EC_to_K_out << "13," << K_values[3] << endl; 
   EC_to_K_out << "14," << K_values[2] << endl; 
   EC_to_K_out << "15," << K_values[3] << endl; 
-  EC_to_K_out << "-9999," << K_values[2] << endl; 
+  EC_to_K_out << "-9999," << K_values[2] << endl;
+  EC_to_K_out << "-99999," << K_values[2] << endl; 
   
   EC_to_K_out.close();
 }

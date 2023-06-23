@@ -88,7 +88,7 @@
 int main (int nNumberofArgs,char *argv[])
 {
 
-  string version_number = "0.8";
+  string version_number = "0.9";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -822,7 +822,7 @@ int main (int nNumberofArgs,char *argv[])
       cout << "I'm afraid I can't do any cosmogenic computations without this information." << endl;
       cout << "Make sure you designate the cosmo_parameter_prefix in the parameter file." << endl;
 
-      cout << "I can still print a production raste or a pressure raster from here though." << endl;
+      cout << "I can still print a production raster or a pressure raster from here though." << endl;
       cout << "I am switching off the other analyses." << endl;
       this_bool_map["check_cosmo_basins"] = false;
       this_bool_map["spawn_cosmo_basins"] = false;
@@ -1375,6 +1375,13 @@ int main (int nNumberofArgs,char *argv[])
       cout << "I am implementing a transient column. " << endl;
       cout << "This requires a transient erosion file." << endl;
       cout << "See the help file for the format of this file." << endl;
+      cout << "It is a csv with three columns with headers: " << endl;
+      cout << "time,rate,removal" << endl;
+      cout << "time is the time before present of the change. So must be increasing in time" << endl;
+      cout << "rate erosion rate in m per year." << endl;
+      cout << "removal is a depth of removal in the past." << endl;
+      cout << "removal will be triggered if the subsequent time is the same as the past time, otherwise ignored" << endl; 
+      cout << "The last row is the erosion rate as the background and must have a time of -9999" << endl;
 
       LSDParticleColumn PartCol;
 

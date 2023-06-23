@@ -68,7 +68,7 @@
 int main (int nNumberofArgs,char *argv[])
 {
 
-  string version_number = "0.8";
+  string version_number = "0.9";
   string citation = "http://doi.org/10.5281/zenodo.4577879";
 
   cout << "=========================================================" << endl;
@@ -241,7 +241,7 @@ int main (int nNumberofArgs,char *argv[])
   help_map["swath_points_csv"] = {  "string","swath.csv","The name of the csv file for swath mapping. It can be the start and (optional) end point of the swath channel or a series of points that form a polyline that serves as the baseline for the swath.","Filename needs to include the csv extension and have latitude and longitude in the column headers."};
 
   float_default_map["swath_point_spacing"] = 500;
-  help_map["swath_point_spacing"] = {  "float","500","Only used by calcualte_swath_along_line. How closely spaced the points are (in metres) along the baseline.","If this number is large (many times the DEM resolution) the swath will have an irregular edge so this should be close to the DEM resolution."};
+  help_map["swath_point_spacing"] = {  "float","500","Only used by calculate_swath_along_line. How closely spaced the points are (in metres) along the baseline.","If this number is large (many times the DEM resolution) the swath will have an irregular edge so this should be close to the DEM resolution."};
 
   float_default_map["swath_bin_spacing"] = 1000;
   help_map["swath_bin_spacing"] = {  "float","1000","The spacing of the bins in metres that are used to calculate statistics along the swath.","Should be at least a few times bigger than swath_point_spacing or the pixel size of the DEM."};
@@ -394,7 +394,10 @@ int main (int nNumberofArgs,char *argv[])
   help_map["print_directional_gradients"] = {  "bool","false","Prints two rasters: the x and y direction gradients after polynomial fitting.","Part of surface fitting metrics."};
 
   bool_default_map["calculate_basin_statistics"] = false;
-  help_map["calculate_basin_statistics"] = {  "bool","false","Prints some statistics for each basin. SMM needs to check what this does.","Part of surface fitting metrics."};
+  help_map["calculate_basin_statistics"] = {  "bool","false","Prints some statistics for each basin. does mean, median, MAD and other stuff.","You should supply basin locations."};
+
+  bool_default_map["print_basin_perimeters"] = false;
+  help_map["print_basin_perimeters"] = {"bool","false","Prints some basin perimeters with elevations.","You will get out an odered csv file."};
 
   //========================================================
   // Window size estimation
@@ -513,6 +516,9 @@ int main (int nNumberofArgs,char *argv[])
 
   bool_default_map["print_stream_order_raster"] = false;
   help_map["print_stream_order_raster"] = {  "bool","false","Prints a raster with _SO in filename with stream orders of channel in the appropriate pixel.","Generates a big file so we suggest printing the network to csv."};
+
+  bool_default_map["print_flow_direction_raster"] = false;
+  help_map["print_flow_direction_raster"] = {  "bool","false","Prints a raster with the arcmap flow direction codes.","Codes are 32  64  128 for NW N NE, 16 0 1 for W none W, 8 4 2 for SW S SE."};
 
   bool_default_map["print_channels_to_csv"] = false;
   help_map["print_channels_to_csv"] = {  "bool","false","Prints the channel network to a csv file.","This version produces smaller files than the raster version."};
@@ -674,7 +680,14 @@ int main (int nNumberofArgs,char *argv[])
   help_map["print_junction_angles_to_csv_in_basins"] = {  "bool","false","Prints a csv with the locations of the junctions within selected basins and associated statistics.","csv file contains junction angles; bending angles; areas; gradients; and other information."};
 
   float_default_map["SA_vertical_interval"] = 10;
-  help_map["SA_vertical_interval"] = {  "float","10","This is used in both slope-area routines and also junction angle routines. It sets the vertical drop over which the gradient is measured and the junction angle is measured on points between a tributary within the height and the junction.","For S-A analysis the value should be greater than the vertical uncertainty of your DEM. For junction angles if you set this to a large number it will measure angles between the junction the donor junctions and the receiver junction."};
+  help_map["SA_vertical_interval"] = {  "float","10","This is used in both slope-area routines and also junction angle and junction bearing routines. It sets the vertical drop over which the gradient is measured and the junction angle is measured on points between a tributary within the height and the junction.","For S-A analysis the value should be greater than the vertical uncertainty of your DEM. For junction angles if you set this to a large number it will measure angles between the junction the donor junctions and the receiver junction."};
+
+  // This is for the angles of each
+  bool_default_map["print_segment_bearings_and_gradients_to_csv"] = false;
+  help_map["print_segment_bearings_and_gradients_to_csv"] = {  "bool","false","Prints a csv with ALL the locations of channel segments (denoted by their upstream junction) giving their bearing and their gradient.","csv file contains bearings, stream orders, gradients, and other information."};
+
+  bool_default_map["print_segment_bearings_and_gradients_to_csv_in_basins"] = false;
+  help_map["print_segment_bearings_and_gradients_to_csv_in_basins"] = {  "bool","false","Prints a csv with the locations of channel segments (denoted by their upstream junction) giving their bearing and their gradient within selected basins and associated statistics.","csv file contains bearings, stream orders, gradients, and other information."};
 
 
   // Now for connectivity
@@ -787,6 +800,12 @@ int main (int nNumberofArgs,char *argv[])
 
   cout << "Read filename is: " <<  DATA_DIR+DEM_ID << endl;
   cout << "Write filename is: " << OUT_DIR+OUT_ID << endl;
+
+  if(this_string_map["basin_outlet_csv"]!= "NULL")
+  {
+    cout << "You gave me a basin outlet file, I am going to assume you want to select basins from outlets." << endl;
+    this_bool_map["get_basins_from_outlets"] = true;
+  }
 
   // A little switch to find basins if you supply an outlet file
   if( this_bool_map["get_basins_from_outlets"] )
@@ -2091,6 +2110,7 @@ int main (int nNumberofArgs,char *argv[])
         || this_bool_map["print_MD_drainage_area_raster"]
         || this_bool_map["print_fill_raster"]
         || this_bool_map["print_stream_order_raster"]
+        || this_bool_map["print_flow_direction_raster"]
         || this_bool_map["print_channels_to_csv"]
         || this_bool_map["print_junction_index_raster"]
         || this_bool_map["print_junctions_to_csv"]
@@ -2098,6 +2118,7 @@ int main (int nNumberofArgs,char *argv[])
         || this_bool_map["print_channel_tips_raster"]
         || this_bool_map["print_chi_data_maps"]
         || this_bool_map["print_junction_angles_to_csv"]
+        || this_bool_map["print_segment_bearings_and_gradients_to_csv"]
         || this_bool_map["extract_single_channel"]
         || this_bool_map["remove_nodes_influenced_by_edge"]
         || this_bool_map["isolate_pixels_draining_to_fixed_channel"]
@@ -2174,6 +2195,14 @@ int main (int nNumberofArgs,char *argv[])
     // get a flow info object
     LSDFlowInfo FlowInfo(boundary_conditions,filled_topography);
     cout << "Finished flow routing." << endl;
+
+    if (this_bool_map["print_flow_direction_raster"])
+    {
+      cout << "Let me print the flow direction raster. It will use the ArcMap conventions for flow directions."  << endl;
+      string direction_raster_name = OUT_DIR+OUT_ID+"_FlowDirection";
+      LSDIndexRaster FlowDir = FlowInfo.write_FlowDirection_to_LSDIndexRaster_Arcformat();
+      FlowDir.write_raster(direction_raster_name,raster_ext);
+    }
 
     if (this_bool_map["remove_nodes_influenced_by_edge"])
     {
@@ -2491,6 +2520,7 @@ int main (int nNumberofArgs,char *argv[])
         || this_bool_map["print_channel_tips_raster"]
         || this_bool_map["print_chi_data_maps"]
         || this_bool_map["print_junction_angles_to_csv"]
+        || this_bool_map["print_segment_bearings_and_gradients_to_csv"]
         || this_bool_map["extract_ridges"]
         || this_bool_map["calculate_hypsometric_integral"]
         || this_bool_map["clip_raster_to_basins"])
@@ -2620,7 +2650,9 @@ int main (int nNumberofArgs,char *argv[])
         cout << "I am testing the junction angle code with elevations." << endl;
         string JAngles_csv_name = OUT_DIR+OUT_ID+"_FULL_JAngles.csv";
         vector<int> JunctionList;
-        JunctionNetwork.print_complete_junction_angles_to_csv(JunctionList, FlowInfo, filled_topography, FlowDistance, this_float_map["SA_vertical_interval"], JAngles_csv_name);
+        JunctionNetwork.print_complete_junction_angles_to_csv(JunctionList, FlowInfo, 
+                                                              filled_topography, FlowDistance, 
+                                                              this_float_map["SA_vertical_interval"], JAngles_csv_name);
 
         if ( this_bool_map["convert_csv_to_geojson"])
         {
@@ -2628,6 +2660,35 @@ int main (int nNumberofArgs,char *argv[])
           LSDSpatialCSVReader thiscsv(JAngles_csv_name);
           thiscsv.print_data_to_geojson(gjson_name);
         }
+      }
+
+
+      if( this_bool_map["print_segment_bearings_and_gradients_to_csv"] )
+      {
+        // Calculate flow distance
+        LSDRaster FlowDistance = FlowInfo.distance_from_outlet();
+
+        cout << endl << endl << "=======================================" << endl;
+        cout << "I am running the segment bearing routine. Use this to make a fun stereonet of channels and see if it matches your rocks!" << endl;
+        string SBearings_csv_name = OUT_DIR+OUT_ID+"_segment_bearings.csv";
+        vector<int> JunctionList;
+        JunctionNetwork.print_complete_segment_bearings_and_gradients_to_csv(JunctionList, FlowInfo, 
+                                                              filled_topography, FlowDistance, 
+                                                              this_float_map["SA_vertical_interval"], SBearings_csv_name);
+
+
+        if ( this_bool_map["convert_csv_to_geojson"])
+        {
+          string gjson_name = OUT_DIR+OUT_ID+"_segment_bearings.geojson";
+          LSDSpatialCSVReader thiscsv(SBearings_csv_name);
+          thiscsv.print_data_to_geojson(gjson_name);
+
+          string gjson_vector_name = OUT_DIR+OUT_ID+"_segment_bearings_vector.geojson";
+          JunctionNetwork.print_complete_segment_bearings_and_gradients_to_geojson(JunctionList, FlowInfo, 
+                                                              filled_topography, FlowDistance, 
+                                                              this_float_map["SA_vertical_interval"], gjson_vector_name);
+        }  
+        cout << "Done with segment bearing routine." << endl << endl << endl;
       }
 
 
@@ -2662,9 +2723,21 @@ int main (int nNumberofArgs,char *argv[])
       if(this_bool_map["find_basins"] ||
          this_bool_map["print_chi_data_maps"] ||
          this_bool_map["calculate_basin_statistics"] ||
-         this_bool_map["clip_raster_to_basins"])
+         this_bool_map["clip_raster_to_basins"] ||
+         this_bool_map["print_basin_perimeters"] ||
+         this_bool_map["print_segment_bearings_and_gradients_to_csv_in_basins"] ||
+         this_bool_map["print_junction_angles_to_csv_in_basins"])
       {
+        
         cout << "I am now going to extract some basins for you." << endl;
+        cout << "The trigger for this is: " << endl;
+        if (this_bool_map["find_basins"]) {cout << "find basins" << endl;}
+        if (this_bool_map["print_chi_data_maps"]) {cout << "print_chi_data_maps" << endl;}
+        if (this_bool_map["calculate_basin_statistics"]) {cout << "calculate_basin_statistics" << endl;}
+        if (this_bool_map["clip_raster_to_basins"]) {cout << "clip_raster_to_basins" << endl;}
+        if (this_bool_map["print_basin_perimeters"]) {cout << "print_basin_perimeters" << endl;}
+        if (this_bool_map["print_segment_bearings_and_gradients_to_csv_in_basins"]) {cout << "print_segment_bearings_and_gradients_to_csv_in_basins" << endl;}
+        if (this_bool_map["print_junction_angles_to_csv_in_basins"]) {cout << "print_junction_angles_to_csv_in_basins" << endl;}
         vector<int> BaseLevelJunctions;
         vector<int> BaseLevelJunctions_Initial;
 
@@ -2866,6 +2939,49 @@ int main (int nNumberofArgs,char *argv[])
 
 
 
+        // Now for junction angles only within the selected basins
+        if(this_bool_map["print_segment_bearings_and_gradients_to_csv_in_basins"])
+        {
+          vector<int> basin_junctions;
+          for(int i = 0; i< N_BaseLevelJuncs; i++)
+          {
+            // get the upslope junctions
+            vector<int> these_junctions = JunctionNetwork.get_upslope_junctions(BaseLevelJunctions[i]);
+
+            // now append these to the master list
+            basin_junctions.insert( basin_junctions.end(), these_junctions.begin(), these_junctions.end() );
+          }
+
+          int N_basin_junctions = int(basin_junctions.size());
+          if (N_basin_junctions == 0)
+          {
+            cout << "I am stopping here since I don't have any junctions over which to measure the segment gradients and bearings." << endl;
+            exit(EXIT_FAILURE);
+          }
+
+          // Calculate flow distance
+          LSDRaster FlowDistance = FlowInfo.distance_from_outlet();
+
+          cout << "I am running the segment bearing routine. Use this to ." << endl;
+          string SBearings_csv_name = OUT_DIR+OUT_ID+"_segment_bearings.csv";
+          JunctionNetwork.print_complete_segment_bearings_and_gradients_to_csv(basin_junctions, FlowInfo, 
+                                                                filled_topography, FlowDistance, 
+                                                                this_float_map["SA_vertical_interval"], SBearings_csv_name);
+
+
+          if ( this_bool_map["convert_csv_to_geojson"])
+          {
+            string gjson_name = OUT_DIR+OUT_ID+"_segment_bearings.geojson";
+            LSDSpatialCSVReader thiscsv(SBearings_csv_name);
+            thiscsv.print_data_to_geojson(gjson_name);
+
+            string gjson_vector_name = OUT_DIR+OUT_ID+"_segment_bearings_vector.geojson";
+            JunctionNetwork.print_complete_segment_bearings_and_gradients_to_geojson(basin_junctions, FlowInfo, 
+                                                                filled_topography, FlowDistance, 
+                                                                this_float_map["SA_vertical_interval"], SBearings_csv_name);
+          }         
+        }
+
         // Now to clip basins
         if(this_bool_map["clip_raster_to_basins"])
         {
@@ -2938,6 +3054,39 @@ int main (int nNumberofArgs,char *argv[])
             }
             bd_out << endl;
 
+          }
+        }
+
+        // Now we get the basin perimeters
+        if (this_bool_map["print_basin_perimeters"])
+        {
+          cout << "I am now going to print some basin perimeter information." << endl;
+          cout << "The will be a different file for each basin, use the basin info csv to tell you which basin is which." << endl;
+          cout << "The basin perimeter files will have the basin number in the filename" << endl;
+
+          int N_BL = int(BaseLevelJunctions.size());
+          for(int bsn = 0; bsn < N_BL; bsn++)
+          {
+            cout << "Processing basin " << bsn << " of " << N_BL << endl;
+            LSDBasin ThisBasin(BaseLevelJunctions[bsn], FlowInfo, JunctionNetwork);
+
+            // dont need this stuff it is in the printing routine
+            ThisBasin.set_Perimeter(FlowInfo);
+            string basin_perimeter_fname = OUT_DIR+OUT_ID+"_basin_"+itoa(bsn)+"_perimeter.csv";
+            ThisBasin.print_perimeter_to_csv(FlowInfo, basin_perimeter_fname);            
+            
+            
+            ThisBasin.clean_perimeter(FlowInfo);
+            basin_perimeter_fname = OUT_DIR+OUT_ID+"_basin_"+itoa(bsn)+"_CLEANperimeter.csv";
+            ThisBasin.print_perimeter_to_csv(FlowInfo, basin_perimeter_fname);     
+
+
+            vector<int> Reordered_nodes = ThisBasin.order_perimeter_nodes_SMM(FlowInfo); 
+            basin_perimeter_fname = OUT_DIR+OUT_ID+"_basin_"+itoa(bsn)+"_CLEAN_ORDEREDperimeter.csv";
+            string add_column_name = "elevation(m)";
+            FlowInfo.print_vector_of_nodeindices_to_csv_file_with_latlong(Reordered_nodes, basin_perimeter_fname, filled_topography, add_column_name);
+
+            //ThisBasin.print_perimeter_hypsometry_to_csv(FlowInfo, basin_perimeter_fname, filled_topography);
           }
         }
 

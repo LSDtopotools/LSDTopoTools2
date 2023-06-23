@@ -873,7 +873,7 @@ void LSDBasin::set_Perimeter(LSDFlowInfo& FlowInfo)
   {
 
     FlowInfo.retrieve_current_row_and_col(BasinNodes[q], i, j);
-      BasinData[i][j] = BasinNodes[q];
+    BasinData[i][j] = BasinNodes[q];
 
   }
 
@@ -884,31 +884,31 @@ void LSDBasin::set_Perimeter(LSDFlowInfo& FlowInfo)
     NDVCount = 0;
     // cout << i << "||" << j << endl;
 
-      if (i != 0 && j != 0 && i<NRows-1 && j < NCols-1)
-      {
-        //count border cells that are NDV
+    if (i != 0 && j != 0 && i<NRows-1 && j < NCols-1)
+    {
+      //count border cells that are NDV
 
-        if (BasinData[i-1][j-1] == NoDataValue){ ++NDVCount; }
-        if (BasinData[i][j-1] == NoDataValue){ ++NDVCount; }
-        if (BasinData[i+1][j-1] == NoDataValue){ ++NDVCount; }
-        if (BasinData[i-1][j] == NoDataValue){ ++NDVCount; }
-        if (BasinData[i+1][j] == NoDataValue){ ++NDVCount; }
-        if (BasinData[i-1][j+1] == NoDataValue){ ++NDVCount; }
-        if (BasinData[i][j+1] == NoDataValue){ ++NDVCount; }
-        if (BasinData[i+1][j+1] == NoDataValue){ ++NDVCount; }
+      if (BasinData[i-1][j-1] == NoDataValue){ ++NDVCount; }
+      if (BasinData[i][j-1] == NoDataValue){ ++NDVCount; }
+      if (BasinData[i+1][j-1] == NoDataValue){ ++NDVCount; }
+      if (BasinData[i-1][j] == NoDataValue){ ++NDVCount; }
+      if (BasinData[i+1][j] == NoDataValue){ ++NDVCount; }
+      if (BasinData[i-1][j+1] == NoDataValue){ ++NDVCount; }
+      if (BasinData[i][j+1] == NoDataValue){ ++NDVCount; }
+      if (BasinData[i+1][j+1] == NoDataValue){ ++NDVCount; }
 
-        if (NDVCount >= 1 && NDVCount < 8)
-        {  //increase the first value to get a simpler polygon  (changed to 1 by FJC 23/03/15 to get only internal hilltops.
-          //edge pixel                       // Otherwise not all external ridges were being excluded from the analysis).
-          I.push_back(i);
-          J.push_back(j);
-          B.push_back(BasinNodes[q]);
-        }
+      if (NDVCount >= 1 && NDVCount < 8)
+      {  //increase the first value to get a simpler polygon  (changed to 1 by FJC 23/03/15 to get only internal hilltops.
+        //edge pixel                       // Otherwise not all external ridges were being excluded from the analysis).
+        I.push_back(i);
+        J.push_back(j);
+        B.push_back(BasinNodes[q]);
       }
-      else
-      {
-        ++i;
-      }
+    }
+    else
+    {
+      ++i;
+    }
 
   }
 
@@ -916,8 +916,6 @@ void LSDBasin::set_Perimeter(LSDFlowInfo& FlowInfo)
   Perimeter_i = I;
   Perimeter_j = J;
   Perimeter_nodes = B;
-
-
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -966,10 +964,6 @@ void LSDBasin::print_perimeter_hypsometry_to_csv(LSDFlowInfo& FlowInfo, string p
 
   set_Perimeter(FlowInfo);
   clean_perimeter(FlowInfo);
-
-  // TESTING
-  string perim_test = "/home/clubb/Data_for_papers/drainage_capture/Santa_Cruz/FUCK_THIS.csv";
-  print_perimeter_to_csv(FlowInfo, perim_test);
 
   //  open the file
   ofstream perim_out;
@@ -1100,10 +1094,10 @@ vector<int> LSDBasin::order_perimeter_nodes(LSDFlowInfo& FlowInfo)
     next_j = Outlet_j+1;
     cout << "The closest node is to the SE" << endl;
   }
-  else if (PerimeterNodes[Outlet_i-1][Outlet_j+1] == 1) // southwest
+  else if (PerimeterNodes[Outlet_i+1][Outlet_j-1] == 1) // southwest
   {
-    next_i = Outlet_i-1;
-    next_j = Outlet_j+1;
+    next_i = Outlet_i+1;
+    next_j = Outlet_j-1;
     cout << "The closest node is to the SW" << endl;
   }
   else
@@ -1356,6 +1350,209 @@ vector<int> LSDBasin::order_perimeter_nodes(LSDFlowInfo& FlowInfo)
 
   return sorted_nodes;
 }
+
+
+
+
+
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// Order perimeter nodes from the outlet
+// Must CLEAN the perimeter first using clean_perimeter function
+// FJC 16/01/18
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<int> LSDBasin::order_perimeter_nodes_SMM(LSDFlowInfo& FlowInfo)
+{
+  // first clean the perimeter nodes
+  //clean_perimeter(FlowInfo);
+  cout << "Ordering the perimeter nodes..." << endl;
+  vector<int> sorted_nodes;
+  Array2D<int> PerimeterNodes(NRows,NCols,0);
+
+  // first get the outlet node
+  int outlet_node = get_Outlet_node();
+  int outlet_row, outlet_col;
+  FlowInfo.retrieve_current_row_and_col(outlet_node, outlet_row, outlet_col);
+  Outlet_i = outlet_row;
+  Outlet_j = outlet_col;
+  cout << "The outlet node is: " << outlet_node << endl;
+
+  // get an array of perimeter nodes
+  for (int i = 0; i < int(Perimeter_nodes.size()); i++)
+  {
+    int this_row, this_col;
+    FlowInfo.retrieve_current_row_and_col(Perimeter_nodes[i], this_row, this_col);
+    PerimeterNodes[this_row][this_col] = 1;
+  }
+  // The outlet always needs to be in the perimeter
+  // The outlet is already added so it gets an increment to 2 
+  PerimeterNodes[Outlet_i][Outlet_j] = 2;
+  cout << "Got the array of perimeter nodes" << endl;
+  cout << "The outlet row and column are: " << Outlet_i << "," << Outlet_j << endl;
+
+  // push back the outlet node, node 0
+  sorted_nodes.push_back(outlet_node);
+  int next_i, next_j;
+  bool first_node = true; // bool to check if you're at the first node. This makes a difference because if you're at the first node we don't want to go back to the outlet.
+
+
+  // N, S, E, and W will always be the shortest distances, so do these first
+  if (PerimeterNodes[Outlet_i][Outlet_j-1] == 1) // West
+  {
+    next_i = Outlet_i;
+    next_j = Outlet_j-1;
+    //cout << "The closest node is to the west" << endl;
+  }
+  else if (PerimeterNodes[Outlet_i-1][Outlet_j] == 1) // North
+  {
+    next_i = Outlet_i-1;
+    next_j = Outlet_j;
+    //cout << "The closest node is to the north" << endl;
+  }
+  else if (PerimeterNodes[Outlet_i][Outlet_j+1] == 1)  // east
+  {
+    next_i = Outlet_i;
+    next_j = Outlet_j+1;
+    //cout << "The closest node is to the east" << endl;
+  }
+  else if (PerimeterNodes[Outlet_i+1][Outlet_j] == 1)  // south
+  {
+    next_i = Outlet_i+1;
+    next_j = Outlet_j;
+    //cout << "The closest node is to the south" << endl;
+  }
+  else if (PerimeterNodes[Outlet_i-1][Outlet_j-1] == 1) // northwest
+  {
+    next_i = Outlet_i-1;
+    next_j = Outlet_j-1;
+    //cout << "The closest node is to the NW" << endl;
+  }
+  else if (PerimeterNodes[Outlet_i-1][Outlet_j+1] == 1) // northeast
+  {
+    next_i = Outlet_i-1;
+    next_j = Outlet_j+1;
+    //cout << "The closest node is to the NE" << endl;
+  }
+  else if (PerimeterNodes[Outlet_i+1][Outlet_j+1] == 1) // southeast
+  {
+    next_i = Outlet_i+1;
+    next_j = Outlet_j+1;
+    //cout << "The closest node is to the SE" << endl;
+  }
+  else if (PerimeterNodes[Outlet_i+1][Outlet_j-1] == 1) // southwest
+  {
+    next_i = Outlet_i+1;
+    next_j = Outlet_j-1;
+    //cout << "The closest node is to the SW" << endl;
+  }
+  else
+  {
+    //cout << "None of these were perimeter nodes, oops" << endl;
+  }
+
+  cout << "The first node is at: " << next_i << "," << next_j << endl;
+
+  // push back the next node to the sorted node vector
+  int next_node = FlowInfo.retrieve_node_from_row_and_column(next_i, next_j);
+  sorted_nodes.push_back(next_node);
+
+  bool reached_outlet = false;
+  int this_i, this_j;
+  // now start at the outlet node and find the nearest perimeter node.
+  while (reached_outlet == false)
+  {
+    // start at the next node and find the one with the closest distance that
+    // hasn't already been visited
+    this_i = next_i;
+    this_j = next_j;
+    PerimeterNodes[this_i][this_j] = 2;
+
+    // N, S, E, and W will always be the shortest distances, so do these first
+    if (PerimeterNodes[this_i][this_j-1] == 1) // West
+    {
+      next_i = this_i;
+      next_j = this_j-1;
+      //cout << "The closest node is to the west" << endl;
+    }
+    else if (PerimeterNodes[this_i-1][this_j] == 1) // North
+    {
+      next_i = this_i-1;
+      next_j = this_j;
+      //cout << "The closest node is to the north" << endl;
+    }
+    else if (PerimeterNodes[this_i][this_j+1] == 1)  // east
+    {
+      next_i = this_i;
+      next_j = this_j+1;
+      //cout << "The closest node is to the east" << endl;
+    }
+    else if (PerimeterNodes[this_i+1][this_j] == 1)  // south
+    {
+      next_i = this_i+1;
+      next_j = this_j;
+      //cout << "The closest node is to the south" << endl;
+    }
+    else if (PerimeterNodes[this_i-1][this_j-1] == 1) // northwest
+    {
+      next_i = this_i-1;
+      next_j = this_j-1;
+      //cout << "The closest node is to the NW" << endl;
+    }
+    else if (PerimeterNodes[this_i-1][this_j+1] == 1) // northeast
+    {
+      next_i = this_i-1;
+      next_j = this_j+1;
+      //cout << "The closest node is to the NE" << endl;
+    }
+    else if (PerimeterNodes[this_i+1][this_j+1] == 1) // southeast
+    {
+      next_i = this_i+1;
+      next_j = this_j+1;
+      //cout << "The closest node is to the SE" << endl;
+    }
+    else if (PerimeterNodes[this_i+1][this_j-1] == 1) // southwest
+    {
+      next_i = this_i+1;
+      next_j = this_j-1;
+      //cout << "The closest node is to the SW" << endl;
+    }
+    else
+    {
+      reached_outlet = true;
+    }
+
+    //cout << "The next node is at: " << next_i << "," << next_j << endl;
+
+    if (!reached_outlet)
+    {
+      next_node = FlowInfo.retrieve_node_from_row_and_column(next_i, next_j);
+      sorted_nodes.push_back(next_node);
+    }
+  }
+
+  return sorted_nodes;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -2527,7 +2724,7 @@ void LSDBasin::organise_perimeter(LSDFlowInfo& flowpy)
 
   // TESTING FUNCTION, DELETE IT AFTERWARDS BORIS!!!!
   Perimeter_nodes = Perimeter_nodes_sorted;
-    print_perimeter_to_csv(flowpy, "/home/boris/Desktop/LSD/capture/sorbas/peritest_AFTER.csv");
+  print_perimeter_to_csv(flowpy, "/home/boris/Desktop/LSD/capture/sorbas/peritest_AFTER.csv");
 
 
 

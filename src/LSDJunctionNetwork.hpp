@@ -273,11 +273,16 @@ class LSDJunctionNetwork
 
 
   /// @brief This is a more complete function for junction angles
-  ///  It overwirtes two maps, containing all sorts of information about
+  ///  It overwrites two maps, containing all sorts of information about
   ///   the junction angles.
   ///  This is an overloaded version that gives some slope and flow distance information
   /// @param JunctionList a list of junctions
   /// @param FlowInfo an LSDFlowInfo object
+  /// @param Elevation The elevation of the studied landscape
+  /// @param FlowDistance The flow distance raster
+  /// @param vertical_interval A vertical interval over which gradient is measured
+  ///    note that both  this interval and the vertical offset between the junction pixel and the last pixel before the
+  ///    next junction are used to generate two gradients. 
   /// @param JA_int_info A map where the key is the junction number
   ///    and the vector is a series of integer data about that juction
   /// @param JA_float_info A map where the key is the junction number
@@ -376,6 +381,60 @@ class LSDJunctionNetwork
                                              LSDFlowInfo& FlowInfo, LSDRaster& Elevations,
                                              LSDRaster& FlowDistance, float vertical_interval,
                                              string csv_name);
+
+
+  /// @brief This calculates the channel bearings and gradients so you can make
+  ///   a stereonet using the channel segment information. 
+  /// @param JunctionList a list of junctions
+  /// @param FlowInfo an LSDFlowInfo object
+  /// @param Elevation The elevation of the studied landscape
+  /// @param FlowDistance The flow distance raster
+  /// @param vertical_interval A vertical interval over which gradient is measured
+  ///    note that both  this interval and the vertical offset between the junction pixel and the last pixel before the
+  ///    next junction are used to generate two gradients. 
+  /// @param JA_int_info A map where the key is the junction number
+  ///    and the vector is a series of integer data about that juction
+  /// @param JA_float_info A map where the key is the junction number
+  ///    and the vector is a series of float data about that juction
+  /// @author SMM
+  /// @date 01/06/2023
+  void calculate_segment_bearings_and_gradients_complete(vector<int> JunctionList,
+                                                            LSDFlowInfo& FlowInfo, LSDRaster& Elevation,
+                                                            LSDRaster& FlowDistance, float vertical_interval,
+                                                            map<int , vector<int> >& JA_int_info,
+                                                            map<int, vector<float> >& JA_float_info );
+
+
+  /// @brief This prints the bearings and gradients to a csv file
+  /// @param JunctionList The list of junctions to analyze. If this is an empty vector,
+  ///  the code analyses all junctions in the DEM
+  /// @param FlowInfo The LSDFlowInfo object
+  /// @param Elevations An elevation raster
+  /// @param FlowDistance A flow distance raster
+  /// @param vertical_interval: the vertical interval around which you want the slope measured
+  /// @param csv_name The name of the file. Needs full path and csv extension
+  /// @author SMM
+  /// @date 01/06/2023
+  void print_complete_segment_bearings_and_gradients_to_csv(vector<int> JunctionList,
+                                             LSDFlowInfo& FlowInfo, LSDRaster& Elevations,
+                                             LSDRaster& FlowDistance, float vertical_interval,
+                                             string csv_name);
+
+
+  /// @brief This prints the bearings and gradients to a geojson file
+  /// @param JunctionList The list of junctions to analyze. If this is an empty vector,
+  ///  the code analyses all junctions in the DEM
+  /// @param FlowInfo The LSDFlowInfo object
+  /// @param Elevations An elevation raster
+  /// @param FlowDistance A flow distance raster
+  /// @param vertical_interval: the vertical interval around which you want the slope measured
+  /// @param json_name The name of the file. Needs full path and geojson extension
+  /// @author SMM
+  /// @date 01/06/2023
+  void print_complete_segment_bearings_and_gradients_to_geojson(vector<int> JunctionList,
+                                                       LSDFlowInfo& FlowInfo, LSDRaster& Elevations,
+                                                       LSDRaster& FlowDistance, float vertical_interval,
+                                                       string json_name);
 
   /// @brief This gets the junction number of a given node.
   /// @param Node
@@ -754,6 +813,17 @@ class LSDJunctionNetwork
   /// @date 01/09/12
   LSDIndexChannel generate_longest_index_channel_from_junction(int outlet_junction,LSDFlowInfo& FInfo,LSDRaster& dist_from_outlet);
 
+  /// @brief This function extracts the longest channel originating from a junction number
+  /// outlet_junction.
+  /// @param outlet_junction Outlet of junction.
+  /// @param FInfo LSDFlowInfo object.
+  /// @param dist_from_outlet Distance from outlet junction.
+  /// @return nodeindex sequence of the channel
+  /// @author SMM
+  /// @date 11/06/23
+  vector<int> generate_longest_nodeindex_channel_from_junction(int outlet_junction, LSDFlowInfo& FInfo,
+                                        LSDRaster& dist_from_outlet);
+
   // this generates the longest channel in a basin. The basin starts where a channel of
   // some order intersects with a channel of higher order. So the bain includes the
   // basin junction, but also the channel flowing downstream from this basin
@@ -775,6 +845,30 @@ class LSDJunctionNetwork
   /// @author SMM
   /// @date 01/09/12
   LSDIndexChannel generate_longest_index_channel_in_basin(int basin_junction, LSDFlowInfo& FInfo,
+            LSDRaster& dist_from_outlet);
+
+
+  // this generates the longest channel in a basin. The basin starts where a channel of
+  // some order intersects with a channel of higher order. So the bain includes the
+  // basin junction, but also the channel flowing downstream from this basin
+  // junction
+  // It starts from the node of the receiver junction, so if one were to extract
+  // the basin from this node one would get a basin that starts one node upstream from
+  // the lowest node in this
+  /// @brief This generates the longest channel in a basin.
+  ///
+  /// @details The basin starts where a channel of some order intersects with a
+  /// channel of higher order. So the bain includes the basin junction, but also
+  /// the channel flowing downstream from this basin junction. It starts from the
+  /// node of the receiver junction, so if one were to extract the basin from
+  /// this node one would get a basin that starts one node upstream from the lowest node in this.
+  /// @param basin_junction
+  /// @param FInfo LSDFlowInfo object.
+  /// @param dist_from_outlet
+  /// @return nodeindex of the longest channel.
+  /// @author SMM
+  /// @date 11/06/23
+  vector<int> generate_longest_nodeindex_channel_in_basin(int basin_junction, LSDFlowInfo& FInfo,
             LSDRaster& dist_from_outlet);
 
   /// @brief This generates the upstream source nodes from a vector of basin junctions
